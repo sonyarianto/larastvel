@@ -2,16 +2,15 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use axum::{
+    handler::Handler,
     response::{Html, IntoResponse, Json},
-    routing::get,
+    routing::{delete, get, patch, post, put, MethodRouter},
     Router as AxumRouter,
 };
 
-use crate::foundation::Application;
-
 #[derive(Clone)]
 pub struct Registrar {
-    _app: Application,
+    router: Arc<Mutex<AxumRouter>>,
     routes: Arc<Mutex<Vec<RouteDefinition>>>,
     group_prefix: Arc<Mutex<Option<String>>>,
 }
@@ -25,32 +24,70 @@ pub struct RouteDefinition {
 }
 
 impl Registrar {
-    pub fn new(app: Application) -> Self {
+    pub(crate) fn new(
+        router: Arc<Mutex<AxumRouter>>,
+        routes: Arc<Mutex<Vec<RouteDefinition>>>,
+    ) -> Self {
         Self {
-            _app: app,
-            routes: Arc::new(Mutex::new(vec![])),
+            router,
+            routes,
             group_prefix: Arc::new(Mutex::new(None)),
         }
     }
 
-    pub fn get(&self, uri: &str, handler: impl IntoRouteHandler) {
-        self.add_route("GET", uri, handler);
+    pub fn get<H, T>(&self, uri: &str, handler: H)
+    where
+        H: Handler<T, ()> + IntoRouteHandler,
+        T: 'static,
+    {
+        let uri = self.resolve_uri(uri);
+        let name = handler.name();
+        let method_router = get(handler);
+        self.add_method_route("GET", &uri, method_router, &name);
     }
 
-    pub fn post(&self, uri: &str, handler: impl IntoRouteHandler) {
-        self.add_route("POST", uri, handler);
+    pub fn post<H, T>(&self, uri: &str, handler: H)
+    where
+        H: Handler<T, ()> + IntoRouteHandler,
+        T: 'static,
+    {
+        let uri = self.resolve_uri(uri);
+        let name = handler.name();
+        let method_router = post(handler);
+        self.add_method_route("POST", &uri, method_router, &name);
     }
 
-    pub fn put(&self, uri: &str, handler: impl IntoRouteHandler) {
-        self.add_route("PUT", uri, handler);
+    pub fn put<H, T>(&self, uri: &str, handler: H)
+    where
+        H: Handler<T, ()> + IntoRouteHandler,
+        T: 'static,
+    {
+        let uri = self.resolve_uri(uri);
+        let name = handler.name();
+        let method_router = put(handler);
+        self.add_method_route("PUT", &uri, method_router, &name);
     }
 
-    pub fn patch(&self, uri: &str, handler: impl IntoRouteHandler) {
-        self.add_route("PATCH", uri, handler);
+    pub fn patch<H, T>(&self, uri: &str, handler: H)
+    where
+        H: Handler<T, ()> + IntoRouteHandler,
+        T: 'static,
+    {
+        let uri = self.resolve_uri(uri);
+        let name = handler.name();
+        let method_router = patch(handler);
+        self.add_method_route("PATCH", &uri, method_router, &name);
     }
 
-    pub fn delete(&self, uri: &str, handler: impl IntoRouteHandler) {
-        self.add_route("DELETE", uri, handler);
+    pub fn delete<H, T>(&self, uri: &str, handler: H)
+    where
+        H: Handler<T, ()> + IntoRouteHandler,
+        T: 'static,
+    {
+        let uri = self.resolve_uri(uri);
+        let name = handler.name();
+        let method_router = delete(handler);
+        self.add_method_route("DELETE", &uri, method_router, &name);
     }
 
     pub fn view(&self, uri: &str, template: &str) {
@@ -68,30 +105,46 @@ impl Registrar {
         *self.group_prefix.lock().unwrap() = prev_prefix;
     }
 
-    fn add_route(&self, method: &str, uri: &str, _handler: impl IntoRouteHandler) {
+    fn resolve_uri(&self, uri: &str) -> String {
         let prefix = self.group_prefix.lock().unwrap().clone();
-        let full_uri = match &prefix {
+        match &prefix {
             Some(p) => format!("/{}{}", p.trim_start_matches('/'), uri),
-            None => uri.to_string(),
-        };
-
-        let def = RouteDefinition {
-            method: method.to_string(),
-            uri: full_uri,
-            handler_name: _handler.name(),
-            middleware: vec![],
-        };
-
-        self.routes.lock().unwrap().push(def);
+            None => {
+                if uri.starts_with('/') {
+                    uri.to_string()
+                } else {
+                    format!("/{}", uri)
+                }
+            }
+        }
     }
 
-    pub fn register_routes(&self, _app: Application) {
-        // Routes are registered by the kernel
+    fn add_method_route(
+        &self,
+        method: &str,
+        uri: &str,
+        method_router: MethodRouter,
+        handler_name: &str,
+    ) {
+        {
+            let mut router = self.router.lock().unwrap();
+            *router = std::mem::take(&mut *router).route(uri, method_router);
+        }
+        self.routes.lock().unwrap().push(RouteDefinition {
+            method: method.to_string(),
+            uri: uri.to_string(),
+            handler_name: handler_name.to_string(),
+            middleware: vec![],
+        });
     }
 
     pub fn build(&self) -> AxumRouter {
-        AxumRouter::new()
-            .route("/health", get(|| async { Json(serde_json::json!({"status": "ok"})) }))
+        let mut router = self.router.lock().unwrap();
+        let r = std::mem::take(&mut *router);
+        r.route(
+            "/health",
+            get(|| async { Json(serde_json::json!({"status": "ok"})) }),
+        )
     }
 
     pub fn list_routes(&self) -> Vec<RouteDefinition> {

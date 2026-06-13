@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use axum::Router as AxumRouter;
 use tracing::info;
 
 use crate::config::Config;
 use crate::console::ConsoleKernel;
 use crate::database::DatabaseManager;
-use crate::routing::Registrar;
+use crate::routing::{Registrar, RouteDefinition};
 
 pub trait ServiceProvider: Send + Sync {
     fn register(&self, app: &Application);
@@ -30,6 +31,8 @@ struct AppInner {
     db: Option<DatabaseManager>,
     base_path: PathBuf,
     booted: bool,
+    router: Arc<Mutex<AxumRouter>>,
+    routes: Arc<Mutex<Vec<RouteDefinition>>>,
 }
 
 impl Application {
@@ -44,6 +47,8 @@ impl Application {
             db: None,
             base_path: path,
             booted: false,
+            router: Arc::new(Mutex::new(AxumRouter::new())),
+            routes: Arc::new(Mutex::new(vec![])),
         }));
 
         Self { inner }
@@ -111,16 +116,17 @@ impl Application {
     }
 
     pub fn router(&self) -> Registrar {
-        Registrar::new(self.clone())
+        let inner = self.inner.lock().unwrap();
+        Registrar::new(inner.router.clone(), inner.routes.clone())
     }
 
     pub async fn run(self) {
         self.boot();
 
         let router = {
-            let r = Registrar::new(self.clone());
-            r.register_routes(self.clone());
-            r.build()
+            let inner = self.inner.lock().unwrap();
+            let registrar = Registrar::new(inner.router.clone(), inner.routes.clone());
+            registrar.build()
         };
 
         let addr = self
