@@ -141,7 +141,12 @@ impl Translator {
         }
     }
 
-    pub fn choice(&self, key: &str, count: i64, replace: Option<HashMap<String, String>>) -> String {
+    pub fn choice(
+        &self,
+        key: &str,
+        count: i64,
+        replace: Option<HashMap<String, String>>,
+    ) -> String {
         let template = self
             .resolve(key, &self.locale)
             .or_else(|| self.resolve(key, &self.fallback_locale))
@@ -161,17 +166,21 @@ impl Translator {
             || self.resolve(key, &self.fallback_locale).is_some()
     }
 
-pub fn has_for_locale(&self, key: &str, locale: &str) -> bool {
-    if locale == self.fallback_locale {
-        return self.fallback_translations.get(key).and_then(|v| v.as_str()).is_some();
-    }
-    if let Some(trans) = self.translations.get(locale) {
-        if trans.get(key).and_then(|v| v.as_str()).is_some() {
-            return true;
+    pub fn has_for_locale(&self, key: &str, locale: &str) -> bool {
+        if locale == self.fallback_locale {
+            return self
+                .fallback_translations
+                .get(key)
+                .and_then(|v| v.as_str())
+                .is_some();
         }
+        if let Some(trans) = self.translations.get(locale) {
+            if trans.get(key).and_then(|v| v.as_str()).is_some() {
+                return true;
+            }
+        }
+        false
     }
-    false
-}
 }
 
 pub fn set_locale(locale: &str) {
@@ -259,9 +268,7 @@ fn select_plural(template: &str, count: i64) -> String {
     for segment in &segments {
         let segment = segment.trim();
 
-        let extract = segment
-            .split_once(']')
-            .or_else(|| segment.split_once('}'));
+        let extract = segment.split_once(']').or_else(|| segment.split_once('}'));
 
         if let Some((range_part, message)) = extract {
             has_bracket = true;
@@ -303,7 +310,11 @@ fn select_plural(template: &str, count: i64) -> String {
         }
     }
 
-    segments.last().unwrap_or(&template).trim().replace(":count", &count.to_string())
+    segments
+        .last()
+        .unwrap_or(&template)
+        .trim()
+        .replace(":count", &count.to_string())
 }
 
 #[cfg(test)]
@@ -312,7 +323,9 @@ mod tests {
 
     fn setup_translator() -> Translator {
         let mut t = Translator::new("en", "en");
-        t.load_json("en", r#"{
+        t.load_json(
+            "en",
+            r#"{
             "hello": "Hello World",
             "greeting": "Hello :name",
             "auth": {
@@ -323,14 +336,18 @@ mod tests {
                 "welcome": "Welcome to :app"
             },
             "apples": "{0} No apples|{1} One apple|[2,*] :count apples"
-        }"#);
-        t.load_json("id", r#"{
+        }"#,
+        );
+        t.load_json(
+            "id",
+            r#"{
             "hello": "Halo Dunia",
             "greeting": "Halo :name",
             "auth": {
                 "failed": "Kredensial ini tidak cocok dengan catatan kami."
             }
-        }"#);
+        }"#,
+        );
         t
     }
 
@@ -370,7 +387,10 @@ mod tests {
     fn test_nested_dot_notation() {
         let t = setup_translator();
         let params = HashMap::from([("app".to_string(), "Larastvel".to_string())]);
-        assert_eq!(t.get("messages.welcome", Some(params)), "Welcome to Larastvel");
+        assert_eq!(
+            t.get("messages.welcome", Some(params)),
+            "Welcome to Larastvel"
+        );
     }
 
     #[test]
@@ -463,19 +483,28 @@ mod tests {
     #[test]
     fn test_global_fallback() {
         set_fallback_locale("en");
-        assert_eq!(super::super::translation::Translator::new("en", "en").fallback_locale(), "en");
+        assert_eq!(
+            super::super::translation::Translator::new("en", "en").fallback_locale(),
+            "en"
+        );
     }
 
     #[test]
     fn test_flatten_json() {
         let mut map = serde_json::Map::new();
-        map.insert("auth".to_string(), Value::Object({
-            let mut m = serde_json::Map::new();
-            m.insert("failed".to_string(), Value::String("Failed".to_string()));
-            m
-        }));
+        map.insert(
+            "auth".to_string(),
+            Value::Object({
+                let mut m = serde_json::Map::new();
+                m.insert("failed".to_string(), Value::String("Failed".to_string()));
+                m
+            }),
+        );
         let flat = flatten_json(&map, "");
-        assert_eq!(flat.get("auth.failed").and_then(|v| v.as_str()), Some("Failed"));
+        assert_eq!(
+            flat.get("auth.failed").and_then(|v| v.as_str()),
+            Some("Failed")
+        );
     }
 
     #[test]

@@ -40,7 +40,9 @@ impl CronExpression {
             && self.hour.matches(dt.hour() as i32)
             && self.day_of_month.matches(dt.day() as i32)
             && self.month.matches(dt.month() as i32)
-            && self.day_of_week.matches(dt.weekday().num_days_from_sunday() as i32)
+            && self
+                .day_of_week
+                .matches(dt.weekday().num_days_from_sunday() as i32)
     }
 }
 
@@ -63,7 +65,9 @@ impl CronField {
                 if parts.len() != 2 {
                     return Err(format!("Invalid step expression: {}", field));
                 }
-                let step: i32 = parts[1].parse().map_err(|_| format!("Invalid step: {}", parts[1]))?;
+                let step: i32 = parts[1]
+                    .parse()
+                    .map_err(|_| format!("Invalid step: {}", parts[1]))?;
                 if parts[0] == "*" {
                     Ok(CronField::Step(min, step))
                 } else if parts[0].contains('-') {
@@ -71,29 +75,44 @@ impl CronField {
                     if range_parts.len() != 2 {
                         return Err(format!("Invalid step range: {}", field));
                     }
-                    let start: i32 = range_parts[0].parse().map_err(|_| "Invalid range start".to_string())?;
-                    let end: i32 = range_parts[1].parse().map_err(|_| "Invalid range end".to_string())?;
+                    let start: i32 = range_parts[0]
+                        .parse()
+                        .map_err(|_| "Invalid range start".to_string())?;
+                    let end: i32 = range_parts[1]
+                        .parse()
+                        .map_err(|_| "Invalid range end".to_string())?;
                     Ok(CronField::StepRange(start, end, step))
                 } else {
-                    let start: i32 = parts[0].parse().map_err(|_| "Invalid step start".to_string())?;
+                    let start: i32 = parts[0]
+                        .parse()
+                        .map_err(|_| "Invalid step start".to_string())?;
                     Ok(CronField::StepRange(start, max, step))
                 }
             }
             _ if field.contains(',') => {
-                let values: Result<Vec<i32>, _> = field.split(',').map(|s| s.trim().parse::<i32>()).collect();
-                Ok(CronField::List(values.map_err(|_| format!("Invalid list: {}", field))?))
+                let values: Result<Vec<i32>, _> =
+                    field.split(',').map(|s| s.trim().parse::<i32>()).collect();
+                Ok(CronField::List(
+                    values.map_err(|_| format!("Invalid list: {}", field))?,
+                ))
             }
             _ if field.contains('-') => {
                 let parts: Vec<&str> = field.split('-').collect();
                 if parts.len() != 2 {
                     return Err(format!("Invalid range: {}", field));
                 }
-                let start: i32 = parts[0].parse().map_err(|_| "Invalid range start".to_string())?;
-                let end: i32 = parts[1].parse().map_err(|_| "Invalid range end".to_string())?;
+                let start: i32 = parts[0]
+                    .parse()
+                    .map_err(|_| "Invalid range start".to_string())?;
+                let end: i32 = parts[1]
+                    .parse()
+                    .map_err(|_| "Invalid range end".to_string())?;
                 Ok(CronField::Range(start, end))
             }
             _ => {
-                let val: i32 = field.parse().map_err(|_| format!("Invalid cron value: {}", field))?;
+                let val: i32 = field
+                    .parse()
+                    .map_err(|_| format!("Invalid cron value: {}", field))?;
                 Ok(CronField::Single(val))
             }
         }
@@ -113,7 +132,8 @@ impl CronField {
     }
 }
 
-type JobCallback = Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<(), JobError>> + Send>> + Send + Sync>;
+type JobCallback =
+    Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<(), JobError>> + Send>> + Send + Sync>;
 
 pub struct ScheduledEvent {
     pub cron: CronExpression,
@@ -310,7 +330,9 @@ impl ScheduleManager {
 
         for event in events {
             if event.is_due(&now) {
-                let result = tokio::runtime::Runtime::new().unwrap().block_on(event.run());
+                let result = tokio::runtime::Runtime::new()
+                    .unwrap()
+                    .block_on(event.run());
                 results.push(result);
             }
         }
@@ -346,8 +368,8 @@ impl ScheduleManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
     use crate::ShouldQueue;
+    use chrono::TimeZone;
 
     fn dt(y: i32, m: u32, d: u32, h: u32, min: u32) -> chrono::DateTime<chrono::Local> {
         chrono::Local
@@ -547,7 +569,9 @@ mod tests {
         assert_eq!(schedule.events().len(), 1);
 
         let event = schedule.events().into_iter().next().unwrap();
-        let result = tokio::runtime::Runtime::new().unwrap().block_on(event.run());
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(event.run());
         assert!(result.is_ok());
         assert!(flag.load(Ordering::SeqCst));
     }
@@ -602,7 +626,9 @@ mod tests {
     fn test_event_without_callback_errors() {
         let cron = parse_cron("* * * * *").unwrap();
         let event = ScheduledEvent::new(cron, "empty");
-        let result = tokio::runtime::Runtime::new().unwrap().block_on(event.run());
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(event.run());
         assert!(result.is_err());
     }
 }

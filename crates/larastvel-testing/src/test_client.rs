@@ -31,8 +31,8 @@ impl TestClient {
     }
 
     pub fn with_basic_auth(mut self, username: &str, password: &str) -> Self {
-        let encoded = base64::engine::general_purpose::STANDARD
-            .encode(format!("{}:{}", username, password));
+        let encoded =
+            base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", username, password));
         self.default_headers.insert(
             axum::http::header::AUTHORIZATION,
             HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap(),
@@ -121,8 +121,7 @@ impl TestClient {
 
     async fn request(&self, method: Method, uri: &str, body: Bytes) -> TestResponse {
         let empty = HeaderMap::new();
-        self.request_with_headers(method, uri, body, empty)
-            .await
+        self.request_with_headers(method, uri, body, empty).await
     }
 
     async fn request_with_headers(

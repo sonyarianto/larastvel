@@ -84,7 +84,9 @@ impl RateLimiter {
     }
 
     pub fn remaining(&self, identifier: &str) -> u64 {
-        self.config.max_attempts.saturating_sub(self.attempts(identifier))
+        self.config
+            .max_attempts
+            .saturating_sub(self.attempts(identifier))
     }
 
     pub fn too_many_attempts(&self, identifier: &str) -> bool {
@@ -230,22 +232,13 @@ pub async fn rate_limit_middleware(
 
 fn resolve_client_ip(req: &Request) -> String {
     let headers = req.headers();
-    if let Some(val) = headers
-        .get("X-Forwarded-For")
-        .and_then(|v| v.to_str().ok())
-    {
+    if let Some(val) = headers.get("X-Forwarded-For").and_then(|v| v.to_str().ok()) {
         return val.to_string();
     }
-    if let Some(val) = headers
-        .get("X-Real-IP")
-        .and_then(|v| v.to_str().ok())
-    {
+    if let Some(val) = headers.get("X-Real-IP").and_then(|v| v.to_str().ok()) {
         return val.to_string();
     }
-    if let Some(addr) = req
-        .extensions()
-        .get::<std::net::SocketAddr>()
-    {
+    if let Some(addr) = req.extensions().get::<std::net::SocketAddr>() {
         return addr.ip().to_string();
     }
     "unknown".to_string()
@@ -368,7 +361,12 @@ mod tests {
         let response = err.into_response();
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(
-            response.headers().get("Retry-After").unwrap().to_str().unwrap(),
+            response
+                .headers()
+                .get("Retry-After")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "30"
         );
     }

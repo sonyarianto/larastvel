@@ -817,7 +817,8 @@ impl MigrationTrait for Migration {
         todo!("Implement down migration");
     }
 }
-"#.to_string();
+"#
+    .to_string();
 
     let file_path = migrations_dir.join(format!("{}.rs", file_name));
     if file_path.exists() {
@@ -863,5 +864,8 @@ impl MigrationTrait for Migration {
 
 async fn run_schedule_command() {
     println!("{}", "Running scheduled tasks...".green().bold());
-    println!("{}", "  Register your schedule in your application's kernel.".dimmed());
+    println!(
+        "{}",
+        "  Register your schedule in your application's kernel.".dimmed()
+    );
 }

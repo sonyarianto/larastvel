@@ -58,4 +58,7 @@ jsonwebtoken = "9"
 regex = "1"
 serde_urlencoded = "0.7"
 hex = "0.4"
+hmac = "0.12"
+sha2 = "0.10"
+md-5 = "0.10"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls-tls"] }

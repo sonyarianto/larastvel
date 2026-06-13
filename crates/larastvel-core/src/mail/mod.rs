@@ -3,9 +3,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use lettre::{
-    message::header::ContentType,
-    transport::smtp::authentication::Credentials,
-    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    message::header::ContentType, transport::smtp::authentication::Credentials, AsyncSmtpTransport,
+    AsyncTransport, Message, Tokio1Executor,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -151,35 +150,30 @@ impl Mailer for SmtpMailer {
         }
 
         for addr in &mailable.to {
-            message_builder = message_builder
-                .to(
-                    addr.parse::<lettre::message::Mailbox>()
-                        .map_err(|e| MailError::Build(e.to_string()))?,
-                );
+            message_builder = message_builder.to(addr
+                .parse::<lettre::message::Mailbox>()
+                .map_err(|e| MailError::Build(e.to_string()))?);
         }
 
         for addr in &mailable.cc {
-            message_builder = message_builder
-                .cc(
-                    addr.parse::<lettre::message::Mailbox>()
-                        .map_err(|e| MailError::Build(e.to_string()))?,
-                );
+            message_builder = message_builder.cc(addr
+                .parse::<lettre::message::Mailbox>()
+                .map_err(|e| MailError::Build(e.to_string()))?);
         }
 
         for addr in &mailable.bcc {
-            message_builder = message_builder
-                .bcc(
-                    addr.parse::<lettre::message::Mailbox>()
-                        .map_err(|e| MailError::Build(e.to_string()))?,
-                );
+            message_builder = message_builder.bcc(
+                addr.parse::<lettre::message::Mailbox>()
+                    .map_err(|e| MailError::Build(e.to_string()))?,
+            );
         }
 
         if let Some(reply_to) = &mailable.reply_to {
-            message_builder = message_builder
-                .reply_to(
-                    reply_to.parse::<lettre::message::Mailbox>()
-                        .map_err(|e| MailError::Build(e.to_string()))?,
-                );
+            message_builder = message_builder.reply_to(
+                reply_to
+                    .parse::<lettre::message::Mailbox>()
+                    .map_err(|e| MailError::Build(e.to_string()))?,
+            );
         }
 
         let message = message_builder
@@ -346,15 +340,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_mailable_builder() {
-        let m = Mailable::new(
-            vec!["a@b.com".to_string()],
-            "Subject",
-            "Body",
-        )
-        .from("f@b.com")
-        .reply_to("r@b.com")
-        .cc(vec!["c@b.com".to_string()])
-        .bcc(vec!["d@b.com".to_string()]);
+        let m = Mailable::new(vec!["a@b.com".to_string()], "Subject", "Body")
+            .from("f@b.com")
+            .reply_to("r@b.com")
+            .cc(vec!["c@b.com".to_string()])
+            .bcc(vec!["d@b.com".to_string()]);
 
         assert_eq!(m.from, Some("f@b.com".to_string()));
         assert_eq!(m.reply_to, Some("r@b.com".to_string()));
@@ -421,16 +411,15 @@ mod tests {
         let mailer = LogMailer::new("log");
         let mailable = Mailable::new(vec![], "No To", "body");
         let result = mailer.send(mailable).await;
-        assert!(result.is_ok(), "LogMailer should not reject empty recipients");
+        assert!(
+            result.is_ok(),
+            "LogMailer should not reject empty recipients"
+        );
     }
 
     #[tokio::test]
     async fn test_mailable_html_constructor() {
-        let m = Mailable::html(
-            vec!["u@e.com".to_string()],
-            "HTML",
-            "<b>bold</b>",
-        );
+        let m = Mailable::html(vec!["u@e.com".to_string()], "HTML", "<b>bold</b>");
         assert_eq!(m.content_type, ContentType::TEXT_HTML);
         assert_eq!(m.subject, "HTML");
         assert_eq!(m.body, "<b>bold</b>");

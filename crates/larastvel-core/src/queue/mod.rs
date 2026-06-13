@@ -506,11 +506,11 @@ mod tests {
         let _c1 = counter.clone();
         let _c2 = counter.clone();
 
-            #[derive(Debug)]
-            struct OrderedJob {
-                id: usize,
-                results: Arc<Mutex<Vec<usize>>>,
-            }
+        #[derive(Debug)]
+        struct OrderedJob {
+            id: usize,
+            results: Arc<Mutex<Vec<usize>>>,
+        }
         #[async_trait]
         impl ShouldQueue for OrderedJob {
             async fn handle(&self) -> Result<(), JobError> {
@@ -524,8 +524,20 @@ mod tests {
         }
 
         let results = Arc::new(Mutex::new(Vec::new()));
-        queue.push(Box::new(OrderedJob { id: 1, results: results.clone() })).await.unwrap();
-        queue.push(Box::new(OrderedJob { id: 2, results: results.clone() })).await.unwrap();
+        queue
+            .push(Box::new(OrderedJob {
+                id: 1,
+                results: results.clone(),
+            }))
+            .await
+            .unwrap();
+        queue
+            .push(Box::new(OrderedJob {
+                id: 2,
+                results: results.clone(),
+            }))
+            .await
+            .unwrap();
 
         let job1 = queue.pop().await.unwrap();
         job1.handle().await.unwrap();
@@ -548,8 +560,20 @@ mod tests {
         assert_eq!(queue.count().await, 0);
 
         let handled = Arc::new(AtomicBool::new(false));
-        queue.push(Box::new(TestJob { name: "j1".to_string(), handled: handled.clone() })).await.unwrap();
-        queue.push(Box::new(TestJob { name: "j2".to_string(), handled: handled.clone() })).await.unwrap();
+        queue
+            .push(Box::new(TestJob {
+                name: "j1".to_string(),
+                handled: handled.clone(),
+            }))
+            .await
+            .unwrap();
+        queue
+            .push(Box::new(TestJob {
+                name: "j2".to_string(),
+                handled: handled.clone(),
+            }))
+            .await
+            .unwrap();
         assert_eq!(queue.count().await, 2);
 
         queue.pop().await;
@@ -560,7 +584,13 @@ mod tests {
     async fn test_queue_worker_process() {
         let queue = Arc::new(InMemoryQueue::new("worker"));
         let handled = Arc::new(AtomicBool::new(false));
-        queue.push(Box::new(TestJob { name: "w".to_string(), handled: handled.clone() })).await.unwrap();
+        queue
+            .push(Box::new(TestJob {
+                name: "w".to_string(),
+                handled: handled.clone(),
+            }))
+            .await
+            .unwrap();
 
         let worker = QueueWorker::new(queue);
         worker.process_next_job().await;
@@ -572,7 +602,13 @@ mod tests {
     async fn test_queue_worker_work_once() {
         let queue = Arc::new(InMemoryQueue::new("once"));
         let handled = Arc::new(AtomicBool::new(false));
-        queue.push(Box::new(TestJob { name: "once".to_string(), handled: handled.clone() })).await.unwrap();
+        queue
+            .push(Box::new(TestJob {
+                name: "once".to_string(),
+                handled: handled.clone(),
+            }))
+            .await
+            .unwrap();
 
         let worker = QueueWorker::new(queue);
         worker.work_once().await.unwrap();
@@ -828,15 +864,15 @@ mod tests {
             .expect("Failed to connect to in-memory SQLite");
 
         let resolver: JobResolver = Arc::new(|_, _| None);
-        let queue = DatabaseQueue::new("custom", db.clone(), resolver)
-            .with_table("custom_jobs");
+        let queue = DatabaseQueue::new("custom", db.clone(), resolver).with_table("custom_jobs");
         queue.ensure_table_exists().await.unwrap();
 
         use sea_orm::ConnectionTrait;
         let result = db
             .execute(sea_orm::Statement::from_string(
                 sea_orm::DatabaseBackend::Sqlite,
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_jobs'".to_string(),
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_jobs'"
+                    .to_string(),
             ))
             .await;
         assert!(result.is_ok());

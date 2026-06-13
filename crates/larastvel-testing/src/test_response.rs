@@ -140,7 +140,8 @@ impl TestResponse {
     pub fn assert_json(&self, expected: Value) -> &Self {
         let actual = self.json();
         assert_eq!(
-            actual, expected,
+            actual,
+            expected,
             "JSON response did not match expected.\nExpected:\n{}\n\nActual:\n{}",
             serde_json::to_string_pretty(&expected).unwrap_or_default(),
             serde_json::to_string_pretty(&actual).unwrap_or_default()
@@ -241,10 +242,7 @@ impl TestResponse {
     }
 
     pub fn assert_header(&self, key: &str, value: &str) -> &Self {
-        let actual = self
-            .headers
-            .get(key)
-            .and_then(|v| v.to_str().ok());
+        let actual = self.headers.get(key).and_then(|v| v.to_str().ok());
         assert_eq!(
             actual,
             Some(value),

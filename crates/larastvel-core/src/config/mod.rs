@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub app: AppConfig,
+    pub broadcasting: BroadcastingConfig,
     pub database: DatabaseConfig,
     pub logging: LoggingConfig,
     pub view: ViewConfig,
@@ -44,6 +45,16 @@ pub struct ViewConfig {
     pub paths: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BroadcastingConfig {
+    pub default: String,
+    pub app_id: String,
+    pub key: String,
+    pub secret: String,
+    pub cluster: String,
+    pub encrypted: bool,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -69,6 +80,14 @@ impl Default for Config {
             view: ViewConfig {
                 engine: "tera".to_string(),
                 paths: vec!["resources/views".to_string()],
+            },
+            broadcasting: BroadcastingConfig {
+                default: "log".to_string(),
+                app_id: String::new(),
+                key: String::new(),
+                secret: String::new(),
+                cluster: "mt1".to_string(),
+                encrypted: true,
             },
             extra: HashMap::new(),
         }

@@ -4,7 +4,7 @@ A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
 
 ## Status
 
-Active development (~60% feature parity). Core architecture is solid with most framework features implemented.
+Active development (~85% feature parity). Core architecture is solid with most framework features implemented.
 
 ## Features
 
@@ -32,7 +32,7 @@ Active development (~60% feature parity). Core architecture is solid with most f
 - **Rate Limiting** — Token bucket with `RateLimiter`, `RateLimiterRegistry`, Axum middleware
 - **Localization** — JSON translation files, `__()` / `trans_choice()`, pluralization, locale switching
 - **Task Scheduling** — Cron expression parser, `Schedule` builder, `ScheduleManager`
-- **Testing** — 300+ unit tests across all modules
+- **Testing** — 336+ unit tests across all modules
 
 ## Quick Start
 
@@ -154,9 +154,9 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Pagination | `Paginator<T>` / `PaginationParams` extractor / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / `rate_limit_middleware` / token bucket | ✅ |
 | Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
-| Broadcasting | — | ❌ |
+| Broadcasting | `BroadcastManager` / `PusherBroadcaster` / `LogBroadcaster` / `Channel` (public/private/presence) / `BroadcastEvent` trait | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / `set_locale()` / JSON files | ✅ |
-| Testing (PHPUnit) | — | ❌ |
+| Testing (PHPUnit) | `TestClient` / `TestResponse` / `RefreshDatabase` / PHPUnit-like assertions | ✅ |
 | Task Scheduling (Cron) | `Schedule` / `ScheduleManager` / cron parser / `ScheduledEvent` / `schedule:run` CLI | ✅ |
 
 ## License

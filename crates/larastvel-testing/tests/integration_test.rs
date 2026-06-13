@@ -1,13 +1,15 @@
-use axum::Router;
-use axum::routing::get;
 use axum::response::Json;
-use serde_json::json;
+use axum::routing::get;
+use axum::Router;
 use larastvel_testing::TestClient;
+use serde_json::json;
 
 #[tokio::test]
 async fn test_get_request() {
-    let app = Router::new()
-        .route("/hello", get(|| async { Json(json!({"message": "Hello, world!"})) }));
+    let app = Router::new().route(
+        "/hello",
+        get(|| async { Json(json!({"message": "Hello, world!"})) }),
+    );
 
     let client = TestClient::new(app);
 
@@ -21,8 +23,7 @@ async fn test_get_request() {
 
 #[tokio::test]
 async fn test_not_found() {
-    let app = Router::new()
-        .route("/exists", get(|| async { "ok" }));
+    let app = Router::new().route("/exists", get(|| async { "ok" }));
 
     let client = TestClient::new(app);
 
@@ -32,8 +33,10 @@ async fn test_not_found() {
 
 #[tokio::test]
 async fn test_see_text() {
-    let app = Router::new()
-        .route("/page", get(|| async { "<html><body><h1>Welcome</h1><p>to Larastvel</p></body></html>" }));
+    let app = Router::new().route(
+        "/page",
+        get(|| async { "<html><body><h1>Welcome</h1><p>to Larastvel</p></body></html>" }),
+    );
 
     let client = TestClient::new(app);
 
@@ -48,31 +51,34 @@ async fn test_see_text() {
 
 #[tokio::test]
 async fn test_post_json() {
-    use serde_json::Value;
     use axum::routing::post;
+    use serde_json::Value;
 
-    let app = Router::new()
-        .route("/echo", post(|body: axum::Json<Value>| async move { Json(body.0) }));
+    let app = Router::new().route(
+        "/echo",
+        post(|body: axum::Json<Value>| async move { Json(body.0) }),
+    );
 
     let client = TestClient::new(app);
 
     let resp = client.post_json("/echo", &json!({"key": "value"})).await;
-    resp.assert_ok()
-        .assert_json(json!({"key": "value"}));
+    resp.assert_ok().assert_json(json!({"key": "value"}));
 }
 
 #[tokio::test]
 async fn test_headers_and_auth() {
-    let app = Router::new()
-        .route("/protected", get(|headers: axum::http::HeaderMap| async move {
-            let auth = headers.get("authorization")
+    let app = Router::new().route(
+        "/protected",
+        get(|headers: axum::http::HeaderMap| async move {
+            let auth = headers
+                .get("authorization")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("none");
             Json(json!({"auth": auth}))
-        }));
+        }),
+    );
 
-    let client = TestClient::new(app)
-        .with_bearer_token("my-token");
+    let client = TestClient::new(app).with_bearer_token("my-token");
 
     let resp = client.get("/protected").await;
     resp.assert_ok()
@@ -81,8 +87,10 @@ async fn test_headers_and_auth() {
 
 #[tokio::test]
 async fn test_json_missing_and_structure() {
-    let app = Router::new()
-        .route("/data", get(|| async { Json(json!({"name": "test", "values": [1, 2, 3]})) }));
+    let app = Router::new().route(
+        "/data",
+        get(|| async { Json(json!({"name": "test", "values": [1, 2, 3]})) }),
+    );
 
     let client = TestClient::new(app);
 

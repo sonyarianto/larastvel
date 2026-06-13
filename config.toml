@@ -19,3 +19,11 @@ format = "text"
 [view]
 engine = "tera"
 paths = ["resources/views"]
+
+[broadcasting]
+default = "log"
+app_id = ""
+key = ""
+secret = ""
+cluster = "mt1"
+encrypted = true

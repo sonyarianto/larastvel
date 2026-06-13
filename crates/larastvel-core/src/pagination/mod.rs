@@ -119,9 +119,7 @@ impl PaginationParams {
     pub fn new(page: Option<usize>, per_page: Option<usize>) -> Self {
         Self {
             page: page.unwrap_or(1).max(1),
-            per_page: per_page
-                .unwrap_or(DEFAULT_PER_PAGE)
-                .clamp(1, MAX_PER_PAGE),
+            per_page: per_page.unwrap_or(DEFAULT_PER_PAGE).clamp(1, MAX_PER_PAGE),
         }
     }
 
