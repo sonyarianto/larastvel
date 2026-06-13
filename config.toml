@@ -1,0 +1,21 @@
+[app]
+name = "Larastvel"
+url = "http://localhost:8080"
+env = "local"
+debug = true
+
+[database]
+driver = "sqlite"
+host = "127.0.0.1"
+port = 3306
+database = "larastvel.db"
+username = "root"
+password = ""
+
+[logging]
+level = "debug"
+format = "text"
+
+[view]
+engine = "tera"
+paths = ["resources/views"]

@@ -1,0 +1,149 @@
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use tracing::info;
+
+use crate::config::Config;
+use crate::console::ConsoleKernel;
+use crate::database::DatabaseManager;
+use crate::routing::Registrar;
+
+pub trait ServiceProvider: Send + Sync {
+    fn register(&self, app: &Application);
+    fn boot(&self, _app: &Application) {}
+    fn provides(&self) -> Vec<&'static str> {
+        vec![]
+    }
+}
+
+#[derive(Clone)]
+pub struct Application {
+    inner: Arc<Mutex<AppInner>>,
+}
+
+struct AppInner {
+    instances: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    aliases: HashMap<String, TypeId>,
+    config: Config,
+    db: Option<DatabaseManager>,
+    base_path: PathBuf,
+    booted: bool,
+}
+
+impl Application {
+    pub fn new(base_path: Option<PathBuf>) -> Self {
+        let path = base_path.unwrap_or_else(|| PathBuf::from("."));
+        let config = Config::load(&path);
+
+        let inner = Arc::new(Mutex::new(AppInner {
+            instances: HashMap::new(),
+            aliases: HashMap::new(),
+            config,
+            db: None,
+            base_path: path,
+            booted: false,
+        }));
+
+        Self { inner }
+    }
+
+    pub fn base_path(&self) -> PathBuf {
+        self.inner.lock().unwrap().base_path.clone()
+    }
+
+    pub fn config(&self) -> Config {
+        self.inner.lock().unwrap().config.clone()
+    }
+
+    pub fn boot(&self) {
+        let mut inner = self.inner.lock().unwrap();
+        if inner.booted {
+            return;
+        }
+        inner.booted = true;
+        info!("Application booted");
+    }
+
+    pub fn bind<T: Any + Send + Sync>(&self, instance: T) {
+        let id = TypeId::of::<T>();
+        self.inner
+            .lock()
+            .unwrap()
+            .instances
+            .insert(id, Box::new(instance));
+    }
+
+    pub fn singleton<T: Any + Send + Sync + Clone>(&self, instance: T) {
+        self.bind(instance);
+    }
+
+    pub fn make<T: Any + Send + Sync + Clone>(&self) -> Option<T> {
+        let inner = self.inner.lock().unwrap();
+        let id = TypeId::of::<T>();
+        inner
+            .instances
+            .get(&id)
+            .and_then(|b| b.downcast_ref::<T>())
+            .cloned()
+    }
+
+    pub fn alias(&self, alias: &str, id: TypeId) {
+        self.inner
+            .lock()
+            .unwrap()
+            .aliases
+            .insert(alias.to_string(), id);
+    }
+
+    pub fn database(&self) -> Option<DatabaseManager> {
+        self.inner.lock().unwrap().db.clone()
+    }
+
+    pub fn with_database(self, db: DatabaseManager) -> Self {
+        self.inner.lock().unwrap().db = Some(db);
+        self
+    }
+
+    pub fn console_kernel(&self) -> ConsoleKernel {
+        ConsoleKernel::new(self.clone())
+    }
+
+    pub fn router(&self) -> Registrar {
+        Registrar::new(self.clone())
+    }
+
+    pub async fn run(self) {
+        self.boot();
+
+        let router = {
+            let r = Registrar::new(self.clone());
+            r.register_routes(self.clone());
+            r.build()
+        };
+
+        let addr = self
+            .config()
+            .get("app.url")
+            .unwrap_or_else(|| "0.0.0.0:8080".to_string())
+            .replace("http://", "")
+            .trim_end_matches('/')
+            .to_string();
+        let addr = if addr.contains(':') {
+            addr
+        } else {
+            format!("{}:8080", addr)
+        };
+
+        info!("Larastvel server starting on {}", addr);
+        let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+        axum::serve(listener, router).await.unwrap();
+    }
+}
+
+pub trait Kernel: Send + Sync {
+    fn register_providers(&self, app: &Application);
+    fn register_routes(&self, app: &Application);
+    fn boot(&self, app: &Application);
+}

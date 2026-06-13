@@ -1,0 +1,17 @@
+[package]
+name = "larastvel-tinker"
+version = "0.1.0"
+edition = "2021"
+description = "Larastvel Tinker - interactive REPL"
+
+[[bin]]
+name = "tinker"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+colored.workspace = true
+rustyline = "18"
+larastvel-core = { path = "../larastvel-core" }

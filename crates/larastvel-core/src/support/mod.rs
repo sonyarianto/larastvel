@@ -1,0 +1,35 @@
+pub mod vite;
+pub mod helpers;
+
+pub use helpers::*;
+pub use vite::Vite;
+
+use std::path::PathBuf;
+
+pub fn base_path(path: Option<&str>) -> PathBuf {
+    let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    match path {
+        Some(p) => base.join(p),
+        None => base,
+    }
+}
+
+pub fn storage_path(path: Option<&str>) -> PathBuf {
+    base_path(Some("storage")).join(path.unwrap_or(""))
+}
+
+pub fn app_path(path: Option<&str>) -> PathBuf {
+    base_path(Some("src")).join(path.unwrap_or(""))
+}
+
+pub fn config_path(path: Option<&str>) -> PathBuf {
+    base_path(Some("config")).join(path.unwrap_or(""))
+}
+
+pub fn resource_path(path: Option<&str>) -> PathBuf {
+    base_path(Some("resources")).join(path.unwrap_or(""))
+}
+
+pub fn public_path(path: Option<&str>) -> PathBuf {
+    base_path(Some("public")).join(path.unwrap_or(""))
+}

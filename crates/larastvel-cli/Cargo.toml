@@ -1,0 +1,20 @@
+[package]
+name = "larastvel-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Larastvel CLI - artisan equivalent"
+
+[[bin]]
+name = "larastvel"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+colored.workspace = true
+uuid.workspace = true
+larastvel-core = { path = "../larastvel-core" }

@@ -1,0 +1,17 @@
+[package]
+name = "larastvel-new"
+version = "0.1.0"
+edition = "2021"
+description = "Larastvel project scaffolding tool"
+
+[[bin]]
+name = "larastvel-new"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+colored.workspace = true
+reqwest.workspace = true
