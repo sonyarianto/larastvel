@@ -145,7 +145,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | `app/Models/User.php` | `src/models/user.rs` | ✅ |
 | Eloquent ORM | `DbModel` trait + SeaORM | ⚠️ Partial |
-| Blade templating | Tera | ⚠️ Partial |
+| Blade templating | Tera + Blade directive compiler (@auth/@csrf/@error/@guest/@method) | ✅ |
 | Migrations (`database/migrations/`) | `src/database/migrations/` + Migrator | ✅ |
 | `php artisan migrate` | `larastvel migrate` | ✅ |
 | Seeders | `Seeder` trait + `DatabaseManager::seed::<S>()` + `make:seeder` | ✅ |
