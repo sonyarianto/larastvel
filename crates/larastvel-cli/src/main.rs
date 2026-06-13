@@ -29,6 +29,15 @@ enum Commands {
     },
     /// Generate a new application key
     KeyGenerate,
+    /// Run database migrations
+    Migrate,
+    /// Drop all tables and re-run all migrations
+    MigrateFresh,
+    /// Rollback the last migration (or N steps)
+    MigrateRollback {
+        #[arg(short, long)]
+        steps: Option<u32>,
+    },
     /// Display help for any command
     Make {
         #[command(subcommand)]
@@ -78,6 +87,19 @@ async fn main() {
             println!("{}", "Application key generated:".green());
             println!("  APP_KEY={}", key.cyan());
         }
+        Some(Commands::Migrate) => {
+            run_migrate_command("migrate");
+        }
+        Some(Commands::MigrateFresh) => {
+            run_migrate_command("migrate:fresh");
+        }
+        Some(Commands::MigrateRollback { steps }) => {
+            let cmd = match steps {
+                Some(n) => format!("migrate:rollback --steps {}", n),
+                None => "migrate:rollback".to_string(),
+            };
+            run_migrate_command(&cmd);
+        }
         Some(Commands::Make { target }) => {
             match target {
                 Some(MakeTarget::Model { name }) => {
@@ -87,7 +109,7 @@ async fn main() {
                     println!("{}", format!("Creating controller: {}", name).green());
                 }
                 Some(MakeTarget::Migration { name }) => {
-                    println!("{}", format!("Creating migration: {}", name).green());
+                    make_migration(&name);
                 }
                 None => {
                     println!("{}", "Available make targets:".cyan());
@@ -106,6 +128,9 @@ async fn main() {
             println!("  route:list       List all registered routes");
             println!("  new              Create a new Larastvel application");
             println!("  key:generate     Generate a new application key");
+            println!("  migrate          Run database migrations");
+            println!("  migrate:fresh    Drop all tables and re-run migrations");
+            println!("  migrate:rollback Rollback the last migration");
             println!("  make:model       Create a new model");
             println!("  make:controller  Create a new controller");
             println!("  make:migration   Create a new migration");
@@ -185,6 +210,7 @@ tokio = {{ version = "1", features = ["full"] }}
 serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
 tracing = "0.1"
+sea-orm-migration = "1"
 "#, name = name);
 
     let config_toml = r#"[app]
@@ -459,5 +485,113 @@ impl larastvel_core::models::DbModel for {name} {{
         format!("✓ Model [{}] created at '{}'.", name, file_path.display())
             .green()
             .bold()
+    );
+}
+
+fn run_migrate_command(subcommand: &str) {
+    println!(
+        "{}",
+        format!("Running '{}'...", subcommand).green().bold()
+    );
+    let status = std::process::Command::new("cargo")
+        .args(["run", "--", "--migrate", subcommand])
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("{}", "✓ Migration completed successfully.".green());
+        }
+        _ => {
+            eprintln!(
+                "{}",
+                "Migration failed. Make sure you're in the project root directory.".red()
+            );
+            eprintln!(
+                "{}",
+                "You can also run: cargo run -- --migrate <command>".dimmed()
+            );
+        }
+    }
+}
+
+fn make_migration(name: &str) {
+    let migrations_dir = std::path::Path::new("src/database/migrations");
+    std::fs::create_dir_all(migrations_dir).unwrap();
+
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    let secs = duration.as_secs();
+    let version = format!("m{}", secs);
+    let snake_name = {
+        let mut result = String::new();
+        for (i, ch) in name.chars().enumerate() {
+            if ch.is_uppercase() {
+                if i > 0 {
+                    result.push('_');
+                }
+                result.push(ch.to_ascii_lowercase());
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    };
+    let file_name = format!("{}_{}", version, snake_name);
+
+    let migration_content = format!(
+        r#"use larastvel_core::sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {{
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {{
+        todo!("Implement up migration");
+    }}
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {{
+        todo!("Implement down migration");
+    }}
+}}
+"#
+    );
+
+    let file_path = migrations_dir.join(format!("{}.rs", file_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!("Error: Migration '{}' already exists at '{}'.", name, file_path.display()).red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, migration_content).unwrap();
+
+    // Register in mod.rs
+    let mod_path = migrations_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", file_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!(
+            "✓ Migration [{}] created at '{}'.",
+            name,
+            file_path.display()
+        )
+        .green()
+        .bold()
+    );
+    println!(
+        "{}",
+        "  Don't forget to register the migration in src/database/migrator.rs".dimmed()
     );
 }

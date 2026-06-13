@@ -11,6 +11,7 @@ pub mod support;
 pub mod view;
 
 pub use axum;
+pub use sea_orm_migration;
 pub use serde;
 pub use serde_json;
 pub use sea_orm;

@@ -55,6 +55,7 @@ async fn main() {
 
 fn create_project(path: &PathBuf, name: &str, database: &str, with_vite: bool) {
     let dirs = [
+        "src/database/migrations",
         "src/models",
         "src/routes",
         "resources/views",
@@ -63,8 +64,6 @@ fn create_project(path: &PathBuf, name: &str, database: &str, with_vite: bool) {
         "public",
         "routes",
         "config",
-        "database/migrations",
-        "database/seeders",
         "storage/logs",
         "storage/app",
         "tests",
@@ -87,6 +86,7 @@ tokio = {{ version = "1", features = ["full"] }}
 serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
 tracing = "0.1"
+sea-orm-migration = "1"
 "#,
         name
     );
@@ -96,6 +96,7 @@ tracing = "0.1"
         r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
 use larastvel_core::routing::Registrar;
 
+mod database;
 mod models;
 mod routes;
 
@@ -105,7 +106,18 @@ async fn main() {{
     logging::init(&app.config());
 
     let db = DatabaseManager::new(&app.config());
-    db.connect().await.expect("Failed to connect to database");
+    match db.connect().await {{
+        Ok(conn) => {{
+            tracing::info!("Database connected successfully");
+            let _ = larastvel_core::models::set_global_database(conn);
+        }}
+        Err(e) => tracing::warn!("Database connection failed: {{}} (app will still run)", e),
+    }}
+
+    if let Err(e) = db.migrate::<database::migrator::Migrator>().await {{
+        tracing::warn!("Migration failed: {{}} (app will still run)", e);
+    }}
+
     let app = app.with_database(db);
 
     let router = app.router();
@@ -223,11 +235,89 @@ DB_PASSWORD=
         name, database, name
     );
 
+    // database/mod.rs
+    let database_mod = r#"pub mod migrator;
+pub mod migrations;
+"#;
+
+    // database/migrator.rs
+    let database_migrator = r#"use larastvel_core::sea_orm_migration::prelude::*;
+
+use super::migrations;
+
+pub struct Migrator;
+
+#[async_trait::async_trait]
+impl MigratorTrait for Migrator {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(migrations::m20220101_000001_create_users_table::Migration)]
+    }
+}
+"#;
+
+    // database/migrations/mod.rs
+    let database_migrations_mod = r#"pub mod m20220101_000001_create_users_table;
+"#;
+
+    // database/migrations/m20220101_000001_create_users_table.rs
+    let database_users_migration = r#"use larastvel_core::sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(Users::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Users::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Users::Name).string().not_null())
+                    .col(ColumnDef::new(Users::Email).string().not_null())
+                    .col(ColumnDef::new(Users::Password).string().not_null())
+                    .col(ColumnDef::new(Users::CreatedAt).date_time().not_null())
+                    .col(ColumnDef::new(Users::UpdatedAt).date_time().not_null())
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Users::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(Iden)]
+enum Users {
+    Table,
+    Id,
+    Name,
+    Email,
+    Password,
+    CreatedAt,
+    UpdatedAt,
+}
+"#;
+
     // Write files
     std::fs::write(path.join("Cargo.toml"), cargo).unwrap();
     std::fs::write(path.join("src/main.rs"), main_rs).unwrap();
     std::fs::write(path.join("src/models/mod.rs"), models_mod).unwrap();
     std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
+    std::fs::write(path.join("src/database/mod.rs"), database_mod).unwrap();
+    std::fs::write(path.join("src/database/migrator.rs"), database_migrator).unwrap();
+    std::fs::write(path.join("src/database/migrations/mod.rs"), database_migrations_mod).unwrap();
+    std::fs::write(path.join("src/database/migrations/m20220101_000001_create_users_table.rs"), database_users_migration).unwrap();
     std::fs::write(path.join("src/routes/mod.rs"), routes_mod).unwrap();
     std::fs::write(path.join("src/routes/web.rs"), routes_web).unwrap();
     std::fs::write(path.join("src/routes/api.rs"), routes_api).unwrap();

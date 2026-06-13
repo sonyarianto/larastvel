@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use sea_orm::{ConnectOptions, Database, DbConn};
+use sea_orm_migration::MigratorTrait;
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -72,10 +73,27 @@ impl DatabaseManager {
         }
     }
 
-    pub async fn migrate(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let _conn = self.connect().await?;
+    pub async fn migrate<M: MigratorTrait>(&self) -> Result<(), sea_orm::DbErr> {
+        let conn = self.connect().await?;
         info!("Running database migrations");
-        Ok(())
+        M::up(&conn, None).await
+    }
+
+    pub async fn migrate_fresh<M: MigratorTrait>(&self) -> Result<(), sea_orm::DbErr> {
+        let conn = self.connect().await?;
+        info!("Running fresh database migrations (dropping all tables)");
+        M::fresh(&conn).await
+    }
+
+    pub async fn migrate_rollback<M: MigratorTrait>(&self, steps: Option<u32>) -> Result<(), sea_orm::DbErr> {
+        let conn = self.connect().await?;
+        info!("Rolling back database migrations");
+        M::down(&conn, steps).await
+    }
+
+    pub async fn migrate_status<M: MigratorTrait>(&self) -> Result<(), sea_orm::DbErr> {
+        let conn = self.connect().await?;
+        M::status(&conn).await
     }
 
     pub async fn seed(&self) -> Result<(), Box<dyn std::error::Error>> {

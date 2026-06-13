@@ -1,6 +1,8 @@
+mod database;
 mod models;
 mod routes;
 
+use database::migrator::Migrator;
 use larastvel_core::{Application, DatabaseManager, logging};
 
 #[tokio::main]
@@ -16,6 +18,11 @@ async fn main() {
         }
         Err(e) => tracing::warn!("Database connection failed: {} (app will still run)", e),
     }
+
+    if let Err(e) = db.migrate::<Migrator>().await {
+        tracing::warn!("Migration failed: {} (app will still run)", e);
+    }
+
     let app = app.with_database(db);
 
     let router = app.router();

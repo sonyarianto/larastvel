@@ -127,7 +127,8 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | `app/Models/User.php` | `src/models/user.rs` | ✅ |
 | Eloquent ORM | `DbModel` trait + SeaORM | ⚠️ Partial |
 | Blade templating | Tera | ⚠️ Partial |
-| Migrations (`database/migrations/`) | sea-orm-migration (not wired) | ❌ |
+| Migrations (`database/migrations/`) | `src/database/migrations/` + Migrator | ✅ |
+| `php artisan migrate` | `larastvel migrate` | ✅ |
 | Seeders | `DatabaseManager::seed()` stub | ❌ |
 | Session | — | ❌ |
 | Authentication / Auth | — | ❌ |

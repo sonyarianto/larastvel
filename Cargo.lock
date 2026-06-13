@@ -1476,6 +1476,7 @@ name = "larastvel-app"
 version = "0.1.0"
 dependencies = [
  "larastvel-core",
+ "sea-orm-migration",
  "serde",
  "serde_json",
  "tokio",
