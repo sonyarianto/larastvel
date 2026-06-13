@@ -41,13 +41,23 @@ impl AblyBroadcaster {
     }
 
     fn auth_header_value(&self) -> String {
-        format!("Basic {}", base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.api_key.as_bytes()))
+        format!(
+            "Basic {}",
+            base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                self.api_key.as_bytes()
+            )
+        )
     }
 
     /// Generate a basic auth token for private channel subscriptions.
     /// Ably uses Capability-based tokens — for simplicity we generate
     /// a capability token with full access using the API key directly.
-    pub fn generate_private_auth(&self, channel_name: &str, _socket_id: &str) -> Result<String, BroadcastError> {
+    pub fn generate_private_auth(
+        &self,
+        channel_name: &str,
+        _socket_id: &str,
+    ) -> Result<String, BroadcastError> {
         // Ably doesn't use HMAC signing like Pusher for channel auth.
         // Instead, clients authenticate via token or basic auth.
         // For a dev/demo scenario, we return a capability token string.
@@ -109,17 +119,17 @@ impl Broadcaster for AblyBroadcaster {
     async fn authenticate(
         &self,
         channel_name: &str,
-        socket_id: &str,
+        _socket_id: &str,
         _callback: Option<&ChannelAuthCallback>,
     ) -> Result<String, BroadcastError> {
-        let token = self.generate_private_auth(channel_name, socket_id)?;
+        let token = self.generate_private_auth(channel_name, _socket_id)?;
         Ok(token)
     }
 
     async fn authenticate_presence(
         &self,
         channel_name: &str,
-        socket_id: &str,
+        _socket_id: &str,
         channel_data: &PresenceChannelData,
         _callback: Option<&ChannelAuthCallback>,
     ) -> Result<String, BroadcastError> {
@@ -154,20 +164,13 @@ mod tests {
     #[test]
     fn test_base_url_default() {
         let broadcaster = AblyBroadcaster::new("ably", "key:secret");
-        assert_eq!(
-            broadcaster.base_url(),
-            "https://main.realtime.ably.net"
-        );
+        assert_eq!(broadcaster.base_url(), "https://main.realtime.ably.net");
     }
 
     #[test]
     fn test_base_url_custom_environment() {
-        let broadcaster = AblyBroadcaster::new("ably", "key:secret")
-            .with_environment("sandbox");
-        assert_eq!(
-            broadcaster.base_url(),
-            "https://sandbox.realtime.ably.net"
-        );
+        let broadcaster = AblyBroadcaster::new("ably", "key:secret").with_environment("sandbox");
+        assert_eq!(broadcaster.base_url(), "https://sandbox.realtime.ably.net");
     }
 
     #[test]

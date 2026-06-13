@@ -36,7 +36,7 @@ use larastvel_core::axum::{
     Form, Router,
 };
 use larastvel_core::notifications::{
-    Notification, NotificationChannel, NotificationSender, Notifiable,
+    Notifiable, Notification, NotificationChannel, NotificationSender,
 };
 use larastvel_core::rate_limiter::{RateLimitConfig, RateLimitExceeded, RateLimiter};
 use larastvel_core::routing::Registrar;
@@ -75,7 +75,13 @@ impl SmsStore {
         }
     }
 
-    pub fn add(&mut self, to: String, from: String, message: String, status: String) -> SentSmsEntry {
+    pub fn add(
+        &mut self,
+        to: String,
+        from: String,
+        message: String,
+        status: String,
+    ) -> SentSmsEntry {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -241,12 +247,16 @@ impl SmsController {
     // -------------------------------------------------------------------------
 
     /// GET /sms — show the SMS dashboard (HTML).
-    pub async fn show_dashboard(
-        Extension(store): Extension<SharedSmsStore>,
-    ) -> Response {
+    pub async fn show_dashboard(Extension(store): Extension<SharedSmsStore>) -> Response {
         let history = {
             let store = store.lock().unwrap();
-            store.all().iter().rev().take(20).cloned().collect::<Vec<_>>()
+            store
+                .all()
+                .iter()
+                .rev()
+                .take(20)
+                .cloned()
+                .collect::<Vec<_>>()
         };
         let total_sent = {
             let store = store.lock().unwrap();
@@ -411,7 +421,8 @@ impl SmsController {
             } else {
                 r#"<p style="text-align:center;margin-top:1rem;color:#64748b;font-size:0.8125rem;">
                     Showing up to 20 recent messages.
-                   </p>"#.to_string()
+                   </p>"#
+                    .to_string()
             },
         );
         Html(html).into_response()
@@ -482,7 +493,10 @@ impl SmsController {
             phone: phone.to_string(),
         };
 
-        let from = body.from.as_ref().map(|s| s.trim().to_string())
+        let from = body
+            .from
+            .as_ref()
+            .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
 
         let notification = SmsDemoNotification {
@@ -632,8 +646,8 @@ mod tests {
     use super::*;
     use larastvel_core::axum::body::Body;
     use larastvel_core::axum::http::Request;
-    use larastvel_core::axum::Router as AxumRouter;
     use larastvel_core::axum::routing;
+    use larastvel_core::axum::Router as AxumRouter;
     use tower::ServiceExt;
 
     /// Build a test router with a shared SMS store and rate limiter.
@@ -643,10 +657,7 @@ mod tests {
 
         AxumRouter::new()
             .route("/sms", routing::get(SmsController::show_dashboard))
-            .route(
-                "/api/sms/send",
-                routing::post(SmsController::send_sms),
-            )
+            .route("/api/sms/send", routing::post(SmsController::send_sms))
             .route(
                 "/api/sms/history",
                 routing::get(SmsController::list_history),
@@ -790,9 +801,7 @@ mod tests {
                     .method("POST")
                     .uri("/api/sms/send")
                     .header("content-type", "application/x-www-form-urlencoded")
-                    .body(Body::from(
-                        "phone=not-a-phone&message=Hello&from=Test",
-                    ))
+                    .body(Body::from("phone=not-a-phone&message=Hello&from=Test"))
                     .unwrap(),
             )
             .await
@@ -841,10 +850,7 @@ mod tests {
         let store = new_sms_store();
 
         let app = AxumRouter::new()
-            .route(
-                "/api/sms/send",
-                routing::post(SmsController::send_sms),
-            )
+            .route("/api/sms/send", routing::post(SmsController::send_sms))
             .layer(Extension(store))
             .layer(Extension(rate_limiter));
 
@@ -902,8 +908,18 @@ mod tests {
         // Manually add some entries
         {
             let mut s = store.lock().unwrap();
-            s.add("+15551111111".to_string(), "App".to_string(), "First SMS".to_string(), "sent".to_string());
-            s.add("+15552222222".to_string(), "App".to_string(), "Second SMS".to_string(), "sent".to_string());
+            s.add(
+                "+15551111111".to_string(),
+                "App".to_string(),
+                "First SMS".to_string(),
+                "sent".to_string(),
+            );
+            s.add(
+                "+15552222222".to_string(),
+                "App".to_string(),
+                "Second SMS".to_string(),
+                "sent".to_string(),
+            );
         }
 
         let app = AxumRouter::new()
@@ -949,9 +965,24 @@ mod tests {
         // Pre-populate with 3 entries
         {
             let mut s = store.lock().unwrap();
-            s.add("+15551111111".to_string(), "App".to_string(), "Msg 1".to_string(), "sent".to_string());
-            s.add("+15552222222".to_string(), "App".to_string(), "Msg 2".to_string(), "sent".to_string());
-            s.add("+15553333333".to_string(), "App".to_string(), "Msg 3".to_string(), "sent".to_string());
+            s.add(
+                "+15551111111".to_string(),
+                "App".to_string(),
+                "Msg 1".to_string(),
+                "sent".to_string(),
+            );
+            s.add(
+                "+15552222222".to_string(),
+                "App".to_string(),
+                "Msg 2".to_string(),
+                "sent".to_string(),
+            );
+            s.add(
+                "+15553333333".to_string(),
+                "App".to_string(),
+                "Msg 3".to_string(),
+                "sent".to_string(),
+            );
         }
 
         let app = AxumRouter::new()
@@ -1068,18 +1099,38 @@ mod tests {
         let mut store = SmsStore::new();
         assert_eq!(store.count(), 0);
 
-        store.add("+15551234567".to_string(), "App".to_string(), "Test".to_string(), "sent".to_string());
+        store.add(
+            "+15551234567".to_string(),
+            "App".to_string(),
+            "Test".to_string(),
+            "sent".to_string(),
+        );
         assert_eq!(store.count(), 1);
 
-        store.add("+15559876543".to_string(), "App".to_string(), "Test 2".to_string(), "sent".to_string());
+        store.add(
+            "+15559876543".to_string(),
+            "App".to_string(),
+            "Test 2".to_string(),
+            "sent".to_string(),
+        );
         assert_eq!(store.count(), 2);
     }
 
     #[test]
     fn test_sms_store_auto_increment() {
         let mut store = SmsStore::new();
-        let e1 = store.add("+15551111111".to_string(), "App".to_string(), "A".to_string(), "sent".to_string());
-        let e2 = store.add("+15552222222".to_string(), "App".to_string(), "B".to_string(), "sent".to_string());
+        let e1 = store.add(
+            "+15551111111".to_string(),
+            "App".to_string(),
+            "A".to_string(),
+            "sent".to_string(),
+        );
+        let e2 = store.add(
+            "+15552222222".to_string(),
+            "App".to_string(),
+            "B".to_string(),
+            "sent".to_string(),
+        );
         assert_eq!(e1.id, 1);
         assert_eq!(e2.id, 2);
     }

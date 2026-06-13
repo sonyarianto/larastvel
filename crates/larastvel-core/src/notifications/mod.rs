@@ -304,21 +304,15 @@ impl NotificationSender {
 
         for channel in &channels {
             let result = match channel {
-                NotificationChannel::Mail => {
-                    self.send_mail(notifiable, &notification).await
-                }
+                NotificationChannel::Mail => self.send_mail(notifiable, &notification).await,
                 NotificationChannel::Broadcast => {
                     self.send_broadcast(notifiable, &notification).await
                 }
                 NotificationChannel::Database => {
                     self.send_database(notifiable, &notification).await
                 }
-                NotificationChannel::Webhook => {
-                    self.send_webhook(notifiable, &notification).await
-                }
-                NotificationChannel::Sms => {
-                    self.send_sms(notifiable, &notification).await
-                }
+                NotificationChannel::Webhook => self.send_webhook(notifiable, &notification).await,
+                NotificationChannel::Sms => self.send_sms(notifiable, &notification).await,
             };
             results.insert(channel.clone(), result);
         }
@@ -394,14 +388,18 @@ impl NotificationSender {
         notifiable: &dyn Notifiable,
         notification: &N,
     ) -> Result<(), NotificationError> {
-        let broadcaster = self
-            .broadcaster
-            .as_ref()
-            .ok_or(NotificationError::ChannelNotConfigured("broadcast".to_string()))?;
+        let broadcaster =
+            self.broadcaster
+                .as_ref()
+                .ok_or(NotificationError::ChannelNotConfigured(
+                    "broadcast".to_string(),
+                ))?;
 
         let payload = notification
             .to_broadcast()
-            .ok_or(NotificationError::ChannelNotSupported("broadcast".to_string()))?;
+            .ok_or(NotificationError::ChannelNotSupported(
+                "broadcast".to_string(),
+            ))?;
 
         let channels: Vec<String> = notifiable
             .route_broadcast_channels()
@@ -440,7 +438,9 @@ impl NotificationSender {
         let db = self
             .database
             .as_ref()
-            .ok_or(NotificationError::ChannelNotConfigured("database".to_string()))?;
+            .ok_or(NotificationError::ChannelNotConfigured(
+                "database".to_string(),
+            ))?;
 
         let sql = "CREATE TABLE IF NOT EXISTS notifications (
             id TEXT PRIMARY KEY,
@@ -453,9 +453,14 @@ impl NotificationSender {
             updated_at INTEGER NOT NULL
         )";
 
-        db.execute(Statement::from_string(DatabaseBackend::Sqlite, sql))
-            .await
-            .map_err(|e| NotificationError::Database(format!("Failed to create notifications table: {}", e)))?;
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            sql.to_string(),
+        ))
+        .await
+        .map_err(|e| {
+            NotificationError::Database(format!("Failed to create notifications table: {}", e))
+        })?;
 
         Ok(())
     }
@@ -481,10 +486,7 @@ impl NotificationSender {
         // Set the recipient from the notifiable
         sms.to = vec![phone];
 
-        sender
-            .send(sms)
-            .await
-            .map_err(NotificationError::Sms)?;
+        sender.send(sms).await.map_err(NotificationError::Sms)?;
 
         Ok(())
     }
@@ -494,10 +496,12 @@ impl NotificationSender {
         notifiable: &dyn Notifiable,
         notification: &N,
     ) -> Result<(), NotificationError> {
-        let client = self
-            .webhook_client
-            .as_ref()
-            .ok_or(NotificationError::ChannelNotConfigured("webhook".to_string()))?;
+        let client =
+            self.webhook_client
+                .as_ref()
+                .ok_or(NotificationError::ChannelNotConfigured(
+                    "webhook".to_string(),
+                ))?;
 
         let url = notifiable
             .route_webhook_url()
@@ -505,7 +509,9 @@ impl NotificationSender {
 
         let payload = notification
             .to_webhook()
-            .ok_or(NotificationError::ChannelNotSupported("webhook".to_string()))?;
+            .ok_or(NotificationError::ChannelNotSupported(
+                "webhook".to_string(),
+            ))?;
 
         let response = client
             .post(&url)
@@ -540,11 +546,15 @@ impl NotificationSender {
         let db = self
             .database
             .as_ref()
-            .ok_or(NotificationError::ChannelNotConfigured("database".to_string()))?;
+            .ok_or(NotificationError::ChannelNotConfigured(
+                "database".to_string(),
+            ))?;
 
         let data = notification
             .to_database()
-            .ok_or(NotificationError::ChannelNotSupported("database".to_string()))?;
+            .ok_or(NotificationError::ChannelNotSupported(
+                "database".to_string(),
+            ))?;
 
         let id = Uuid::new_v4().to_string();
         let now = SystemTime::now()
@@ -556,19 +566,16 @@ impl NotificationSender {
             .last()
             .unwrap_or("unknown")
             .to_string();
-        let data_json = serde_json::to_string(&data)
-            .unwrap_or_else(|_| "{}".to_string());
+        let data_json = serde_json::to_string(&data).unwrap_or_else(|_| "{}".to_string());
 
-        let sql = format!(
-            "INSERT INTO notifications \
+        let sql = "INSERT INTO notifications \
              (id, notifiable_id, notifiable_type, notification_type, data, \
               read_at, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?6)"
-        );
+             VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?6)";
 
         db.execute(Statement::from_sql_and_values(
             DatabaseBackend::Sqlite,
-            &sql,
+            sql,
             [
                 id.into(),
                 notifiable.notification_id().into(),
@@ -596,7 +603,9 @@ pub async fn send<N: Notification>(
     notifiable: &dyn Notifiable,
     notification: N,
 ) -> HashMap<NotificationChannel, Result<(), NotificationError>> {
-    NotificationSender::new().send(notifiable, notification).await
+    NotificationSender::new()
+        .send(notifiable, notification)
+        .await
 }
 
 /// Send a notification using a configured sender.
@@ -650,9 +659,7 @@ pub enum NotificationError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::broadcasting::{BroadcastEvent, BroadcastManager};
     use crate::mail::LogMailer;
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
     // -------------------------------------------------------------------------
@@ -709,10 +716,7 @@ mod tests {
 
     impl Notification for OrderNotification {
         fn via(&self) -> Vec<NotificationChannel> {
-            vec![
-                NotificationChannel::Mail,
-                NotificationChannel::Broadcast,
-            ]
+            vec![NotificationChannel::Mail, NotificationChannel::Broadcast]
         }
 
         fn to_mail(&self) -> Option<Mailable> {
@@ -839,8 +843,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_mail_channel() {
-        let sender = NotificationSender::new()
-            .with_mailer(Arc::new(LogMailer::new("log")));
+        let sender = NotificationSender::new().with_mailer(Arc::new(LogMailer::new("log")));
 
         let user = TestUser {
             id: "42".to_string(),
@@ -873,8 +876,7 @@ mod tests {
             }
         }
 
-        let sender = NotificationSender::new()
-            .with_mailer(Arc::new(LogMailer::new("log")));
+        let sender = NotificationSender::new().with_mailer(Arc::new(LogMailer::new("log")));
 
         let user = NoEmailUser {
             id: "1".to_string(),
@@ -944,7 +946,11 @@ mod tests {
         let results = sender.send(&user, notification).await;
 
         let mail_result = results.get(&NotificationChannel::Mail).unwrap();
-        assert!(mail_result.is_ok(), "Mail should succeed: {:?}", mail_result);
+        assert!(
+            mail_result.is_ok(),
+            "Mail should succeed: {:?}",
+            mail_result
+        );
 
         let broadcast_result = results.get(&NotificationChannel::Broadcast).unwrap();
         assert!(
@@ -956,8 +962,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_all_succeeds() {
-        let sender = NotificationSender::new()
-            .with_mailer(Arc::new(LogMailer::new("log")));
+        let sender = NotificationSender::new().with_mailer(Arc::new(LogMailer::new("log")));
 
         let user = TestUser {
             id: "99".to_string(),
@@ -999,8 +1004,8 @@ mod tests {
     async fn test_broadcast_without_channels_fails() {
         use crate::broadcasting::log::LogBroadcaster;
 
-        let sender = NotificationSender::new()
-            .with_broadcaster(Arc::new(LogBroadcaster::new("log")));
+        let sender =
+            NotificationSender::new().with_broadcaster(Arc::new(LogBroadcaster::new("log")));
 
         let user = TestUser {
             id: "1".to_string(),
@@ -1021,8 +1026,8 @@ mod tests {
     async fn test_broadcast_private_channel_prefixing() {
         use crate::broadcasting::log::LogBroadcaster;
 
-        let sender = NotificationSender::new()
-            .with_broadcaster(Arc::new(LogBroadcaster::new("log")));
+        let sender =
+            NotificationSender::new().with_broadcaster(Arc::new(LogBroadcaster::new("log")));
 
         let user = TestUser {
             id: "1".to_string(),
@@ -1049,8 +1054,7 @@ mod tests {
         let db = sea_orm::Database::connect("sqlite::memory:")
             .await
             .expect("Failed to connect to in-memory SQLite");
-        NotificationSender::new()
-            .with_database(db)
+        NotificationSender::new().with_database(db)
     }
 
     #[tokio::test]
@@ -1115,16 +1119,28 @@ mod tests {
             broadcast_channels: vec![],
         };
 
-        let result = sender.send(&user, WelcomeDbNotification {
-            user_name: "Alice".to_string(),
-        }).await;
+        let result = sender
+            .send(
+                &user,
+                WelcomeDbNotification {
+                    user_name: "Alice".to_string(),
+                },
+            )
+            .await;
 
         let db_result = result.get(&NotificationChannel::Database).unwrap();
-        assert!(db_result.is_ok(), "Database insert should succeed: {:?}", db_result);
+        assert!(
+            db_result.is_ok(),
+            "Database insert should succeed: {:?}",
+            db_result
+        );
 
         // Verify the notification was stored
         let sql = "SELECT id, notifiable_id, notification_type, data FROM notifications WHERE notifiable_id = ?1";
-        let row = sender.database.as_ref().unwrap()
+        let row = sender
+            .database
+            .as_ref()
+            .unwrap()
             .query_one(Statement::from_sql_and_values(
                 DatabaseBackend::Sqlite,
                 sql,
@@ -1169,15 +1185,23 @@ mod tests {
 
         // Send 3 notifications
         for i in 0..3 {
-            let result = sender.send(&user, SimpleNotification {
-                msg: format!("notification-{}", i),
-            }).await;
+            let result = sender
+                .send(
+                    &user,
+                    SimpleNotification {
+                        msg: format!("notification-{}", i),
+                    },
+                )
+                .await;
             assert!(result.get(&NotificationChannel::Database).unwrap().is_ok());
         }
 
         // Verify all 3 were stored
         let sql = "SELECT COUNT(*) as cnt FROM notifications WHERE notifiable_id = ?1";
-        let row = sender.database.as_ref().unwrap()
+        let row = sender
+            .database
+            .as_ref()
+            .unwrap()
             .query_one(Statement::from_sql_and_values(
                 DatabaseBackend::Sqlite,
                 sql,
@@ -1197,8 +1221,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_notification_no_channels() {
-        let sender = NotificationSender::new()
-            .with_mailer(Arc::new(LogMailer::new("log")));
+        let sender = NotificationSender::new().with_mailer(Arc::new(LogMailer::new("log")));
 
         let user = TestUser {
             id: "1".to_string(),
@@ -1252,13 +1275,15 @@ mod tests {
             }
         }
 
-        let results = sender.send(
-            &WebhookUser,
-            WebhookTestNotification {
-                event: "test".to_string(),
-                data: "hello".to_string(),
-            },
-        ).await;
+        let results = sender
+            .send(
+                &WebhookUser,
+                WebhookTestNotification {
+                    event: "test".to_string(),
+                    data: "hello".to_string(),
+                },
+            )
+            .await;
 
         let wh_result = results.get(&NotificationChannel::Webhook).unwrap();
         assert!(wh_result.is_err());
@@ -1272,8 +1297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_webhook_without_url_fails() {
-        let sender = NotificationSender::new()
-            .with_webhook_client(reqwest::Client::new());
+        let sender = NotificationSender::new().with_webhook_client(reqwest::Client::new());
 
         #[derive(Debug)]
         struct NoUrlUser;
@@ -1287,13 +1311,15 @@ mod tests {
             }
         }
 
-        let results = sender.send(
-            &NoUrlUser,
-            WebhookTestNotification {
-                event: "ping".to_string(),
-                data: "pong".to_string(),
-            },
-        ).await;
+        let results = sender
+            .send(
+                &NoUrlUser,
+                WebhookTestNotification {
+                    event: "ping".to_string(),
+                    data: "pong".to_string(),
+                },
+            )
+            .await;
 
         let wh_result = results.get(&NotificationChannel::Webhook).unwrap();
         assert!(wh_result.is_err());
@@ -1319,8 +1345,7 @@ mod tests {
             }
         }
 
-        let sender = NotificationSender::new()
-            .with_webhook_client(reqwest::Client::new());
+        let sender = NotificationSender::new().with_webhook_client(reqwest::Client::new());
 
         #[derive(Debug)]
         struct PayloadlessUser;
@@ -1356,7 +1381,7 @@ mod tests {
                 reqwest::Client::builder()
                     .connect_timeout(std::time::Duration::from_millis(100))
                     .build()
-                    .unwrap()
+                    .unwrap(),
             );
 
         #[derive(Debug)]
@@ -1406,7 +1431,10 @@ mod tests {
 
         // Mail and Broadcast should succeed
         assert!(results.get(&NotificationChannel::Mail).unwrap().is_ok());
-        assert!(results.get(&NotificationChannel::Broadcast).unwrap().is_ok());
+        assert!(results
+            .get(&NotificationChannel::Broadcast)
+            .unwrap()
+            .is_ok());
 
         // Webhook should fail (no actual server listening on localhost:9999)
         let wh_result = results.get(&NotificationChannel::Webhook).unwrap();
@@ -1469,12 +1497,14 @@ mod tests {
             }
         }
 
-        let results = sender.send(
-            &SmsUser,
-            SmsTestNotification {
-                content: "Hello!".to_string(),
-            },
-        ).await;
+        let results = sender
+            .send(
+                &SmsUser,
+                SmsTestNotification {
+                    content: "Hello!".to_string(),
+                },
+            )
+            .await;
 
         let sms_result = results.get(&NotificationChannel::Sms).unwrap();
         assert!(sms_result.is_err());
@@ -1490,8 +1520,7 @@ mod tests {
     async fn test_sms_without_phone_fails() {
         use crate::sms::LogSmsSender;
 
-        let sender = NotificationSender::new()
-            .with_sms_sender(Arc::new(LogSmsSender::new()));
+        let sender = NotificationSender::new().with_sms_sender(Arc::new(LogSmsSender::new()));
 
         #[derive(Debug)]
         struct NoPhoneUser;
@@ -1505,12 +1534,14 @@ mod tests {
             }
         }
 
-        let results = sender.send(
-            &NoPhoneUser,
-            SmsTestNotification {
-                content: "Ping".to_string(),
-            },
-        ).await;
+        let results = sender
+            .send(
+                &NoPhoneUser,
+                SmsTestNotification {
+                    content: "Ping".to_string(),
+                },
+            )
+            .await;
 
         let sms_result = results.get(&NotificationChannel::Sms).unwrap();
         assert!(sms_result.is_err());
@@ -1538,8 +1569,7 @@ mod tests {
             }
         }
 
-        let sender = NotificationSender::new()
-            .with_sms_sender(Arc::new(LogSmsSender::new()));
+        let sender = NotificationSender::new().with_sms_sender(Arc::new(LogSmsSender::new()));
 
         #[derive(Debug)]
         struct PayloadlessUser;
@@ -1568,8 +1598,7 @@ mod tests {
     async fn test_sms_channel_success() {
         use crate::sms::LogSmsSender;
 
-        let sender = NotificationSender::new()
-            .with_sms_sender(Arc::new(LogSmsSender::new()));
+        let sender = NotificationSender::new().with_sms_sender(Arc::new(LogSmsSender::new()));
 
         #[derive(Debug)]
         struct SmsUser;
@@ -1583,12 +1612,14 @@ mod tests {
             }
         }
 
-        let results = sender.send(
-            &SmsUser,
-            SmsTestNotification {
-                content: "Hello from Larastvel!".to_string(),
-            },
-        ).await;
+        let results = sender
+            .send(
+                &SmsUser,
+                SmsTestNotification {
+                    content: "Hello from Larastvel!".to_string(),
+                },
+            )
+            .await;
 
         let sms_result = results.get(&NotificationChannel::Sms).unwrap();
         assert!(sms_result.is_ok(), "SMS should succeed: {:?}", sms_result);
@@ -1652,7 +1683,10 @@ mod tests {
 
         assert_eq!(results.len(), 3);
         assert!(results.get(&NotificationChannel::Mail).unwrap().is_ok());
-        assert!(results.get(&NotificationChannel::Broadcast).unwrap().is_ok());
+        assert!(results
+            .get(&NotificationChannel::Broadcast)
+            .unwrap()
+            .is_ok());
         assert!(results.get(&NotificationChannel::Sms).unwrap().is_ok());
     }
 

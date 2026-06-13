@@ -49,7 +49,7 @@ use larastvel_core::axum::{
     response::{Html, IntoResponse, Json, Response},
     Form, Router,
 };
-use larastvel_core::mail::{LogMailer, MailError, MailManager, Mailer, Mailable};
+use larastvel_core::mail::{LogMailer, MailError, MailManager, Mailable, Mailer};
 use larastvel_core::rate_limiter::{RateLimitConfig, RateLimitExceeded, RateLimiter};
 use larastvel_core::routing::Registrar;
 use larastvel_core::serde::Deserialize;
@@ -147,9 +147,7 @@ fn welcome_email_html(name: &str, app_name: &str) -> String {
     </div>
 </body>
 </html>"#,
-        app_name,
-        name,
-        "http://localhost:8080",
+        app_name, name, "http://localhost:8080",
     )
 }
 
@@ -188,10 +186,7 @@ fn receipt_email_html(name: &str, order_id: &str, amount: &str, app_name: &str) 
     </div>
 </body>
 </html>"#,
-        order_id,
-        name,
-        amount,
-        app_name,
+        order_id, name, amount, app_name,
     )
 }
 
@@ -419,12 +414,7 @@ impl MailController {
         }
         rate_limiter.hit(&email);
 
-        let html = receipt_email_html(
-            body.name.trim(),
-            &body.order_id,
-            &body.amount,
-            "Larastvel",
-        );
+        let html = receipt_email_html(body.name.trim(), &body.order_id, &body.amount, "Larastvel");
         let subject = format!("Order #{} Confirmed ✅", body.order_id);
 
         let mailable = Mailable::html(vec![email.clone()], &subject, &html)
@@ -571,9 +561,13 @@ fn main() {
     println!();
     println!("Routes:");
     println!("  GET  /mail/test         — show mail-testing dashboard");
-    println!("  POST /mail/send         — send a custom email (form: to, subject, body, content_type)");
+    println!(
+        "  POST /mail/send         — send a custom email (form: to, subject, body, content_type)"
+    );
     println!("  POST /mail/welcome      — send a welcome email (form: name, email)");
-    println!("  POST /mail/receipt      — send an order receipt (form: name, email, order_id, amount)");
+    println!(
+        "  POST /mail/receipt      — send an order receipt (form: name, email, order_id, amount)"
+    );
     println!();
     println!("Rate limiting: 10 emails/minute per recipient address.");
     println!();
@@ -594,8 +588,8 @@ mod tests {
     use super::*;
     use larastvel_core::axum::body::Body;
     use larastvel_core::axum::http::Request;
-    use larastvel_core::axum::Router as AxumRouter;
     use larastvel_core::axum::routing;
+    use larastvel_core::axum::Router as AxumRouter;
     use tower::ServiceExt;
 
     /// Build a test router with MailManager and RateLimiter in extensions.
@@ -606,22 +600,10 @@ mod tests {
         let rate_limiter = mail_rate_limiter();
 
         AxumRouter::new()
-            .route(
-                "/mail/test",
-                routing::get(MailController::show_dashboard),
-            )
-            .route(
-                "/mail/send",
-                routing::post(MailController::send_email),
-            )
-            .route(
-                "/mail/welcome",
-                routing::post(MailController::send_welcome),
-            )
-            .route(
-                "/mail/receipt",
-                routing::post(MailController::send_receipt),
-            )
+            .route("/mail/test", routing::get(MailController::show_dashboard))
+            .route("/mail/send", routing::post(MailController::send_email))
+            .route("/mail/welcome", routing::post(MailController::send_welcome))
+            .route("/mail/receipt", routing::post(MailController::send_receipt))
             .layer(Extension(mail_manager))
             .layer(Extension(rate_limiter))
     }
@@ -849,7 +831,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resp.status(), 200, "Fresh limiter should allow first request");
+        assert_eq!(
+            resp.status(),
+            200,
+            "Fresh limiter should allow first request"
+        );
     }
 
     #[tokio::test]

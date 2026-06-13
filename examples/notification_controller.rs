@@ -40,13 +40,13 @@ use larastvel_core::axum::{
     Form, Router,
 };
 use larastvel_core::notifications::{
-    BroadcastPayload, DatabaseNotification, Notification, NotificationChannel,
-    NotificationError, NotificationSender, Notifiable,
+    BroadcastPayload, DatabaseNotification, Notifiable, Notification, NotificationChannel,
+    NotificationError, NotificationSender,
 };
 use larastvel_core::rate_limiter::{RateLimitConfig, RateLimitExceeded, RateLimiter};
 use larastvel_core::routing::Registrar;
-use larastvel_core::sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use larastvel_core::sea_orm;
+use larastvel_core::sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use larastvel_core::serde::{Deserialize, Serialize};
 use larastvel_core::serde_json::{self, json};
 
@@ -179,12 +179,12 @@ impl NotificationController {
     // -------------------------------------------------------------------------
 
     /// GET /notifications — show the notification dashboard (HTML).
-    pub async fn show_dashboard(
-        Extension(db): Extension<sea_orm::DatabaseConnection>,
-    ) -> Response {
+    pub async fn show_dashboard(Extension(db): Extension<sea_orm::DatabaseConnection>) -> Response {
         let total = Self::fetch_total(&db).await;
         let unread_count = Self::fetch_unread_count(&db).await;
-        let recent = Self::fetch_notifications(&db, 1, 10).await.unwrap_or_default();
+        let recent = Self::fetch_notifications(&db, 1, 10)
+            .await
+            .unwrap_or_default();
 
         let recent_rows: String = recent
             .iter()
@@ -348,7 +348,8 @@ impl NotificationController {
             } else {
                 r#"<p style="text-align:center;margin-top:1rem;color:#64748b;font-size:0.8125rem;">
                     Showing up to 10 recent notifications.
-                   </p>"#.to_string()
+                   </p>"#
+                    .to_string()
             },
         );
         Html(html).into_response()
@@ -424,8 +425,7 @@ impl NotificationController {
         let notification = DemoNotification { data };
 
         // Create a sender with just the database channel
-        let sender = NotificationSender::new()
-            .with_database(db);
+        let sender = NotificationSender::new().with_database(db);
 
         let results = sender.send(&notifiable, notification).await;
         let db_result = results.get(&NotificationChannel::Database);
@@ -494,9 +494,7 @@ impl NotificationController {
     }
 
     /// POST /api/notifications/read-all — mark all notifications as read.
-    pub async fn mark_all_read(
-        Extension(db): Extension<sea_orm::DatabaseConnection>,
-    ) -> Response {
+    pub async fn mark_all_read(Extension(db): Extension<sea_orm::DatabaseConnection>) -> Response {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -747,8 +745,8 @@ mod tests {
     use super::*;
     use larastvel_core::axum::body::Body;
     use larastvel_core::axum::http::Request;
-    use larastvel_core::axum::Router as AxumRouter;
     use larastvel_core::axum::routing;
+    use larastvel_core::axum::Router as AxumRouter;
     use std::sync::atomic::{AtomicU64, Ordering};
     use tower::ServiceExt;
 
@@ -763,8 +761,7 @@ mod tests {
             .expect("Failed to connect to in-memory SQLite");
 
         // Ensure the notifications table exists
-        let sender = NotificationSender::new()
-            .with_database(db.clone());
+        let sender = NotificationSender::new().with_database(db.clone());
         sender.ensure_notifications_table().await.unwrap();
 
         let rate_limiter = notification_rate_limiter();
@@ -822,21 +819,22 @@ mod tests {
               read_at, created_at, updated_at) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)";
 
-        let read_at: Option<i64> = if read { Some(now) } else { None };        db.execute(Statement::from_sql_and_values(
-                DatabaseBackend::Sqlite,
-                sql,
-                [
-                    id.clone().into(),
-                    notifiable_id.to_string().into(),
-                    "user".into(),
-                    "DemoNotification".into(),
-                    data_json.into(),
-                    read_at.into(),
-                    now.into(),
-                ],
-            ))
-            .await
-            .unwrap();
+        let read_at: Option<i64> = if read { Some(now) } else { None };
+        db.execute(Statement::from_sql_and_values(
+            DatabaseBackend::Sqlite,
+            sql,
+            [
+                id.clone().into(),
+                notifiable_id.to_string().into(),
+                "user".into(),
+                "DemoNotification".into(),
+                data_json.into(),
+                read_at.into(),
+                now.into(),
+            ],
+        ))
+        .await
+        .unwrap();
 
         id
     }
@@ -974,7 +972,9 @@ mod tests {
                     .method("POST")
                     .uri("/api/notifications/send")
                     .header("content-type", "application/x-www-form-urlencoded")
-                    .body(Body::from("notifiable_id=user-1&title=Welcome!&body=Hello+there"))
+                    .body(Body::from(
+                        "notifiable_id=user-1&title=Welcome!&body=Hello+there",
+                    ))
                     .unwrap(),
             )
             .await
@@ -1049,11 +1049,8 @@ mod tests {
             rate_limiter.hit("ratelimited-user");
         }
 
-        let db = sea_orm::Database::connect("sqlite::memory:")
-            .await
-            .unwrap();
-        let sender = NotificationSender::new()
-            .with_database(db.clone());
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let sender = NotificationSender::new().with_database(db.clone());
         sender.ensure_notifications_table().await.unwrap();
 
         let app = AxumRouter::new()
@@ -1160,7 +1157,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resp.status(), 200, "Marking already-read notification is idempotent");
+        assert_eq!(
+            resp.status(),
+            200,
+            "Marking already-read notification is idempotent"
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -1172,14 +1173,7 @@ mod tests {
         let (app, db) = test_router().await;
         // Insert 3 unread notifications
         for i in 0..3 {
-            insert_test_notification(
-                &db,
-                "user-1",
-                &format!("Notif {}", i),
-                "",
-                false,
-            )
-            .await;
+            insert_test_notification(&db, "user-1", &format!("Notif {}", i), "", false).await;
         }
 
         let resp = app
@@ -1223,14 +1217,7 @@ mod tests {
         let (app, db) = test_router().await;
         // Insert 5 notifications
         for i in 0..5 {
-            insert_test_notification(
-                &db,
-                "user-1",
-                &format!("Notif {}", i),
-                "",
-                false,
-            )
-            .await;
+            insert_test_notification(&db, "user-1", &format!("Notif {}", i), "", false).await;
         }
 
         // Page 1 with 2 per page
@@ -1348,14 +1335,7 @@ mod tests {
         let (app, db) = test_router().await;
         // Insert 150 notifications
         for i in 0..150 {
-            insert_test_notification(
-                &db,
-                "user-1",
-                &format!("Bulk {}", i),
-                "",
-                false,
-            )
-            .await;
+            insert_test_notification(&db, "user-1", &format!("Bulk {}", i), "", false).await;
         }
 
         // Request per_page=999 — should be capped at 100

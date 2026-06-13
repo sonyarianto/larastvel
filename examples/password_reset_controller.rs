@@ -30,13 +30,13 @@
 
 use std::sync::Arc;
 
+use larastvel_core::auth::{PasswordResetBroker, PasswordResetConfig, PasswordResetError};
 use larastvel_core::axum::{
     extract::{Extension, Path, Query},
     http::StatusCode,
     response::{Html, IntoResponse, Json, Response},
     Form, Router,
 };
-use larastvel_core::auth::{PasswordResetBroker, PasswordResetError, PasswordResetConfig};
 use larastvel_core::mail::LogMailer;
 use larastvel_core::rate_limiter::{RateLimitConfig, RateLimitExceeded, RateLimiter};
 use larastvel_core::routing::Registrar;
@@ -85,10 +85,7 @@ pub struct MessageResponse {
 /// Limits to 3 requests per minute per email address, which prevents
 /// brute-force token generation while remaining usable for legitimate users.
 pub fn forgot_password_rate_limiter() -> RateLimiter {
-    RateLimiter::new(
-        RateLimitConfig::per_minute(3)
-            .named("forgot-password"),
-    )
+    RateLimiter::new(RateLimitConfig::per_minute(3).named("forgot-password"))
 }
 
 // =============================================================================
@@ -307,8 +304,7 @@ impl PasswordResetController {
     </div>
 </body>
 </html>"#,
-            query.email,
-            token,
+            query.email, token,
         );
         Html(html).into_response()
     }
@@ -356,19 +352,14 @@ impl PasswordResetController {
         // }
         // ```
         broker
-            .reset(
-                &email,
-                &body.token,
-                &body.password,
-                |email, _password| {
-                    // --- SIMULATED: replace with real DB logic ---
-                    tracing::info!(
-                        "Password reset for {} — would update password hash here",
-                        email,
-                    );
-                    Ok(())
-                },
-            )
+            .reset(&email, &body.token, &body.password, |email, _password| {
+                // --- SIMULATED: replace with real DB logic ---
+                tracing::info!(
+                    "Password reset for {} — would update password hash here",
+                    email,
+                );
+                Ok(())
+            })
             .await?;
 
         Ok(Json(json!({
@@ -411,8 +402,8 @@ mod tests {
     use super::*;
     use larastvel_core::axum::body::Body;
     use larastvel_core::axum::http::Request;
-    use larastvel_core::axum::Router;
     use larastvel_core::axum::routing;
+    use larastvel_core::axum::Router;
     use larastvel_core::sea_orm::ConnectionTrait;
     use tower::ServiceExt;
 
@@ -497,7 +488,11 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resp.status(), 200, "Fresh limiter should allow the first request");
+        assert_eq!(
+            resp.status(),
+            200,
+            "Fresh limiter should allow the first request"
+        );
     }
 
     /// Test that the handler returns 429 when rate limit is exceeded.
@@ -570,7 +565,11 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resp.status(), 200, "Different email should not be rate-limited");
+        assert_eq!(
+            resp.status(),
+            200,
+            "Different email should not be rate-limited"
+        );
     }
 
     #[tokio::test]
@@ -711,9 +710,14 @@ mod tests {
         assert_eq!(resp.status(), 200);
 
         // 2. Verify the send-reset-link endpoint returns the expected message
-        let body_bytes = larastvel_core::axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let body_bytes = larastvel_core::axum::body::to_bytes(resp.into_body(), 4096)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-        assert!(json["message"].as_str().unwrap().contains("If that email address is registered"));
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("If that email address is registered"));
 
         // Note: A full E2E test (send → peek token from DB → POST /password/reset)
         // requires sharing the DatabaseConnection between the router and test code.
@@ -819,7 +823,10 @@ mod tests {
             ))
             .await
             .unwrap();
-        assert!(row.is_none(), "Token should be deleted after successful reset");
+        assert!(
+            row.is_none(),
+            "Token should be deleted after successful reset"
+        );
     }
 
     #[tokio::test]

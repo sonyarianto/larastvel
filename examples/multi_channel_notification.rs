@@ -39,8 +39,8 @@ use std::sync::Arc;
 use larastvel_core::broadcasting::log::LogBroadcaster;
 use larastvel_core::mail::LogMailer;
 use larastvel_core::notifications::{
-    BroadcastPayload, Notification, NotificationChannel, NotificationError, NotificationSender,
-    Notifiable,
+    BroadcastPayload, Notifiable, Notification, NotificationChannel, NotificationError,
+    NotificationSender,
 };
 use larastvel_core::sea_orm::{self, ConnectionTrait, DatabaseBackend, Statement};
 use larastvel_core::serde_json::{self, json};
@@ -182,7 +182,10 @@ impl Notification for WelcomeNotification {
             larastvel_core::mail::Mailable::new(
                 vec![],
                 &format!("Welcome to Shop, {}!", self.name),
-                &format!("Hi {},\n\nThanks for joining! We're happy to have you.\n\n-The Shop Team", self.name),
+                &format!(
+                    "Hi {},\n\nThanks for joining! We're happy to have you.\n\n-The Shop Team",
+                    self.name
+                ),
             )
             .from("welcome@example.com"),
         )
@@ -378,9 +381,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_all_fails_when_mailer_missing() {
-        let db = sea_orm::Database::connect("sqlite::memory:")
-            .await
-            .unwrap();
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
 
         // No mailer configured — only database and broadcast
         let sender = NotificationSender::new()
@@ -441,7 +442,10 @@ mod tests {
             Err(NotificationError::ChannelNotConfigured(name)) => {
                 assert_eq!(name, "database");
             }
-            other => panic!("Expected ChannelNotConfigured for database, got {:?}", other),
+            other => panic!(
+                "Expected ChannelNotConfigured for database, got {:?}",
+                other
+            ),
         }
 
         // Broadcast should succeed
@@ -458,11 +462,7 @@ mod tests {
         let sender = NotificationSender::new()
             .with_mailer(Arc::new(LogMailer::new("log")))
             .with_broadcaster(Arc::new(LogBroadcaster::new("log")))
-            .with_database(
-                sea_orm::Database::connect("sqlite::memory:")
-                    .await
-                    .unwrap(),
-            );
+            .with_database(sea_orm::Database::connect("sqlite::memory:").await.unwrap());
 
         // User with no broadcast channels configured
         struct NoBroadcastUser {
@@ -567,8 +567,8 @@ mod tests {
         // WelcomeNotification.via() returns [Mail, Database], so when
         // the sender iterates those channels, neither is configured and
         // both return ChannelNotConfigured errors.
-        let sender = NotificationSender::new()
-            .with_broadcaster(Arc::new(LogBroadcaster::new("log")));
+        let sender =
+            NotificationSender::new().with_broadcaster(Arc::new(LogBroadcaster::new("log")));
 
         let user = ShopUser {
             id: "cust-nosup".to_string(),
@@ -616,11 +616,7 @@ mod tests {
         let sender = NotificationSender::new()
             .with_mailer(Arc::new(LogMailer::new("log")))
             .with_broadcaster(Arc::new(LogBroadcaster::new("log")))
-            .with_database(
-                sea_orm::Database::connect("sqlite::memory:")
-                    .await
-                    .unwrap(),
-            );
+            .with_database(sea_orm::Database::connect("sqlite::memory:").await.unwrap());
 
         struct PrefixedUser;
 
@@ -651,7 +647,12 @@ mod tests {
         // All three should succeed
         assert_eq!(results.len(), 3);
         for (channel, result) in &results {
-            assert!(result.is_ok(), "Channel {:?} should succeed: {:?}", channel, result);
+            assert!(
+                result.is_ok(),
+                "Channel {:?} should succeed: {:?}",
+                channel,
+                result
+            );
         }
     }
 
@@ -710,11 +711,7 @@ mod tests {
         let sender = NotificationSender::new()
             .with_mailer(Arc::new(LogMailer::new("log")))
             .with_broadcaster(Arc::new(LogBroadcaster::new("log")))
-            .with_database(
-                sea_orm::Database::connect("sqlite::memory:")
-                    .await
-                    .unwrap(),
-            );
+            .with_database(sea_orm::Database::connect("sqlite::memory:").await.unwrap());
 
         let user = ShopUser {
             id: "empty-user".to_string(),
