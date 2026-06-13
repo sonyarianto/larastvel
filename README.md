@@ -37,7 +37,7 @@ Active development (~88% feature parity). Core architecture is solid with most f
 - **Cache** — `CacheManager` with multiple stores (array, file, database), TTL support, remember, batch operations
 - **Password Reset** — `PasswordResetBroker` with token generation, database-backed token storage, throttle/expiry, reset link email via `Mailable`, `reset()` with password update callback
 - **Email Verification** — `EmailVerificationBroker` with JWT-signed tokens / `VerifiedUser` Axum extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` callback / `email_verified_at` column in users table
-- **Testing** — 580+ unit tests + 90+ example tests across all modules
+- **Testing** — 500+ unit tests + 100 example tests across all modules
 
 ## Quick Start
 
@@ -110,7 +110,7 @@ crates/
 src/                  Application entrypoint
 resources/            Views, CSS, JS (Laravel resources/ equivalent)
 config.toml           Application configuration
-examples/             Controllers (mail, SMS, notification, password-reset, unified dashboard)
+examples/             Controllers & examples (mail, SMS, notification, password-reset, auth service provider, multi-channel, unified dashboard)
 ```
 
 ## Tech Stack
