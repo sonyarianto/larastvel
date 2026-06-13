@@ -41,6 +41,7 @@ base64.workspace = true
 rand.workspace = true
 jsonwebtoken.workspace = true
 regex.workspace = true
+serde_urlencoded.workspace = true
 
 [dev-dependencies]
 tower.workspace = true

@@ -11,6 +11,7 @@ pub mod http;
 pub mod logging;
 pub mod middleware;
 pub mod models;
+pub mod pagination;
 pub mod routing;
 pub mod support;
 pub mod validation;
