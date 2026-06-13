@@ -136,7 +136,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Queue / Jobs | — | ❌ |
 | Notifications / Mail | — | ❌ |
 | File Storage (Flysystem) | — | ❌ |
-| Events / Listeners | — | ❌ |
+| Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
 | Form Validation | `Validator` / `validate()` / `ValidationErrors` + 20 built-in rules | ✅ |
 | Pagination | `Paginator<T>` / `PaginationParams` extractor / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | — | ❌ |

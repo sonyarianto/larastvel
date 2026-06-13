@@ -5,6 +5,7 @@ pub mod config;
 pub mod console;
 pub mod database;
 pub mod encryption;
+pub mod events;
 pub mod foundation;
 pub mod hash;
 pub mod http;
@@ -25,6 +26,7 @@ pub use serde_json;
 pub use sea_orm;
 pub use tokio;
 
+pub use events::EventService;
 pub use foundation::{Application, Kernel, ServiceProvider};
 pub use routing::Registrar;
 pub use auth::{Auth, AuthError, AuthenticatedUser, Claims};
