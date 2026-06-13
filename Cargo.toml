@@ -5,6 +5,7 @@ members = [
     "crates/larastvel-macros",
     "crates/larastvel-tinker",
     "crates/larastvel-new",
+    "crates/larastvel-testing",
 ]
 resolver = "2"
 

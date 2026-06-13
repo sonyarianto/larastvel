@@ -1699,6 +1699,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "larastvel-testing"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64",
+ "bytes",
+ "larastvel-core",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "tokio",
+ "tower",
+]
+
+[[package]]
 name = "larastvel-tinker"
 version = "0.1.0"
 dependencies = [
