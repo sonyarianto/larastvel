@@ -108,6 +108,42 @@ config.toml           Application configuration
 | Migrations | Phinx | sea-orm-migration |
 | Asset bundling | Vite | Vite (via rust-embed) |
 
+## Parity Tracking
+
+A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-skeleton/) for side-by-side comparison. Use it to verify directory structure, config defaults, routing conventions, and feature behavior.
+
+| Laravel Feature | Larastvel Equivalent | Status |
+|---|---|---|
+| `routes/web.php` | `src/routes/web.rs` | ✅ |
+| `routes/api.php` | `src/routes/api.rs` | ✅ |
+| `routes/console.php` | `crates/larastvel-cli/src/main.rs` | ⚠️ Partial |
+| `config/*.php` (10 files) | `config.toml` (single file) | ⚠️ Partial |
+| `.env` | `.env` | ✅ |
+| `bootstrap/app.php` | `foundation::Application` | ⚠️ Partial |
+| `app/Providers/*` | `ServiceProvider` trait | ⚠️ Stub |
+| `artisan` CLI | `larastvel-cli` | ⚠️ Stub |
+| `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ⚠️ Stub |
+| `app/Models/User.php` | — | ❌ |
+| Eloquent ORM | SeaORM (connection only) | ⚠️ Partial |
+| Blade templating | Tera | ⚠️ Partial |
+| Migrations (`database/migrations/`) | sea-orm-migration (not wired) | ❌ |
+| Seeders | `DatabaseManager::seed()` stub | ❌ |
+| Session | — | ❌ |
+| Authentication / Auth | — | ❌ |
+| Authorization / Gates | — | ❌ |
+| Queue / Jobs | — | ❌ |
+| Notifications / Mail | — | ❌ |
+| File Storage (Flysystem) | — | ❌ |
+| Events / Listeners | — | ❌ |
+| Form Validation | — | ❌ |
+| Pagination | — | ❌ |
+| Rate Limiting | — | ❌ |
+| Encryption / Hashing | — | ❌ |
+| Broadcasting | — | ❌ |
+| Localization | — | ❌ |
+| Testing (PHPUnit) | — | ❌ |
+| Task Scheduling (Cron) | — | ❌ |
+
 ## License
 
 MIT
