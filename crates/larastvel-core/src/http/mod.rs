@@ -67,3 +67,63 @@ impl IntoResponse for Error {
         (status, Json(serde_json::json!({"error": message}))).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+
+    #[test]
+    fn test_json_response_new() {
+        let resp = JsonResponse::new("hello");
+        assert_eq!(resp.data, "hello");
+        assert!(resp.message.is_none());
+    }
+
+    #[test]
+    fn test_json_response_with_message() {
+        let resp = JsonResponse::new(42).with_message("the answer");
+        assert_eq!(resp.data, 42);
+        assert_eq!(resp.message, Some("the answer".to_string()));
+    }
+
+    #[test]
+    fn test_error_not_found() {
+        let err = Error::NotFound("route".to_string());
+        assert_eq!(err.to_string(), "Not Found: route");
+        let resp = err.into_response();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_error_validation() {
+        let err = Error::Validation("bad input".to_string());
+        assert_eq!(err.to_string(), "Validation Error: bad input");
+        let resp = err.into_response();
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn test_error_internal() {
+        let err = Error::Internal("wow".to_string());
+        assert_eq!(err.to_string(), "Internal Error: wow");
+        let resp = err.into_response();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_error_unauthorized() {
+        let err = Error::Unauthorized("nope".to_string());
+        assert_eq!(err.to_string(), "Unauthorized: nope");
+        let resp = err.into_response();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_larastvel_result_type() {
+        let ok: LarastvelResult<i32> = Ok(1);
+        assert!(ok.is_ok());
+        let err: LarastvelResult<i32> = Err(Error::Internal("fail".to_string()));
+        assert!(err.is_err());
+    }
+}

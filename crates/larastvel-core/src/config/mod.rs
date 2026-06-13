@@ -110,3 +110,63 @@ impl Config {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = Config::default();
+        assert_eq!(config.app.name, "larastvel");
+        assert_eq!(config.app.url, "http://localhost:8080");
+        assert_eq!(config.app.env, "local");
+        assert!(config.app.debug);
+        assert_eq!(config.database.driver, "sqlite");
+        assert_eq!(config.database.port, 3306);
+        assert_eq!(config.logging.level, "debug");
+        assert_eq!(config.view.engine, "tera");
+    }
+
+    #[test]
+    fn test_config_get_dot_notation() {
+        let config = Config::default();
+        assert_eq!(config.get("app.name"), Some("larastvel".to_string()));
+        assert_eq!(config.get("app.url"), Some("http://localhost:8080".to_string()));
+        assert_eq!(config.get("app.env"), Some("local".to_string()));
+        assert_eq!(config.get("app.debug"), Some("true".to_string()));
+        assert_eq!(config.get("database.driver"), Some("sqlite".to_string()));
+        assert_eq!(config.get("database.port"), Some("3306".to_string()));
+        assert_eq!(config.get("logging.level"), Some("debug".to_string()));
+    }
+
+    #[test]
+    fn test_config_get_unknown_key() {
+        let config = Config::default();
+        assert_eq!(config.get("nonexistent.key"), None);
+    }
+
+    #[test]
+    fn test_config_get_extra_key() {
+        let mut config = Config::default();
+        config.extra.insert("custom.key".to_string(), toml::Value::String("value".to_string()));
+        assert_eq!(config.get("custom.key"), Some("\"value\"".to_string()));
+    }
+
+    #[test]
+    fn test_config_roundtrip_toml() {
+        let config = Config::default();
+        let toml_str = toml::to_string(&config).unwrap();
+        let parsed: Config = toml::from_str(&toml_str).unwrap();
+        assert_eq!(parsed.app.name, config.app.name);
+        assert_eq!(parsed.database.driver, config.database.driver);
+    }
+
+    #[test]
+    fn test_config_load_nonexistent_path() {
+        let path = std::path::Path::new("/nonexistent/path");
+        let config = Config::load(path);
+        assert_eq!(config.app.name, "larastvel");
+        assert!(config.extra.is_empty());
+    }
+}

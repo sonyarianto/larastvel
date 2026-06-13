@@ -166,3 +166,169 @@ where
         std::any::type_name::<F>().to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::Request;
+    use std::sync::{Arc, Mutex};
+    use tower::ServiceExt;
+
+    #[test]
+    fn test_registrar_new() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        assert!(registrar.list_routes().is_empty());
+    }
+
+    #[test]
+    fn test_route_resolution_without_prefix() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        assert_eq!(registrar.resolve_uri("/foo"), "/foo");
+        assert_eq!(registrar.resolve_uri("foo"), "/foo");
+    }
+
+    #[test]
+    fn test_register_and_build_route() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.get("/test", || async { "hello" });
+
+        let app = registrar.build();
+
+        let response = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.oneshot(
+                    Request::builder()
+                        .method("GET")
+                        .uri("/test")
+                        .body(Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_register_and_build_post_route() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.post("/data", || async { "created" });
+
+        let app = registrar.build();
+
+        let response = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/data")
+                        .body(Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_health_route_in_build() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        let app = registrar.build();
+
+        let response = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.oneshot(
+                    Request::builder()
+                        .method("GET")
+                        .uri("/health")
+                        .body(Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_list_routes_metadata() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.get("/a", || async { "a" });
+        registrar.post("/b", || async { "b" });
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 2);
+        assert_eq!(listed[0].method, "GET");
+        assert_eq!(listed[0].uri, "/a");
+        assert_eq!(listed[1].method, "POST");
+        assert_eq!(listed[1].uri, "/b");
+    }
+
+    #[test]
+    fn test_group_prefix_affects_uri() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.group("/admin", |r| {
+            r.get("/users", || async { "users" });
+        });
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed[0].uri, "/admin/users");
+    }
+
+    #[test]
+    fn test_view_shorthand() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.view("/welcome", "welcome");
+
+        let app = registrar.build();
+
+        let response = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.oneshot(
+                    Request::builder()
+                        .method("GET")
+                        .uri("/welcome")
+                        .body(Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_into_route_handler_for_closure() {
+        let handler = || async { "ok" };
+        let name = handler.name();
+        assert!(!name.is_empty());
+    }
+}

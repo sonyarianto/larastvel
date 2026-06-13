@@ -35,3 +35,6 @@ larastvel-macros = { path = "../larastvel-macros" }
 async-trait = "0.1"
 inventory = "0.3"
 linkme = "0.3"
+
+[dev-dependencies]
+tower.workspace = true

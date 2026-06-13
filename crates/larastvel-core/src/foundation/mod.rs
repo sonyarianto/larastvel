@@ -153,3 +153,82 @@ pub trait Kernel: Send + Sync {
     fn register_routes(&self, app: &Application);
     fn boot(&self, app: &Application);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_application_new_uses_default_config() {
+        let app = Application::new(None);
+        assert_eq!(app.config().app.name, "larastvel");
+    }
+
+    #[test]
+    fn test_application_base_path_defaults_to_dot() {
+        let app = Application::new(None);
+        assert_eq!(app.base_path(), std::path::PathBuf::from("."));
+    }
+
+    #[test]
+    fn test_application_base_path_custom() {
+        let app = Application::new(Some(std::path::PathBuf::from("/tmp")));
+        assert_eq!(app.base_path(), std::path::PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn test_application_bind_and_make() {
+        let app = Application::new(None);
+        app.bind(42i32);
+        let val: Option<i32> = app.make();
+        assert_eq!(val, Some(42));
+    }
+
+    #[test]
+    fn test_application_make_nonexistent() {
+        let app = Application::new(None);
+        let val: Option<String> = app.make();
+        assert!(val.is_none());
+    }
+
+    #[test]
+    fn test_application_singleton() {
+        let app = Application::new(None);
+        app.singleton("shared".to_string());
+        let val: Option<String> = app.make();
+        assert_eq!(val, Some("shared".to_string()));
+    }
+
+    #[test]
+    fn test_application_boot_twice_is_idempotent() {
+        let app = Application::new(None);
+        app.boot();
+        app.boot();
+    }
+
+    #[test]
+    fn test_application_database_is_none_by_default() {
+        let app = Application::new(None);
+        assert!(app.database().is_none());
+    }
+
+    #[test]
+    fn test_application_router_returns_registrar() {
+        let app = Application::new(None);
+        let registrar = app.router();
+        registrar.get("/ping", || async { "pong" });
+        let routes = registrar.list_routes();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].uri, "/ping");
+    }
+
+    #[test]
+    fn test_service_provider_trait() {
+        struct TestProvider;
+        impl ServiceProvider for TestProvider {
+            fn register(&self, _app: &Application) {}
+        }
+        let provider = TestProvider;
+        assert!(provider.provides().is_empty());
+    }
+}
