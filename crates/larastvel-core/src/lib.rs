@@ -14,6 +14,7 @@ pub mod middleware;
 pub mod models;
 pub mod pagination;
 pub mod session;
+pub mod storage;
 pub mod routing;
 pub mod support;
 pub mod validation;

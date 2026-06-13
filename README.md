@@ -135,7 +135,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Authorization / Gates | `auth_middleware` guards routes | ⚠️ Partial |
 | Queue / Jobs | — | ❌ |
 | Notifications / Mail | — | ❌ |
-| File Storage (Flysystem) | — | ❌ |
+| File Storage (Flysystem) | `Filesystem` trait / `LocalDisk` driver / `StorageManager` / put/get/delete/copy/move/list/dirs | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
 | Form Validation | `Validator` / `validate()` / `ValidationErrors` + 20 built-in rules | ✅ |
 | Pagination | `Paginator<T>` / `PaginationParams` extractor / `to_json()` / `IntoResponse` | ✅ |
