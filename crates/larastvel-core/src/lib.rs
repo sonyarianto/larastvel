@@ -13,6 +13,7 @@ pub mod middleware;
 pub mod models;
 pub mod routing;
 pub mod support;
+pub mod validation;
 pub mod view;
 
 pub use axum;

@@ -137,7 +137,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Notifications / Mail | — | ❌ |
 | File Storage (Flysystem) | — | ❌ |
 | Events / Listeners | — | ❌ |
-| Form Validation | — | ❌ |
+| Form Validation | `Validator` / `validate()` / `ValidationErrors` + 20 built-in rules | ✅ |
 | Pagination | — | ❌ |
 | Rate Limiting | — | ❌ |
 | Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
