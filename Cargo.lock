@@ -1610,6 +1610,7 @@ name = "larastvel-app"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "dotenvy",
  "larastvel-core",
  "sea-orm-migration",
  "serde",

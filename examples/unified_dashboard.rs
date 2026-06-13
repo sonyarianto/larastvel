@@ -84,12 +84,36 @@ pub struct AppState {
 }
 
 // =============================================================================
+// ENVIRONMENT VARIABLES
+// =============================================================================
+
+/// Load environment variables from a `.env` file (optional).
+fn load_env() {
+    let _ = dotenvy::dotenv();
+}
+
+// =============================================================================
 // APPLICATION BUILDER
 // =============================================================================
 
 /// Build the complete unified Axum application with all controllers
 /// registered and all extensions wired up.
+///
+/// ## Broadcast driver configuration via environment variables
+///
+/// | Variable          | Required for | Description            |
+/// |-------------------|--------------|------------------------|
+/// | `PUSHER_APP_ID`   | Pusher       | Pusher app ID          |
+/// | `PUSHER_KEY`      | Pusher       | Pusher app key         |
+/// | `PUSHER_SECRET`   | Pusher       | Pusher app secret      |
+/// | `PUSHER_CLUSTER`  | Pusher       | Pusher cluster (e.g. mt1, us2) |
+/// | `ABLY_API_KEY`    | Ably         | Ably API key (`APP_ID:API_KEY`) |
+///
+/// If the required environment variables are missing for a real driver,
+/// only the `LogBroadcaster` (dev-mode) is registered.
 pub async fn build_app() -> (Router, AppState) {
+    load_env();
+
     // --- Database for notifications ---
     let db = sea_orm::Database::connect("sqlite::memory:")
         .await
@@ -116,11 +140,31 @@ pub async fn build_app() -> (Router, AppState) {
 
     let broadcast_log = new_broadcast_log();
 
-    // --- Broadcast drivers (Log, Pusher, Ably) ---
+    // --- Broadcast drivers (Log always available; Pusher/Ably via env) ---
     let mut broadcast_manager = BroadcastManager::new("log");
     broadcast_manager.register("log", LogBroadcaster::new("log"));
-    broadcast_manager.register("pusher", PusherBroadcaster::new("pusher", "APP_ID", "KEY", "SECRET", "mt1"));
-    broadcast_manager.register("ably", AblyBroadcaster::new("ably", "APP_ID:API_KEY"));
+
+    // Pusher: requires PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER
+    let pusher_app_id = std::env::var("PUSHER_APP_ID").ok().filter(|v| !v.is_empty());
+    let pusher_key = std::env::var("PUSHER_KEY").ok().filter(|v| !v.is_empty());
+    let pusher_secret = std::env::var("PUSHER_SECRET").ok().filter(|v| !v.is_empty());
+    let pusher_cluster = std::env::var("PUSHER_CLUSTER").ok().filter(|v| !v.is_empty());
+    if let (Some(app_id), Some(key), Some(secret), Some(cluster)) =
+        (pusher_app_id, pusher_key, pusher_secret, pusher_cluster)
+    {
+        broadcast_manager.register(
+            "pusher",
+            PusherBroadcaster::new("pusher", &app_id, &key, &secret, &cluster),
+        );
+        tracing::info!("📡 PusherBroadcaster registered (cluster: {})", cluster);
+    }
+
+    // Ably: requires ABLY_API_KEY
+    let ably_api_key = std::env::var("ABLY_API_KEY").ok().filter(|v| !v.is_empty());
+    if let Some(api_key) = ably_api_key {
+        broadcast_manager.register("ably", AblyBroadcaster::new("ably", &api_key));
+        tracing::info!("⚡ AblyBroadcaster registered");
+    }
 
     let broadcast_limiter = broadcast_rate_limiter();
 
@@ -842,7 +886,7 @@ textarea{{resize:vertical;min-height:60px;font-family:inherit}}
 <option value="pusher">📡 PusherBroadcaster (real)</option>
 <option value="ably">⚡ AblyBroadcaster (real)</option>
 </select>
-<div class="hint">LogBroadcaster logs events. Pusher/Ably send via their REST APIs (configure APP_ID/KEY in build_app).</div>
+<div class="hint">LogBroadcaster logs events. Pusher/Ably send via their REST APIs. Set PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER (Pusher) or ABLY_API_KEY (Ably) in .env to enable real drivers.</div>
 <button type="submit" class="btn">Broadcast Event 📡</button></form></div>
 <div class="card"><h2 style="font-size:1.125rem;margin-bottom:1rem;color:#f1f5f9;">📋 Event Log</h2>
 <table><thead><tr><th>ID</th><th>Channel</th><th>Event</th><th>Data</th><th>Driver</th><th>Sent</th></tr></thead>
@@ -1173,6 +1217,7 @@ fn fmt_ts(unix_secs: i64) -> String {
 // =============================================================================
 
 fn main() {
+    load_env();
     println!("Unified Dashboard — combines Mail, Broadcast, SMS, and Notification controllers.");
     println!();
     println!("17 routes across 4 channels. Run tests: cargo test --example unified_dashboard");
@@ -1431,6 +1476,39 @@ mod tests {
         let body_bytes = larastvel_core::axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
         assert_eq!(json["total"], 3);
+    }
+
+    #[tokio::test]
+    async fn test_broadcast_default_driver_is_log() {
+        let (app, state) = build_app().await;
+        let resp = app.clone().oneshot(Request::builder().method("POST").uri("/api/broadcast/send")
+            .header("content-type","application/x-www-form-urlencoded")
+            .body(Body::from("channel=user.1&event=test&data=%7B%7D")).unwrap()).await.unwrap();
+        assert_eq!(resp.status(), 200);
+
+        let body = larastvel_core::axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["driver"], "log", "Default driver should be 'log'");
+
+        let log_guard = state.broadcast_log.lock().unwrap();
+        let entry = &log_guard.all()[0];
+        assert_eq!(entry.driver, "log", "Log entry should store 'log' driver");
+    }
+
+    #[tokio::test]
+    async fn test_broadcast_unknown_driver_returns_422() {
+        let (app, _) = build_app().await;
+        let resp = app.clone().oneshot(Request::builder().method("POST").uri("/api/broadcast/send")
+            .header("content-type","application/x-www-form-urlencoded")
+            .body(Body::from("channel=user.1&event=test&data=%7B%7D&driver=nonexistent")).unwrap()).await.unwrap();
+        assert_eq!(resp.status(), 422, "Unknown driver should return 422");
+
+        let body = larastvel_core::axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let error = json["error"].as_str().unwrap_or("");
+        assert!(error.contains("Unknown driver"), "Error should mention 'Unknown driver': got '{}'", error);
+        assert!(error.contains("nonexistent"), "Error should mention the unknown driver name: got '{}'", error);
+        assert!(error.contains("log"), "Error should list available drivers: got '{}'", error);
     }
 
     #[tokio::test]
