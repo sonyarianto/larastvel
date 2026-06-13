@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use larastvel_core::sea_orm;
 use sea_orm::entity::prelude::*;
 

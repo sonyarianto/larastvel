@@ -157,7 +157,7 @@ mod tests {
         let c = called.clone();
 
         let f: ListenerFn = Arc::new(move |payload: EventPayload| {
-            let event = *payload.downcast::<String>().unwrap();
+            let _event = *payload.downcast::<String>().unwrap();
             let c = c.clone();
             Box::pin(async move {
                 c.store(true, Ordering::SeqCst);

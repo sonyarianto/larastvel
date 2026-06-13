@@ -54,7 +54,7 @@ impl Auth {
         Self { secret }
     }
 
-    pub fn default() -> Self {
+    pub fn with_default_secret() -> Self {
         Self::new(DEFAULT_SECRET.as_bytes().to_vec())
     }
 
@@ -117,13 +117,13 @@ mod tests {
 
     #[test]
     fn test_auth_default() {
-        let auth = Auth::default();
+        let auth = Auth::with_default_secret();
         assert!(!auth.secret.is_empty());
     }
 
     #[test]
     fn test_auth_create_and_verify_token() {
-        let auth = Auth::default();
+        let auth = Auth::with_default_secret();
         let token = auth.create_token("user-42").unwrap();
         assert!(!token.is_empty());
 
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_auth_verify_invalid_token() {
-        let auth = Auth::default();
+        let auth = Auth::with_default_secret();
         let result = auth.verify_token("invalid-token");
         assert!(result.is_err());
     }
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_auth_token_expiry() {
-        let auth = Auth::default();
+        let auth = Auth::with_default_secret();
         let token = auth.create_token("user-42").unwrap();
         let claims = auth.verify_token(&token).unwrap();
 

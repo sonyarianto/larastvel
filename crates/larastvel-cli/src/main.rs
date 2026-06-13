@@ -802,24 +802,22 @@ fn make_migration(name: &str) {
     };
     let file_name = format!("{}_{}", version, snake_name);
 
-    let migration_content = format!(
-        r#"use larastvel_core::sea_orm_migration::prelude::*;
+    let migration_content = r#"use larastvel_core::sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
 #[async_trait::async_trait]
-impl MigrationTrait for Migration {{
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {{
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         todo!("Implement up migration");
-    }}
+    }
 
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {{
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         todo!("Implement down migration");
-    }}
-}}
-"#
-    );
+    }
+}
+"#.to_string();
 
     let file_path = migrations_dir.join(format!("{}.rs", file_name));
     if file_path.exists() {

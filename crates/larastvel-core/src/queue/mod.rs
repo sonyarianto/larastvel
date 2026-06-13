@@ -431,6 +431,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     #[derive(Debug)]
     struct CountingJob {
         counter: Arc<AtomicUsize>,
@@ -502,8 +503,8 @@ mod tests {
     async fn test_in_memory_queue_fifo_order() {
         let queue = InMemoryQueue::new("fifo");
         let counter = Arc::new(AtomicUsize::new(0));
-        let c1 = counter.clone();
-        let c2 = counter.clone();
+        let _c1 = counter.clone();
+        let _c2 = counter.clone();
 
             #[derive(Debug)]
             struct OrderedJob {

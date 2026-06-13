@@ -142,6 +142,7 @@ impl Session {
         (&self.flash_new, &self.flash_old)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn age_flash(&mut self) {
         self.flash_old = std::mem::take(&mut self.flash_new);
     }

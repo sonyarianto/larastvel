@@ -52,6 +52,12 @@ impl ValidationErrors {
     }
 }
 
+impl Default for ValidationErrors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IntoResponse for ValidationErrors {
     fn into_response(self) -> Response {
         let status = StatusCode::UNPROCESSABLE_ENTITY;

@@ -208,9 +208,10 @@ pub async fn rate_limit_middleware(
         return Ok(next.run(req).await);
     };
 
-    let limiters = registry.limiters.lock().unwrap();
-    let limiter_names: Vec<String> = limiters.keys().cloned().collect();
-    drop(limiters);
+    let limiter_names: Vec<String> = {
+        let limiters = registry.limiters.lock().unwrap();
+        limiters.keys().cloned().collect()
+    };
 
     for name in &limiter_names {
         if let Some(limiter) = registry.limiter(name) {

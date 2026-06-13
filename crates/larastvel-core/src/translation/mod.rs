@@ -261,11 +261,11 @@ fn select_plural(template: &str, count: i64) -> String {
 
         let extract = segment
             .split_once(']')
-            .or_else(|| segment.split_once('}').map(|(a, b)| (a, b)));
+            .or_else(|| segment.split_once('}'));
 
         if let Some((range_part, message)) = extract {
             has_bracket = true;
-            let open = range_part.find(|c| c == '[' || c == '{');
+            let open = range_part.find(['[', '{']);
             let range = match open {
                 Some(idx) => &range_part[idx + 1..],
                 None => continue,

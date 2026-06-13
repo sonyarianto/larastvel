@@ -13,7 +13,9 @@ struct ViteManifest {
 struct ViteEntry {
     file: String,
     css: Option<Vec<String>>,
+    #[allow(dead_code)]
     src: Option<String>,
+    #[allow(dead_code)]
     is_entry: Option<bool>,
 }
 

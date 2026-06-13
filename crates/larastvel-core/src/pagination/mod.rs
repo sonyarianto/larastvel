@@ -31,7 +31,7 @@ impl<T> Paginator<T> {
         if self.total == 0 {
             return 1;
         }
-        (self.total + self.per_page - 1) / self.per_page
+        self.total.div_ceil(self.per_page)
     }
 
     pub fn from_page(items: Vec<T>, total: usize, page: &PaginationParams) -> Self {
@@ -121,8 +121,7 @@ impl PaginationParams {
             page: page.unwrap_or(1).max(1),
             per_page: per_page
                 .unwrap_or(DEFAULT_PER_PAGE)
-                .max(1)
-                .min(MAX_PER_PAGE),
+                .clamp(1, MAX_PER_PAGE),
         }
     }
 

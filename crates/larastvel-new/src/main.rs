@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use colored::*;
@@ -56,7 +56,7 @@ async fn main() {
     create_project(&project_path, &cli.name, &cli.database, cli.vite);
 }
 
-fn create_project(path: &PathBuf, name: &str, database: &str, with_vite: bool) {
+fn create_project(path: &Path, name: &str, database: &str, with_vite: bool) {
     let dirs = [
         "src/database/migrations",
         "src/models",
@@ -351,7 +351,7 @@ enum Users {
     println!("  larastvel serve");
 }
 
-fn setup_vite(path: &PathBuf) {
+fn setup_vite(path: &Path) {
     let package_json = r#"{
     "private": true,
     "type": "module",

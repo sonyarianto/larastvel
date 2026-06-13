@@ -13,7 +13,7 @@ pub struct ViewFactory {
 }
 
 enum ViewEngine {
-    Tera(Tera),
+    Tera(Box<Tera>),
     None,
 }
 
@@ -22,9 +22,9 @@ impl ViewFactory {
         let engine = if config.view.engine == "tera" {
             let glob_pattern = "resources/views/**/*.html";
             if let Ok(tera) = Tera::parse(glob_pattern) {
-                ViewEngine::Tera(tera)
+                ViewEngine::Tera(Box::new(tera))
             } else {
-                ViewEngine::Tera(Tera::default())
+                ViewEngine::Tera(Box::default())
             }
         } else {
             ViewEngine::None
