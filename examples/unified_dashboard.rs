@@ -18,7 +18,7 @@
 //! | POST   | `/mail/welcome`                 | Send welcome email               |
 //! | POST   | `/mail/receipt`                 | Send order receipt               |
 //! | GET    | `/broadcast`                    | Broadcast dashboard (HTML)       |
-//! | POST   | `/api/broadcast/send`           | Broadcast an event               |
+//! | POST   | `/api/broadcast/send`           | Broadcast an event (driver: log/pusher/ably) |
 //! | GET    | `/api/broadcast/log`            | List broadcast events (JSON)     |
 //! | GET    | `/sms`                          | SMS dashboard (HTML)             |
 //! | POST   | `/api/sms/send`                 | Send an SMS                      |
@@ -55,7 +55,10 @@ use larastvel_core::axum::{
     Form, Router,
 };
 use larastvel_core::axum::routing;
+use larastvel_core::broadcasting::ably::AblyBroadcaster;
 use larastvel_core::broadcasting::log::LogBroadcaster;
+use larastvel_core::broadcasting::pusher::PusherBroadcaster;
+use larastvel_core::broadcasting::BroadcastManager;
 use larastvel_core::broadcasting::Broadcaster;
 use larastvel_core::mail::{LogMailer, MailError, MailManager, Mailer, Mailable};
 use larastvel_core::notifications::{
@@ -112,7 +115,13 @@ pub async fn build_app() -> (Router, AppState) {
     let mail_limiter = mail_rate_limiter();
 
     let broadcast_log = new_broadcast_log();
-    let broadcaster: Arc<dyn Broadcaster> = Arc::new(LogBroadcaster::new("log"));
+
+    // --- Broadcast drivers (Log, Pusher, Ably) ---
+    let mut broadcast_manager = BroadcastManager::new("log");
+    broadcast_manager.register("log", LogBroadcaster::new("log"));
+    broadcast_manager.register("pusher", PusherBroadcaster::new("pusher", "APP_ID", "KEY", "SECRET", "mt1"));
+    broadcast_manager.register("ably", AblyBroadcaster::new("ably", "APP_ID:API_KEY"));
+
     let broadcast_limiter = broadcast_rate_limiter();
 
     // --- Build router ---
@@ -144,7 +153,7 @@ pub async fn build_app() -> (Router, AppState) {
         .layer(Extension(sms_store.clone()))
         .layer(Extension(broadcast_log.clone()))
         .layer(Extension(mail_manager))
-        .layer(Extension(broadcaster))
+        .layer(Extension(broadcast_manager))
         .layer(Extension(broadcast_limiter))
         .layer(Extension(notif_limiter))
         .layer(Extension(sms_limiter))
@@ -239,6 +248,7 @@ struct BroadcastLogEntry {
     channel: String,
     event: String,
     data: String,
+    driver: String,
     sent_at: i64,
 }
 
@@ -254,14 +264,14 @@ impl BroadcastLog {
         Self { entries: Vec::new(), next_id: 1 }
     }
 
-    fn add(&mut self, channel: String, event: String, data: String) -> BroadcastLogEntry {
+    fn add(&mut self, channel: String, event: String, data: String, driver: String) -> BroadcastLogEntry {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;
         let id = self.next_id;
         self.next_id += 1;
-        let entry = BroadcastLogEntry { id, channel, event, data, sent_at: now };
+        let entry = BroadcastLogEntry { id, channel, event, data, driver, sent_at: now };
         self.entries.push(entry.clone());
         entry
     }
@@ -322,7 +332,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 <div class="card"><div class="icon">📧</div><h2>Mail Controller</h2><p>Send transactional emails with styled HTML templates (welcome, receipts, custom). Rate-limited to 10/min.</p>
 <ul class="route-list"><li>GET /mail/test — Dashboard</li><li>POST /mail/send — Custom</li><li>POST /mail/welcome — Welcome</li><li>POST /mail/receipt — Receipt</li></ul>
 <a href="/mail/test" class="btn btn-mail">Open Mail Dashboard →</a></div>
-<div class="card"><div class="icon">📡</div><h2>Broadcast Controller</h2><p>Send real-time WebSocket events via LogBroadcaster with event log tracking.</p>
+<div class="card"><div class="icon">📡</div><h2>Broadcast Controller</h2><p>Send real-time WebSocket events via Log (dev), Pusher (real), or Ably (real) with event log tracking.</p>
 <ul class="route-list"><li>GET /broadcast — Dashboard</li><li>POST /api/broadcast/send — Send event</li><li>GET /api/broadcast/log — Event log</li></ul>
 <a href="/broadcast" class="btn" style="background:#ec4899;color:#fff">Open Broadcast Dashboard →</a></div>
 <div class="card"><div class="icon">📱</div><h2>SMS Controller</h2><p>Send SMS via LogSmsSender with in-memory history. E.164 validation and 5 sends/min rate limit.</p>
@@ -722,6 +732,7 @@ struct SendBroadcastRequest {
     channel: String,
     event: String,
     data: String,
+    driver: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -770,8 +781,13 @@ async fn broadcast_dashboard(Extension(log): Extension<SharedBroadcastLog>) -> R
 
     let rows: String = entries.iter().map(|e| {
         let data_trunc = if e.data.len() > 50 { format!("{}…", &e.data[..50]) } else { e.data.clone() };
-        format!(r#"<tr><td>{0}</td><td>{1}</td><td><span class="badge event">{2}</span></td><td>{3}</td><td>{4}</td></tr>"#,
-            e.id, html_escape(&e.channel), html_escape(&e.event), html_escape(&data_trunc), fmt_ts(e.sent_at))
+        let driver_badge = match e.driver.as_str() {
+            "pusher" => r#"<span class="badge pusher">Pusher</span>"#,
+            "ably" => r#"<span class="badge ably">Ably</span>"#,
+            _ => r#"<span class="badge log">Log</span>"#,
+        };
+        format!(r#"<tr><td>{0}</td><td>{1}</td><td><span class="badge event">{2}</span></td><td>{3}</td><td>{4}</td><td>{5}</td></tr>"#,
+            e.id, html_escape(&e.channel), html_escape(&e.event), html_escape(&data_trunc), driver_badge, fmt_ts(e.sent_at))
     }).collect::<Vec<_>>().join("\n");
 
     let html = format!(r#"<!DOCTYPE html>
@@ -792,7 +808,12 @@ h1{{font-size:2rem;font-weight:800;margin-bottom:0.5rem;background:linear-gradie
 table{{width:100%;border-collapse:collapse}}
 th{{text-align:left;color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;padding:0.75rem 0.5rem;border-bottom:1px solid #334155}}
 td{{padding:0.75rem 0.5rem;border-bottom:1px solid #1e293b;font-family:monospace;font-size:0.8125rem}}
+select{{width:100%;padding:0.625rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:0.875rem;outline:none;transition:border-color 0.2s;margin-bottom:0.75rem;cursor:pointer}}
+select:focus{{border-color:#ec4899}}
 .badge.event{{display:inline-block;padding:0.125rem 0.5rem;border-radius:999px;font-size:0.6875rem;font-weight:600;background:#312e81;color:#a5b4fc}}
+.badge.log{{display:inline-block;padding:0.125rem 0.5rem;border-radius:999px;font-size:0.6875rem;font-weight:600;background:#1e293b;color:#94a3b8}}
+.badge.pusher{{display:inline-block;padding:0.125rem 0.5rem;border-radius:999px;font-size:0.6875rem;font-weight:600;background:#1e3a5f;color:#60a5fa}}
+.badge.ably{{display:inline-block;padding:0.125rem 0.5rem;border-radius:999px;font-size:0.6875rem;font-weight:600;background:#3b0764;color:#c084fc}}
 label{{display:block;color:#cbd5e1;font-size:0.8125rem;font-weight:600;margin-bottom:0.25rem}}
 input,textarea{{width:100%;padding:0.625rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:0.875rem;outline:none;transition:border-color 0.2s;margin-bottom:0.75rem}}
 input:focus,textarea:focus{{border-color:#ec4899}}
@@ -800,33 +821,41 @@ textarea{{resize:vertical;min-height:60px;font-family:inherit}}
 .btn{{padding:0.5rem 1rem;background:#ec4899;color:#fff;border:none;border-radius:6px;font-size:0.8125rem;font-weight:600;cursor:pointer;transition:all 0.2s}}
 .btn:hover{{background:#db2777;transform:translateY(-1px)}}
 .empty{{text-align:center;color:#64748b;padding:2rem;font-size:0.875rem}}
+.hint{{color:#64748b;font-size:0.75rem;margin-top:-0.5rem;margin-bottom:0.75rem}}
 .back{{color:#f43f5e;text-decoration:none;font-size:0.8125rem}}.back:hover{{text-decoration:underline}}
 </style></head>
 <body><div class="container">
 <a href="/" class="back">← Home</a>
 <h1>📡 Broadcast Dashboard</h1>
-<p class="subtitle">Send real-time events via LogBroadcaster</p>
+<p class="subtitle">Send real-time events with driver selection</p>
 <div class="stats"><div class="stat"><div class="stat-value">{0}</div><div class="stat-label">Events Sent</div></div>
-<div class="stat"><div class="stat-value">LogBroadcaster</div><div class="stat-label">Driver</div></div></div>
+<div class="stat"><div class="stat-value">Log / Pusher / Ably</div><div class="stat-label">Drivers</div></div></div>
 <div class="card" style="margin-bottom:1.5rem">
 <h2 style="font-size:1.125rem;margin-bottom:1rem;color:#f1f5f9;">📨 Send Broadcast Event</h2>
 <form action="/api/broadcast/send" method="POST">
 <label>Channel</label><input type="text" name="channel" value="user.1" placeholder="user.1">
 <label>Event Name</label><input type="text" name="event" value="order.shipped" placeholder="order.shipped">
 <label>Data (JSON)</label><textarea name="data">{{{{"order_id": "ORD-1234", "status": "shipped"}}}}</textarea>
+<label>Broadcast Driver</label>
+<select name="driver">
+<option value="log" selected>🔌 LogBroadcaster (dev)</option>
+<option value="pusher">📡 PusherBroadcaster (real)</option>
+<option value="ably">⚡ AblyBroadcaster (real)</option>
+</select>
+<div class="hint">LogBroadcaster logs events. Pusher/Ably send via their REST APIs (configure APP_ID/KEY in build_app).</div>
 <button type="submit" class="btn">Broadcast Event 📡</button></form></div>
 <div class="card"><h2 style="font-size:1.125rem;margin-bottom:1rem;color:#f1f5f9;">📋 Event Log</h2>
-<table><thead><tr><th>ID</th><th>Channel</th><th>Event</th><th>Data</th><th>Sent</th></tr></thead>
+<table><thead><tr><th>ID</th><th>Channel</th><th>Event</th><th>Data</th><th>Driver</th><th>Sent</th></tr></thead>
 <tbody>{1}</tbody></table>{2}</div></div></body></html>"#,
         total,
-        if rows.is_empty() { r#"<tr><td colspan="5" class="empty">No events broadcast yet.</td></tr>"#.to_string() } else { rows },
+        if rows.is_empty() { r#"<tr><td colspan="6" class="empty">No events broadcast yet.</td></tr>"#.to_string() } else { rows },
         if total == 0 { String::new() } else { r#"<p style="text-align:center;margin-top:1rem;color:#64748b;font-size:0.8125rem;">Showing recent 20</p>"#.to_string() }
     );
     Html(html).into_response()
 }
 
 async fn broadcast_send(
-    Extension(broadcaster): Extension<Arc<dyn Broadcaster>>,
+    Extension(manager): Extension<BroadcastManager>,
     Extension(log): Extension<SharedBroadcastLog>,
     Extension(rate_limiter): Extension<RateLimiter>,
     Form(body): Form<SendBroadcastRequest>,
@@ -846,6 +875,18 @@ async fn broadcast_send(
         Err(_) => serde_json::json!({ "text": body.data }),
     };
 
+    // Select the broadcast driver (default: "log")
+    let driver_name = body.driver.as_deref().unwrap_or("log");
+    let broadcaster = match manager.broadcaster(driver_name) {
+        Ok(b) => b,
+        Err(_) => {
+            let available = manager.broadcaster_names().join(", ");
+            return (StatusCode::UNPROCESSABLE_ENTITY, Json(json!({
+                "error": format!("Unknown driver '{}'. Available: {}", driver_name, available)
+            }))).into_response();
+        }
+    };
+
     let notifiable = BroadcastNotifiable { id: channel.clone() };
     let notification = BroadcastDemoNotification { event: event.clone(), data: data.clone() };
     let sender = NotificationSender::new().with_broadcaster(broadcaster);
@@ -853,8 +894,8 @@ async fn broadcast_send(
     let results = sender.send(&notifiable, notification).await;
     match results.get(&NotificationChannel::Broadcast) {
         Some(Ok(())) => {
-            let entry = { let mut l = log.lock().unwrap(); l.add(channel.clone(), event.clone(), data.to_string()) };
-            Json(json!({"message":"Event broadcast","id":entry.id,"event":event,"channel":channel})).into_response()
+            let entry = { let mut l = log.lock().unwrap(); l.add(channel.clone(), event.clone(), data.to_string(), driver_name.to_string()) };
+            Json(json!({"message":"Event broadcast","id":entry.id,"event":event,"channel":channel,"driver":driver_name})).into_response()
         }
         Some(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":format!("Broadcast failed: {}",e)}))).into_response(),
         None => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":"No broadcast channel used"}))).into_response(),
@@ -1141,7 +1182,7 @@ fn main() {
     println!("  SMS Store (Arc<Mutex>) → SMS history");
     println!("  Broadcast Log (Arc<Mutex>) → event log");
     println!("  MailManager (LogMailer) → email");
-    println!("  LogBroadcaster → real-time events");
+    println!("  BroadcastManager → LogBroadcaster / PusherBroadcaster / AblyBroadcaster");
     println!("  Independent rate limiters per channel");
     println!();
     println!("To build and serve:");

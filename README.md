@@ -162,7 +162,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Pagination | `Paginator<T>` / `PaginationParams` extractor / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / `rate_limit_middleware` / token bucket | ✅ |
 | Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
-| Broadcasting | `BroadcastManager` / `PusherBroadcaster` / `LogBroadcaster` / `Channel` (public/private/presence) / `BroadcastEvent` trait | ✅ |
+| Broadcasting | `BroadcastManager` / `PusherBroadcaster` / `LogBroadcaster` / `AblyBroadcaster` / `Channel` (public/private/presence) / `BroadcastEvent` trait | ✅ |
 | Cache (config/cache.php) | `CacheManager` / `ArrayStore` / `FileStore` / `DatabaseStore` / `CacheStore` trait / `CacheItem` with TTL / `remember()` / `many()` / increment/decrement | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / `set_locale()` / JSON files | ✅ |
 | Testing (PHPUnit) | `TestClient` / `TestResponse` / `RefreshDatabase` / PHPUnit-like assertions | ✅ |

@@ -1,3 +1,4 @@
+pub mod ably;
 pub mod log;
 pub mod pusher;
 
