@@ -10,6 +10,7 @@ pub mod foundation;
 pub mod hash;
 pub mod http;
 pub mod logging;
+pub mod mail;
 pub mod middleware;
 pub mod models;
 pub mod pagination;
