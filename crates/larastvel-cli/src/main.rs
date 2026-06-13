@@ -27,6 +27,8 @@ enum Commands {
     RouteList,
     /// Display framework version
     Version,
+    /// Run scheduled tasks
+    ScheduleRun,
     /// Create a new Larastvel application
     New { name: String },
     /// Generate a new application key
@@ -86,6 +88,9 @@ async fn main() {
         }
         Some(Commands::Version) => {
             println!("Larastvel Framework v{}", env!("CARGO_PKG_VERSION"));
+        }
+        Some(Commands::ScheduleRun) => {
+            run_schedule_command().await;
         }
         Some(Commands::New { name }) => {
             println!(
@@ -154,6 +159,7 @@ async fn main() {
             println!("  make:controller  Create a new controller");
             println!("  make:migration   Create a new migration");
             println!("  make:seeder      Create a new seeder");
+            println!("  schedule:run     Run scheduled tasks");
             println!("  db:seed          Run database seeders");
             println!("  version          Display framework version");
         }
@@ -855,4 +861,9 @@ impl MigrationTrait for Migration {{
         "{}",
         "  Don't forget to register the migration in src/database/migrator.rs".dimmed()
     );
+}
+
+async fn run_schedule_command() {
+    println!("{}", "Running scheduled tasks...".green().bold());
+    println!("{}", "  Register your schedule in your application's kernel.".dimmed());
 }

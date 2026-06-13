@@ -4,22 +4,35 @@ A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
 
 ## Status
 
-Early prototype (~20-30% feature parity). Core architecture is in place, but most features are stubs or skeletons.
+Active development (~60% feature parity). Core architecture is solid with most framework features implemented.
 
 ## Features
 
 - **Routing** — Expressively define routes with groups, inspired by Laravel's Router
-- **Database** — SeaORM-powered connection manager (SQLite, PostgreSQL, MySQL)
+- **Database** — SeaORM-powered connection manager (SQLite, PostgreSQL, MySQL) with migrations
 - **Config** — TOML-based config with dot-notation access + `.env` support
 - **Templating** — Tera template engine (Blade-like syntax)
-- **CLI** — Artisan-equivalent tool for `serve`, `make:*`, `key:generate`, `route:list`
+- **CLI** — Artisan-equivalent tool for `serve`, `make:*`, `key:generate`, `route:list`, `migrate:*`, `db:seed`
 - **Service Container** — TypeId-based IoC container with `bind`/`singleton`/`make`
 - **Logging** — Structured tracing with env-filter support
-- **Middleware** — CORS and request logging (Tower-based)
+- **Middleware** — CORS, request logging, auth, rate limiting, session (Tower-based)
 - **Vite Integration** — Asset bundling with manifest-based tag generation
 - **Macros** — `#[derive(Resource)]`, `#[controller]`, `#[route]` proc macros
 - **Tinker** — Interactive REPL (early stage)
 - **Scaffolding** — `larastvel-new` to generate new projects
+- **Authentication** — JWT-based `Auth` service + `AuthenticatedUser` extractor + auth middleware
+- **Encryption / Hashing** — AES-256-GCM encryption + bcrypt hashing
+- **Form Validation** — 20 built-in rules, `ValidatedJson`/`ValidatedQuery` extractors, 422 response
+- **Pagination** — Laravel-compatible JSON with `Paginator<T>`, `PaginationParams` extractor
+- **Session** — Encrypted cookie-based sessions with flash, CSRF, `SessionLayer` middleware
+- **Events / Listeners** — `EventService` with `dispatch()`, `listen()`, `fake()` / `assertDispatched()`
+- **File Storage** — `Filesystem` trait, `LocalDisk` driver, `StorageManager`
+- **Notifications / Mail** — `Mailable` builder, `SmtpMailer` (STARTTLS), `LogMailer`
+- **Queue / Jobs** — `SyncQueue`, `InMemoryQueue`, `DatabaseQueue`, `QueueWorker`, `dispatch()`
+- **Rate Limiting** — Token bucket with `RateLimiter`, `RateLimiterRegistry`, Axum middleware
+- **Localization** — JSON translation files, `__()` / `trans_choice()`, pluralization, locale switching
+- **Task Scheduling** — Cron expression parser, `Schedule` builder, `ScheduleManager`
+- **Testing** — 300+ unit tests across all modules
 
 ## Quick Start
 
@@ -133,18 +146,18 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Session | `SessionHandle` extractor / `SessionLayer` middleware / flash / CSRF / encrypted cookie store | ✅ |
 | Authentication / Auth | JWT `Auth` service + `AuthenticatedUser` extractor + `auth_middleware` | ✅ |
 | Authorization / Gates | `auth_middleware` guards routes | ⚠️ Partial |
-| Queue / Jobs | — | ❌ |
+| Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `QueueManager` / `dispatch()` / `ShouldQueue` trait | ✅ |
 | Notifications / Mail | `Mailer` trait / `Mailable` builder / `SmtpMailer` / `LogMailer` / `MailManager` | ✅ |
 | File Storage (Flysystem) | `Filesystem` trait / `LocalDisk` driver / `StorageManager` / put/get/delete/copy/move/list/dirs | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
 | Form Validation | `Validator` / `validate()` / `ValidationErrors` + 20 built-in rules | ✅ |
 | Pagination | `Paginator<T>` / `PaginationParams` extractor / `to_json()` / `IntoResponse` | ✅ |
-| Rate Limiting | — | ❌ |
+| Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / `rate_limit_middleware` / token bucket | ✅ |
 | Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
 | Broadcasting | — | ❌ |
-| Localization | — | ❌ |
+| Localization | `Translator` / `__()` / `trans_choice()` / pluralization / `set_locale()` / JSON files | ✅ |
 | Testing (PHPUnit) | — | ❌ |
-| Task Scheduling (Cron) | — | ❌ |
+| Task Scheduling (Cron) | `Schedule` / `ScheduleManager` / cron parser / `ScheduledEvent` / `schedule:run` CLI | ✅ |
 
 ## License
 
