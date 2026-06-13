@@ -140,7 +140,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Form Validation | — | ❌ |
 | Pagination | — | ❌ |
 | Rate Limiting | — | ❌ |
-| Encryption / Hashing | — | ❌ |
+| Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
 | Broadcasting | — | ❌ |
 | Localization | — | ❌ |
 | Testing (PHPUnit) | — | ❌ |

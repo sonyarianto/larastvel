@@ -1,7 +1,9 @@
 pub mod config;
 pub mod console;
 pub mod database;
+pub mod encryption;
 pub mod foundation;
+pub mod hash;
 pub mod http;
 pub mod logging;
 pub mod middleware;

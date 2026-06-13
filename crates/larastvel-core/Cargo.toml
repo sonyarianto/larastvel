@@ -35,6 +35,10 @@ larastvel-macros = { path = "../larastvel-macros" }
 async-trait = "0.1"
 inventory = "0.3"
 linkme = "0.3"
+bcrypt.workspace = true
+aes-gcm.workspace = true
+base64.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 tower.workspace = true
