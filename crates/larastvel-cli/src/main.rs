@@ -38,6 +38,8 @@ enum Commands {
         #[arg(short, long)]
         steps: Option<u32>,
     },
+    /// Run database seeders
+    DbSeed,
     /// Display help for any command
     Make {
         #[command(subcommand)]
@@ -53,6 +55,8 @@ enum MakeTarget {
     Controller { name: String },
     /// Create a new migration
     Migration { name: String },
+    /// Create a new seeder
+    Seeder { name: String },
 }
 
 #[tokio::main]
@@ -100,6 +104,9 @@ async fn main() {
             };
             run_migrate_command(&cmd);
         }
+        Some(Commands::DbSeed) => {
+            run_seed_command();
+        }
         Some(Commands::Make { target }) => {
             match target {
                 Some(MakeTarget::Model { name }) => {
@@ -111,11 +118,15 @@ async fn main() {
                 Some(MakeTarget::Migration { name }) => {
                     make_migration(&name);
                 }
+                Some(MakeTarget::Seeder { name }) => {
+                    make_seeder(&name);
+                }
                 None => {
                     println!("{}", "Available make targets:".cyan());
-                    println!("  make:model      Create a new model");
+                    println!("  make:model       Create a new model");
                     println!("  make:controller  Create a new controller");
                     println!("  make:migration   Create a new migration");
+                    println!("  make:seeder      Create a new seeder");
                 }
             }
         }
@@ -134,6 +145,8 @@ async fn main() {
             println!("  make:model       Create a new model");
             println!("  make:controller  Create a new controller");
             println!("  make:migration   Create a new migration");
+            println!("  make:seeder      Create a new seeder");
+            println!("  db:seed          Run database seeders");
             println!("  version          Display framework version");
         }
     }
@@ -582,6 +595,115 @@ impl larastvel_core::routing::ResourceController for {name} {{
         "{}",
         "  Register routes: MyController::register_routes(&registrar);".dimmed()
     );
+}
+
+fn make_seeder(name: &str) {
+    let seeders_dir = std::path::Path::new("src/database/seeders");
+    std::fs::create_dir_all(seeders_dir).unwrap();
+
+    let snake_name = {
+        let mut result = String::new();
+        for (i, ch) in name.chars().enumerate() {
+            if ch.is_uppercase() {
+                if i > 0 {
+                    result.push('_');
+                }
+                result.push(ch.to_ascii_lowercase());
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    };
+
+    let seeder_content = format!(
+        r#"use larastvel_core::database::DatabaseSeeder;
+use larastvel_core::sea_orm::DbConn;
+
+pub struct {name};
+
+impl {name} {{
+    pub async fn run(conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {{
+        // TODO: Insert seed data here
+        // Example:
+        // use sea_orm::{{ActiveModelTrait, Set}};
+        // use crate::models::user::ActiveModel as UserActiveModel;
+        //
+        // let user = UserActiveModel {{
+        //     name: Set("Admin".to_string()),
+        //     email: Set("admin@example.com".to_string()),
+        //     password: Set(larastvel_core::hash::make("password")?),
+        //     ..Default::default()
+        // }};
+        // user.insert(conn).await?;
+
+        tracing::info!("Seeded: {name}");
+        Ok(())
+    }}
+}}
+"#,
+        name = name,
+    );
+
+    let file_path = seeders_dir.join(format!("{}.rs", snake_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!("Error: Seeder '{}' already exists at '{}'.", name, file_path.display()).red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, seeder_content).unwrap();
+
+    // Update mod.rs
+    let mod_path = seeders_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", snake_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!("✓ Seeder [{}] created at '{}'.", name, file_path.display())
+            .green()
+            .bold()
+    );
+    println!(
+        "{}",
+        "  Implement the `run` method to insert seed data.".dimmed()
+    );
+}
+
+fn run_seed_command() {
+    println!(
+        "{}",
+        "Running database seeders...".green().bold()
+    );
+    let status = std::process::Command::new("cargo")
+        .args(["run", "--", "--seed"])
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("{}", "✓ Database seeding completed.".green());
+        }
+        _ => {
+            eprintln!(
+                "{}",
+                "Seeding failed. Make sure you're in the project root directory.".red()
+            );
+            eprintln!(
+                "{}",
+                "You can also run: cargo run -- --seed".dimmed()
+            );
+        }
+    }
 }
 
 fn run_migrate_command(subcommand: &str) {

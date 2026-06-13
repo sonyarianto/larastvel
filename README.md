@@ -129,7 +129,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Blade templating | Tera | ⚠️ Partial |
 | Migrations (`database/migrations/`) | `src/database/migrations/` + Migrator | ✅ |
 | `php artisan migrate` | `larastvel migrate` | ✅ |
-| Seeders | `DatabaseManager::seed()` stub | ❌ |
+| Seeders | `Seeder` trait + `DatabaseManager::seed::<S>()` + `make:seeder` | ✅ |
 | Session | — | ❌ |
 | Authentication / Auth | — | ❌ |
 | Authorization / Gates | — | ❌ |

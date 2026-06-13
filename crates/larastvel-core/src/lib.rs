@@ -23,7 +23,7 @@ pub use tokio;
 
 pub use foundation::{Application, Kernel, ServiceProvider};
 pub use routing::Registrar;
-pub use database::DatabaseManager;
+pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
 pub use config::Config;
 pub use console::ConsoleKernel;
 pub use http::Request;

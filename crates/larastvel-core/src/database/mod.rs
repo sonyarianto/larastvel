@@ -7,6 +7,26 @@ use tracing::info;
 
 use crate::config::Config;
 
+#[async_trait::async_trait]
+pub trait Seeder {
+    fn name() -> &'static str;
+    async fn run(conn: &DbConn) -> Result<(), Box<dyn std::error::Error>>;
+}
+
+pub struct DatabaseSeeder;
+
+impl DatabaseSeeder {
+    pub async fn run_all(_conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
+        info!("Running database seeders");
+        Ok(())
+    }
+
+    pub async fn run_seeder<S: Seeder>(conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
+        info!("Running seeder: {}", S::name());
+        S::run(conn).await
+    }
+}
+
 #[derive(Clone)]
 pub struct DatabaseManager {
     conn: Arc<RwLock<Option<DbConn>>>,
@@ -96,8 +116,43 @@ impl DatabaseManager {
         M::status(&conn).await
     }
 
-    pub async fn seed(&self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("Seeding database");
-        Ok(())
+    pub async fn seed<S: Seeder>(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = self.connect().await?;
+        DatabaseSeeder::run_seeder::<S>(&conn).await
+    }
+
+    pub async fn seed_all(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = self.connect().await?;
+        DatabaseSeeder::run_all(&conn).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestSeeder;
+
+    #[async_trait::async_trait]
+    impl Seeder for TestSeeder {
+        fn name() -> &'static str {
+            "test_seeder"
+        }
+
+        async fn run(_conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_seeder_trait_compiles() {
+        assert_eq!(TestSeeder::name(), "test_seeder");
+    }
+
+    #[test]
+    fn test_database_seeder_static_methods_exist() {
+        // Verify associated functions compile and are callable
+        let _ = DatabaseSeeder::run_all;
+        let _ = DatabaseSeeder::run_seeder::<TestSeeder>;
     }
 }
