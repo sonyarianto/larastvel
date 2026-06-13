@@ -14,7 +14,7 @@ pub struct Registrar {
     group_prefix: Arc<Mutex<Option<String>>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RouteDefinition {
     pub method: String,
     pub uri: String,
