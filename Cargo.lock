@@ -1625,6 +1625,7 @@ dependencies = [
  "colored",
  "dotenvy",
  "glob",
+ "hex",
  "hyper",
  "inventory",
  "jsonwebtoken",

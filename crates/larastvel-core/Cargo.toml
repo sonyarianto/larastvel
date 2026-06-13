@@ -42,6 +42,7 @@ rand.workspace = true
 jsonwebtoken.workspace = true
 regex.workspace = true
 serde_urlencoded.workspace = true
+hex.workspace = true
 
 [dev-dependencies]
 tower.workspace = true
