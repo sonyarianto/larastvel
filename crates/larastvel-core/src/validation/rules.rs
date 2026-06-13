@@ -96,17 +96,15 @@ pub(crate) fn check_rule(
     all_data: &std::collections::HashMap<String, serde_json::Value>,
 ) -> Option<String> {
     match rule {
-        Rule::Required => {
-            match value {
-                None | Some(serde_json::Value::Null) => {
-                    Some(format!("The {} field is required.", field))
-                }
-                Some(serde_json::Value::String(s)) if s.is_empty() => {
-                    Some(format!("The {} field is required.", field))
-                }
-                _ => None,
+        Rule::Required => match value {
+            None | Some(serde_json::Value::Null) => {
+                Some(format!("The {} field is required.", field))
             }
-        }
+            Some(serde_json::Value::String(s)) if s.is_empty() => {
+                Some(format!("The {} field is required.", field))
+            }
+            _ => None,
+        },
         Rule::Email => {
             let s = value.and_then(|v| v.as_str())?;
             let email_regex =
@@ -119,10 +117,7 @@ pub(crate) fn check_rule(
         Rule::Min(n) => {
             if let Some(s) = value.and_then(|v| v.as_str()) {
                 if s.len() < *n {
-                    return Some(format!(
-                        "The {} must be at least {} characters.",
-                        field, n
-                    ));
+                    return Some(format!("The {} must be at least {} characters.", field, n));
                 }
             }
             None
@@ -130,10 +125,7 @@ pub(crate) fn check_rule(
         Rule::Max(n) => {
             if let Some(s) = value.and_then(|v| v.as_str()) {
                 if s.len() > *n {
-                    return Some(format!(
-                        "The {} must not exceed {} characters.",
-                        field, n
-                    ));
+                    return Some(format!("The {} must not exceed {} characters.", field, n));
                 }
             }
             None
@@ -174,8 +166,10 @@ pub(crate) fn check_rule(
             if let Some(v) = value {
                 match v {
                     serde_json::Value::Bool(_) => {}
-                    serde_json::Value::String(s) if s == "true" || s == "false" || s == "1" || s == "0" => {}
-                    serde_json::Value::Number(n) if n.as_f64() == Some(1.0) || n.as_f64() == Some(0.0) => {}
+                    serde_json::Value::String(s)
+                        if s == "true" || s == "false" || s == "1" || s == "0" => {}
+                    serde_json::Value::Number(n)
+                        if n.as_f64() == Some(1.0) || n.as_f64() == Some(0.0) => {}
                     _ => return Some(format!("The {} field must be true or false.", field)),
                 }
             }
@@ -184,9 +178,7 @@ pub(crate) fn check_rule(
         Rule::Confirmed => {
             let confirmation = format!("{}_confirmation", field);
             let val = value.and_then(|v| v.as_str());
-            let conf = all_data
-                .get(&confirmation)
-                .and_then(|v| v.as_str());
+            let conf = all_data.get(&confirmation).and_then(|v| v.as_str());
             match (val, conf) {
                 (Some(v), Some(c)) if v == c => None,
                 _ => Some(format!("The {} confirmation does not match.", field)),
@@ -219,7 +211,10 @@ pub(crate) fn check_rule(
         Rule::AlphaNumeric => {
             if let Some(s) = value.and_then(|v| v.as_str()) {
                 if !s.chars().all(|c| c.is_ascii_alphanumeric()) {
-                    return Some(format!("The {} must contain only letters and numbers.", field));
+                    return Some(format!(
+                        "The {} must contain only letters and numbers.",
+                        field
+                    ));
                 }
             }
             None
@@ -234,10 +229,7 @@ pub(crate) fn check_rule(
         }
         Rule::Ip => {
             if let Some(s) = value.and_then(|v| v.as_str()) {
-                let ip_re = Regex::new(
-                    r"^(\d{1,3}\.){3}\d{1,3}$|^([0-9a-fA-F:]+)$",
-                )
-                .unwrap();
+                let ip_re = Regex::new(r"^(\d{1,3}\.){3}\d{1,3}$|^([0-9a-fA-F:]+)$").unwrap();
                 if !ip_re.is_match(s) {
                     return Some(format!("The {} must be a valid IP address.", field));
                 }
@@ -266,10 +258,7 @@ pub(crate) fn check_rule(
         Rule::Size(n) => {
             if let Some(s) = value.and_then(|v| v.as_str()) {
                 if s.len() != *n {
-                    return Some(format!(
-                        "The {} must be exactly {} characters.",
-                        field, n
-                    ));
+                    return Some(format!("The {} must be exactly {} characters.", field, n));
                 }
             }
             None

@@ -1,2 +1,2 @@
-pub mod migrator;
 pub mod migrations;
+pub mod migrator;

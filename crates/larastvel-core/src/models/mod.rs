@@ -28,8 +28,7 @@ pub trait DbModel: Send + Sync + Sized + 'static {
     }
 
     async fn find(
-        id: impl Into<<<Self::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType>
-            + Send,
+        id: impl Into<<<Self::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType> + Send,
     ) -> Result<Option<<Self::Entity as EntityTrait>::Model>, sea_orm::DbErr> {
         Self::Entity::find_by_id(id).one(Self::db()).await
     }
@@ -72,8 +71,8 @@ pub trait DbModel: Send + Sync + Sized + 'static {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::entity::prelude::*;
     use super::DbModel;
+    use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
     #[sea_orm(table_name = "test_items")]

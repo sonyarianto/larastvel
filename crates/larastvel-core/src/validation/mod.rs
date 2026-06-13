@@ -85,11 +85,7 @@ impl<'a> Validator<'a> {
             let value = self.data.get(*field);
             for rule in field_rules {
                 if let Some(msg) = check_rule(rule, field, value, self.data) {
-                    let msg = self
-                        .custom_messages
-                        .get(*field)
-                        .cloned()
-                        .unwrap_or(msg);
+                    let msg = self.custom_messages.get(*field).cloned().unwrap_or(msg);
                     errors.add(field, &msg);
                 }
             }
@@ -120,18 +116,16 @@ where
     type Rejection = Response;
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        let Json(data) = Json::<T>::from_request(req, state)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    JsonResponse(serde_json::json!({
-                        "errors": {},
-                        "message": format!("Invalid JSON: {}", e)
-                    })),
-                )
-                    .into_response()
-            })?;
+        let Json(data) = Json::<T>::from_request(req, state).await.map_err(|e| {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                JsonResponse(serde_json::json!({
+                    "errors": {},
+                    "message": format!("Invalid JSON: {}", e)
+                })),
+            )
+                .into_response()
+        })?;
         Ok(ValidatedJson(data))
     }
 }
@@ -430,9 +424,11 @@ mod tests {
                 ("password", json!("secret")),
                 ("password_confirm", json!("secret")),
             ]);
-            assert!(
-                validate(&d, vec![("password", vec![rules::same("password_confirm")])]).is_ok()
-            );
+            assert!(validate(
+                &d,
+                vec![("password", vec![rules::same("password_confirm")])]
+            )
+            .is_ok());
         }
 
         #[test]
@@ -441,8 +437,11 @@ mod tests {
                 ("password", json!("secret")),
                 ("password_confirm", json!("different")),
             ]);
-            let err =
-                validate(&d, vec![("password", vec![rules::same("password_confirm")])]).unwrap_err();
+            let err = validate(
+                &d,
+                vec![("password", vec![rules::same("password_confirm")])],
+            )
+            .unwrap_err();
             assert!(err.has("password"));
         }
 
@@ -452,9 +451,11 @@ mod tests {
                 ("password", json!("secret")),
                 ("old_password", json!("oldsecret")),
             ]);
-            assert!(
-                validate(&d, vec![("password", vec![rules::different("old_password")])]).is_ok()
-            );
+            assert!(validate(
+                &d,
+                vec![("password", vec![rules::different("old_password")])]
+            )
+            .is_ok());
         }
 
         #[test]
@@ -610,10 +611,8 @@ mod tests {
         #[test]
         fn fails_alpha_numeric() {
             let d = data(vec![("username", json!("john@123"))]);
-            let err =
-                validate(&d, vec![("username", vec![rules::alpha_numeric()])]).unwrap_err();
+            let err = validate(&d, vec![("username", vec![rules::alpha_numeric()])]).unwrap_err();
             assert!(err.has("username"));
         }
     }
 }
-

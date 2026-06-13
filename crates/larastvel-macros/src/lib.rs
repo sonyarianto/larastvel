@@ -4,9 +4,7 @@ use syn::{parse_macro_input, DeriveInput, ItemStruct};
 
 fn resource_name_from_ident(name: &syn::Ident) -> String {
     let s = name.to_string();
-    s.strip_suffix("Controller")
-        .unwrap_or(&s)
-        .to_lowercase()
+    s.strip_suffix("Controller").unwrap_or(&s).to_lowercase()
 }
 
 #[proc_macro_derive(Resource, attributes(resource))]

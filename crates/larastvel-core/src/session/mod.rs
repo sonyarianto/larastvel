@@ -46,7 +46,11 @@ impl Session {
         }
     }
 
-    pub fn from_data(data: HashMap<String, String>, flash_new: HashMap<String, String>, csrf_token: String) -> Self {
+    pub fn from_data(
+        data: HashMap<String, String>,
+        flash_new: HashMap<String, String>,
+        csrf_token: String,
+    ) -> Self {
         let mut rng = rand::rngs::OsRng;
         let mut id_bytes = [0u8; 20];
         rng.fill_bytes(&mut id_bytes);
@@ -153,8 +157,10 @@ impl Session {
 
     pub fn from_payload(payload: &str) -> Option<Self> {
         let parsed: Value = serde_json::from_str(payload).ok()?;
-        let data: HashMap<String, String> = serde_json::from_value(parsed.get("data")?.clone()).ok()?;
-        let flash_new: HashMap<String, String> = serde_json::from_value(parsed.get("flash_new")?.clone()).ok()?;
+        let data: HashMap<String, String> =
+            serde_json::from_value(parsed.get("data")?.clone()).ok()?;
+        let flash_new: HashMap<String, String> =
+            serde_json::from_value(parsed.get("flash_new")?.clone()).ok()?;
         let csrf_token: String = serde_json::from_value(parsed.get("csrf_token")?.clone()).ok()?;
         Some(Self::from_data(data, flash_new, csrf_token))
     }

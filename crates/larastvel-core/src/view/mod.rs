@@ -43,17 +43,23 @@ impl ViewFactory {
                     template: template.to_string(),
                     source: Box::new(e),
                 })?;
-                let rendered = tera.render(template, &context).map_err(|e| ViewError::Render {
-                    template: template.to_string(),
-                    source: Box::new(e),
-                })?;
+                let rendered = tera
+                    .render(template, &context)
+                    .map_err(|e| ViewError::Render {
+                        template: template.to_string(),
+                        source: Box::new(e),
+                    })?;
                 Ok(rendered)
             }
             ViewEngine::None => Err(ViewError::NoEngine),
         }
     }
 
-    pub async fn render_html(&self, template: &str, data: impl Serialize) -> Result<Html<String>, ViewError> {
+    pub async fn render_html(
+        &self,
+        template: &str,
+        data: impl Serialize,
+    ) -> Result<Html<String>, ViewError> {
         self.render(template, data).await.map(Html)
     }
 }
@@ -63,5 +69,8 @@ pub enum ViewError {
     #[error("No template engine configured")]
     NoEngine,
     #[error("Failed to render template '{template}': {source}")]
-    Render { template: String, source: Box<dyn std::error::Error + Send + Sync> },
+    Render {
+        template: String,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 }

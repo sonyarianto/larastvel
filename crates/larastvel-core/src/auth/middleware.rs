@@ -1,8 +1,8 @@
 use axum::{
     extract::Request,
+    http::StatusCode,
     middleware::Next,
     response::{Json, Response},
-    http::StatusCode,
 };
 use serde_json::json;
 

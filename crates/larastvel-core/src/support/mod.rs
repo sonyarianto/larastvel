@@ -1,5 +1,5 @@
-pub mod vite;
 pub mod helpers;
+pub mod vite;
 
 pub use helpers::*;
 pub use vite::Vite;

@@ -119,7 +119,10 @@ impl PaginationParams {
     pub fn new(page: Option<usize>, per_page: Option<usize>) -> Self {
         Self {
             page: page.unwrap_or(1).max(1),
-            per_page: per_page.unwrap_or(DEFAULT_PER_PAGE).max(1).min(MAX_PER_PAGE),
+            per_page: per_page
+                .unwrap_or(DEFAULT_PER_PAGE)
+                .max(1)
+                .min(MAX_PER_PAGE),
         }
     }
 
@@ -143,9 +146,7 @@ where
         let params: std::collections::HashMap<String, String> =
             serde_urlencoded::from_str(query).unwrap_or_default();
 
-        let page = params
-            .get("page")
-            .and_then(|v| v.parse::<usize>().ok());
+        let page = params.get("page").and_then(|v| v.parse::<usize>().ok());
         let per_page = params
             .get("per_page")
             .or_else(|| params.get("perPage"))
@@ -295,4 +296,3 @@ mod tests {
         assert_eq!(p.per_page, 100);
     }
 }
-

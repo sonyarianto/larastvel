@@ -36,8 +36,11 @@ async fn main() {
         } else {
             eprintln!(
                 "{}",
-                format!("Error: Directory '{}' already exists.", project_path.display())
-                    .red()
+                format!(
+                    "Error: Directory '{}' already exists.",
+                    project_path.display()
+                )
+                .red()
             );
             std::process::exit(1);
         }
@@ -316,8 +319,16 @@ enum Users {
     std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
     std::fs::write(path.join("src/database/mod.rs"), database_mod).unwrap();
     std::fs::write(path.join("src/database/migrator.rs"), database_migrator).unwrap();
-    std::fs::write(path.join("src/database/migrations/mod.rs"), database_migrations_mod).unwrap();
-    std::fs::write(path.join("src/database/migrations/m20220101_000001_create_users_table.rs"), database_users_migration).unwrap();
+    std::fs::write(
+        path.join("src/database/migrations/mod.rs"),
+        database_migrations_mod,
+    )
+    .unwrap();
+    std::fs::write(
+        path.join("src/database/migrations/m20220101_000001_create_users_table.rs"),
+        database_users_migration,
+    )
+    .unwrap();
     std::fs::write(path.join("src/routes/mod.rs"), routes_mod).unwrap();
     std::fs::write(path.join("src/routes/web.rs"), routes_web).unwrap();
     std::fs::write(path.join("src/routes/api.rs"), routes_api).unwrap();

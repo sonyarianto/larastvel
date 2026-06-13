@@ -3,7 +3,7 @@ mod models;
 mod routes;
 
 use database::migrator::Migrator;
-use larastvel_core::{Application, DatabaseManager, logging};
+use larastvel_core::{logging, Application, DatabaseManager};
 
 #[tokio::main]
 async fn main() {

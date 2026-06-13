@@ -101,7 +101,10 @@ impl EventService {
 
     pub fn assert_dispatched_times<E: Event>(expected: usize) -> bool {
         let dispatched = DISPATCHED_EVENTS.lock().unwrap();
-        let count = dispatched.iter().filter(|(id, _)| *id == TypeId::of::<E>()).count();
+        let count = dispatched
+            .iter()
+            .filter(|(id, _)| *id == TypeId::of::<E>())
+            .count();
         count == expected
     }
 
@@ -311,7 +314,10 @@ mod tests {
             order_id: "fake-test".into(),
         })
         .await;
-        assert!(!handled.load(Ordering::SeqCst), "listener should not be called in fake mode");
+        assert!(
+            !handled.load(Ordering::SeqCst),
+            "listener should not be called in fake mode"
+        );
 
         assert!(EventService::assert_dispatched::<OrderShipped>());
 

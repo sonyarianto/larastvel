@@ -187,7 +187,7 @@ pub trait ResourceController: Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Resource, controller};
+    use crate::{controller, Resource};
     use axum::body::Body;
     use axum::http::Request;
     use axum::response::Response;
@@ -589,9 +589,7 @@ mod tests {
             <Self as ResourceController>::index().await
         }
 
-        async fn __users_show(
-            axum::extract::Path(id): axum::extract::Path<String>,
-        ) -> Response {
+        async fn __users_show(axum::extract::Path(id): axum::extract::Path<String>) -> Response {
             <Self as ResourceController>::show(id).await
         }
 
@@ -599,15 +597,11 @@ mod tests {
             <Self as ResourceController>::store().await
         }
 
-        async fn __users_update(
-            axum::extract::Path(id): axum::extract::Path<String>,
-        ) -> Response {
+        async fn __users_update(axum::extract::Path(id): axum::extract::Path<String>) -> Response {
             <Self as ResourceController>::update(id).await
         }
 
-        async fn __users_destroy(
-            axum::extract::Path(id): axum::extract::Path<String>,
-        ) -> Response {
+        async fn __users_destroy(axum::extract::Path(id): axum::extract::Path<String>) -> Response {
             <Self as ResourceController>::destroy(id).await
         }
     }

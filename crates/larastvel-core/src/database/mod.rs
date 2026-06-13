@@ -105,7 +105,10 @@ impl DatabaseManager {
         M::fresh(&conn).await
     }
 
-    pub async fn migrate_rollback<M: MigratorTrait>(&self, steps: Option<u32>) -> Result<(), sea_orm::DbErr> {
+    pub async fn migrate_rollback<M: MigratorTrait>(
+        &self,
+        steps: Option<u32>,
+    ) -> Result<(), sea_orm::DbErr> {
         let conn = self.connect().await?;
         info!("Rolling back database migrations");
         M::down(&conn, steps).await

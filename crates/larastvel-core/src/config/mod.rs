@@ -103,9 +103,7 @@ impl Config {
             ["logging", "format"] => Some(self.logging.format.clone()),
             _ => {
                 let full_key = parts.join(".");
-                self.extra
-                    .get(&full_key)
-                    .map(|v| v.to_string())
+                self.extra.get(&full_key).map(|v| v.to_string())
             }
         }
     }
@@ -132,7 +130,10 @@ mod tests {
     fn test_config_get_dot_notation() {
         let config = Config::default();
         assert_eq!(config.get("app.name"), Some("larastvel".to_string()));
-        assert_eq!(config.get("app.url"), Some("http://localhost:8080".to_string()));
+        assert_eq!(
+            config.get("app.url"),
+            Some("http://localhost:8080".to_string())
+        );
         assert_eq!(config.get("app.env"), Some("local".to_string()));
         assert_eq!(config.get("app.debug"), Some("true".to_string()));
         assert_eq!(config.get("database.driver"), Some("sqlite".to_string()));
@@ -149,7 +150,10 @@ mod tests {
     #[test]
     fn test_config_get_extra_key() {
         let mut config = Config::default();
-        config.extra.insert("custom.key".to_string(), toml::Value::String("value".to_string()));
+        config.extra.insert(
+            "custom.key".to_string(),
+            toml::Value::String("value".to_string()),
+        );
         assert_eq!(config.get("custom.key"), Some("\"value\"".to_string()));
     }
 

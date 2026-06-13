@@ -4,7 +4,11 @@ use clap::{Parser, Subcommand};
 use colored::*;
 
 #[derive(Parser)]
-#[command(name = "larastvel", about = "Larastvel Framework CLI", version = "0.1.0")]
+#[command(
+    name = "larastvel",
+    about = "Larastvel Framework CLI",
+    version = "0.1.0"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -24,9 +28,7 @@ enum Commands {
     /// Display framework version
     Version,
     /// Create a new Larastvel application
-    New {
-        name: String,
-    },
+    New { name: String },
     /// Generate a new application key
     KeyGenerate,
     /// Run database migrations
@@ -68,9 +70,12 @@ async fn main() {
             let host = host.unwrap_or_else(|| "127.0.0.1".to_string());
             println!(
                 "{}",
-                format!("⚡ Larastvel development server starting on http://{}:{}", host, port)
-                    .green()
-                    .bold()
+                format!(
+                    "⚡ Larastvel development server starting on http://{}:{}",
+                    host, port
+                )
+                .green()
+                .bold()
             );
             println!("{}", "  Press Ctrl+C to stop.".dimmed());
             start_server(&host, port).await;
@@ -83,7 +88,12 @@ async fn main() {
             println!("Larastvel Framework v{}", env!("CARGO_PKG_VERSION"));
         }
         Some(Commands::New { name }) => {
-            println!("{}", format!("Creating new Larastvel application: {}", name).green().bold());
+            println!(
+                "{}",
+                format!("Creating new Larastvel application: {}", name)
+                    .green()
+                    .bold()
+            );
             create_project(&name).await;
         }
         Some(Commands::KeyGenerate) => {
@@ -107,29 +117,27 @@ async fn main() {
         Some(Commands::DbSeed) => {
             run_seed_command();
         }
-        Some(Commands::Make { target }) => {
-            match target {
-                Some(MakeTarget::Model { name }) => {
-                    make_model(&name);
-                }
-                Some(MakeTarget::Controller { name }) => {
-                    make_controller(&name);
-                }
-                Some(MakeTarget::Migration { name }) => {
-                    make_migration(&name);
-                }
-                Some(MakeTarget::Seeder { name }) => {
-                    make_seeder(&name);
-                }
-                None => {
-                    println!("{}", "Available make targets:".cyan());
-                    println!("  make:model       Create a new model");
-                    println!("  make:controller  Create a new controller");
-                    println!("  make:migration   Create a new migration");
-                    println!("  make:seeder      Create a new seeder");
-                }
+        Some(Commands::Make { target }) => match target {
+            Some(MakeTarget::Model { name }) => {
+                make_model(&name);
             }
-        }
+            Some(MakeTarget::Controller { name }) => {
+                make_controller(&name);
+            }
+            Some(MakeTarget::Migration { name }) => {
+                make_migration(&name);
+            }
+            Some(MakeTarget::Seeder { name }) => {
+                make_seeder(&name);
+            }
+            None => {
+                println!("{}", "Available make targets:".cyan());
+                println!("  make:model       Create a new model");
+                println!("  make:controller  Create a new controller");
+                println!("  make:migration   Create a new migration");
+                println!("  make:seeder      Create a new seeder");
+            }
+        },
         None => {
             println!("{}", "Larastvel Framework CLI".cyan().bold());
             println!("{}", "Usage: larastvel <command>".dimmed());
@@ -156,14 +164,16 @@ async fn start_server(host: &str, port: u16) {
     let addr = format!("{}:{}", host, port);
     println!("  Server running on http://{}", addr.green());
 
-    let app = larastvel_core::axum::Router::new()
-        .route("/health", larastvel_core::axum::routing::get(|| async {
+    let app = larastvel_core::axum::Router::new().route(
+        "/health",
+        larastvel_core::axum::routing::get(|| async {
             larastvel_core::axum::response::Json(serde_json::json!({
                 "status": "ok",
                 "framework": "Larastvel",
                 "version": env!("CARGO_PKG_VERSION"),
             }))
-        }));
+        }),
+    );
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     larastvel_core::axum::serve(listener, app).await.unwrap();
@@ -172,7 +182,10 @@ async fn start_server(host: &str, port: u16) {
 async fn create_project(name: &str) {
     let path = PathBuf::from(name);
     if path.exists() {
-        eprintln!("{}", format!("Error: Directory '{}' already exists.", name).red());
+        eprintln!(
+            "{}",
+            format!("Error: Directory '{}' already exists.", name).red()
+        );
         std::process::exit(1);
     }
 
@@ -189,7 +202,8 @@ async fn create_project(name: &str) {
     std::fs::create_dir_all(path.join("storage/logs")).unwrap();
     std::fs::create_dir_all(path.join("storage/app")).unwrap();
 
-    let main_rs = format!(r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
+    let main_rs = format!(
+        r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
 
 mod controllers;
 mod models;
@@ -213,9 +227,12 @@ async fn main() {{
     println!("⚡ {name} starting up...");
     app.run().await;
 }}
-"#, name = name);
+"#,
+        name = name
+    );
 
-    let cargo_toml = format!(r#"[package]
+    let cargo_toml = format!(
+        r#"[package]
 name = "{name}"
 version = "0.1.0"
 edition = "2021"
@@ -227,7 +244,9 @@ serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
 tracing = "0.1"
 sea-orm-migration = "1"
-"#, name = name);
+"#,
+        name = name
+    );
 
     let config_toml = r#"[app]
 name = "larastvel"
@@ -423,7 +442,11 @@ impl larastvel_core::models::DbModel for User {
 "#;
 
     std::fs::write(path.join("src/controllers/mod.rs"), controllers_mod).unwrap();
-    std::fs::write(path.join("src/controllers/home_controller.rs"), home_controller).unwrap();
+    std::fs::write(
+        path.join("src/controllers/home_controller.rs"),
+        home_controller,
+    )
+    .unwrap();
     std::fs::write(path.join("src/models/mod.rs"), models_mod).unwrap();
     std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
     std::fs::write(path.join("Cargo.toml"), cargo_toml).unwrap();
@@ -440,7 +463,12 @@ impl larastvel_core::models::DbModel for User {
     std::fs::write(path.join("routes/web.rs"), routes_file).unwrap();
     std::fs::write(path.join(".env"), env_file).unwrap();
 
-    println!("{}", format!("✓ Application [{}] created successfully!", name).green().bold());
+    println!(
+        "{}",
+        format!("✓ Application [{}] created successfully!", name)
+            .green()
+            .bold()
+    );
     println!();
     println!("Next steps:");
     println!("  cd {}", name);
@@ -499,7 +527,12 @@ impl larastvel_core::models::DbModel for {name} {{
     if file_path.exists() {
         eprintln!(
             "{}",
-            format!("Error: Model '{}' already exists at '{}'.", name, file_path.display()).red()
+            format!(
+                "Error: Model '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
         );
         return;
     }
@@ -563,7 +596,12 @@ impl larastvel_core::routing::ResourceController for {name} {{
     if file_path.exists() {
         eprintln!(
             "{}",
-            format!("Error: Controller '{}' already exists at '{}'.", name, file_path.display()).red()
+            format!(
+                "Error: Controller '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
         );
         return;
     }
@@ -582,9 +620,13 @@ impl larastvel_core::routing::ResourceController for {name} {{
 
     println!(
         "{}",
-        format!("✓ Controller [{}] created at '{}'.", name, file_path.display())
-            .green()
-            .bold()
+        format!(
+            "✓ Controller [{}] created at '{}'.",
+            name,
+            file_path.display()
+        )
+        .green()
+        .bold()
     );
     println!(
         "{}",
@@ -649,7 +691,12 @@ impl {name} {{
     if file_path.exists() {
         eprintln!(
             "{}",
-            format!("Error: Seeder '{}' already exists at '{}'.", name, file_path.display()).red()
+            format!(
+                "Error: Seeder '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
         );
         return;
     }
@@ -679,10 +726,7 @@ impl {name} {{
 }
 
 fn run_seed_command() {
-    println!(
-        "{}",
-        "Running database seeders...".green().bold()
-    );
+    println!("{}", "Running database seeders...".green().bold());
     let status = std::process::Command::new("cargo")
         .args(["run", "--", "--seed"])
         .stdout(std::process::Stdio::inherit())
@@ -698,19 +742,13 @@ fn run_seed_command() {
                 "{}",
                 "Seeding failed. Make sure you're in the project root directory.".red()
             );
-            eprintln!(
-                "{}",
-                "You can also run: cargo run -- --seed".dimmed()
-            );
+            eprintln!("{}", "You can also run: cargo run -- --seed".dimmed());
         }
     }
 }
 
 fn run_migrate_command(subcommand: &str) {
-    println!(
-        "{}",
-        format!("Running '{}'...", subcommand).green().bold()
-    );
+    println!("{}", format!("Running '{}'...", subcommand).green().bold());
     let status = std::process::Command::new("cargo")
         .args(["run", "--", "--migrate", subcommand])
         .stdout(std::process::Stdio::inherit())
@@ -781,7 +819,12 @@ impl MigrationTrait for Migration {{
     if file_path.exists() {
         eprintln!(
             "{}",
-            format!("Error: Migration '{}' already exists at '{}'.", name, file_path.display()).red()
+            format!(
+                "Error: Migration '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
         );
         return;
     }

@@ -30,12 +30,11 @@ impl Encrypter {
                 key.len()
             )));
         }
-        let key_arr: &[u8; KEY_SIZE] = key.try_into().map_err(|_| {
-            EncryptError::InvalidKey("key conversion failed".to_string())
-        })?;
-        let cipher = Aes256Gcm::new_from_slice(key_arr).map_err(|e| {
-            EncryptError::InvalidKey(e.to_string())
-        })?;
+        let key_arr: &[u8; KEY_SIZE] = key
+            .try_into()
+            .map_err(|_| EncryptError::InvalidKey("key conversion failed".to_string()))?;
+        let cipher = Aes256Gcm::new_from_slice(key_arr)
+            .map_err(|e| EncryptError::InvalidKey(e.to_string()))?;
         Ok(Self { cipher })
     }
 
@@ -60,11 +59,9 @@ impl Encrypter {
     }
 
     pub fn decrypt(&self, payload_b64: &str) -> Result<String, EncryptError> {
-        let payload = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            payload_b64,
-        )
-        .map_err(|e| EncryptError::DecryptionFailed(format!("invalid base64: {}", e)))?;
+        let payload =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, payload_b64)
+                .map_err(|e| EncryptError::DecryptionFailed(format!("invalid base64: {}", e)))?;
 
         if payload.len() < NONCE_SIZE {
             return Err(EncryptError::DecryptionFailed(
@@ -187,7 +184,8 @@ mod tests {
         let key1 = generate_key();
         let key2 = generate_key();
         assert_ne!(key1, key2);
-        let decoded = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &key1).unwrap();
+        let decoded =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &key1).unwrap();
         assert_eq!(decoded.len(), 32);
     }
 }

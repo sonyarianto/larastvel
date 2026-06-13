@@ -189,7 +189,8 @@ impl Filesystem for LocalDisk {
             return Err(StorageError::NotFound(directory.to_string()));
         }
         let mut result = Vec::new();
-        self.collect_files_recursive(&full, &full, &mut result).await?;
+        self.collect_files_recursive(&full, &full, &mut result)
+            .await?;
         result.sort();
         Ok(result)
     }
@@ -221,7 +222,8 @@ impl Filesystem for LocalDisk {
             return Err(StorageError::NotFound(directory.to_string()));
         }
         let mut result = Vec::new();
-        self.collect_dirs_recursive(&full, &full, &mut result).await?;
+        self.collect_dirs_recursive(&full, &full, &mut result)
+            .await?;
         result.sort();
         Ok(result)
     }
@@ -416,9 +418,7 @@ mod tests {
     #[tokio::test]
     async fn test_copy() {
         let (disk, root) = create_disk();
-        disk.put("source.txt", b"source content")
-            .await
-            .unwrap();
+        disk.put("source.txt", b"source content").await.unwrap();
         disk.copy("source.txt", "dest.txt").await.unwrap();
         assert_eq!(disk.get("dest.txt").await.unwrap(), b"source content");
         cleanup(&root).await;
@@ -507,7 +507,10 @@ mod tests {
     #[tokio::test]
     async fn test_path() {
         let disk = LocalDisk::new(PathBuf::from("/app/storage"), "".to_string());
-        assert_eq!(disk.path("file.txt"), PathBuf::from("/app/storage/file.txt"));
+        assert_eq!(
+            disk.path("file.txt"),
+            PathBuf::from("/app/storage/file.txt")
+        );
         assert_eq!(
             disk.path("sub/dir/file.txt"),
             PathBuf::from("/app/storage/sub/dir/file.txt")

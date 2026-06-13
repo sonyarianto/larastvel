@@ -63,13 +63,11 @@ impl Auth {
     }
 
     pub fn create_token(&self, user_id: &str) -> Result<String, AuthError> {
-        jwt::create_token(user_id, &self.secret)
-            .map_err(|e| AuthError::TokenError(e.to_string()))
+        jwt::create_token(user_id, &self.secret).map_err(|e| AuthError::TokenError(e.to_string()))
     }
 
     pub fn verify_token(&self, token: &str) -> Result<Claims, AuthError> {
-        jwt::verify_token(token, &self.secret)
-            .map_err(|e| AuthError::TokenError(e.to_string()))
+        jwt::verify_token(token, &self.secret).map_err(|e| AuthError::TokenError(e.to_string()))
     }
 
     pub fn extract_token_from_header(headers: &HeaderMap) -> Option<String> {
@@ -94,16 +92,14 @@ where
     type Rejection = AuthError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let token = Auth::extract_token_from_header(&parts.headers)
-            .ok_or(AuthError::InvalidCredentials)?;
+        let token =
+            Auth::extract_token_from_header(&parts.headers).ok_or(AuthError::InvalidCredentials)?;
 
         let secret = parts
             .extensions
             .get::<Vec<u8>>()
             .cloned()
-            .unwrap_or_else(|| {
-                b"larastvel-default-key-change-in-production".to_vec()
-            });
+            .unwrap_or_else(|| b"larastvel-default-key-change-in-production".to_vec());
 
         let auth = Auth::new(secret);
         let claims = auth.verify_token(&token)?;
