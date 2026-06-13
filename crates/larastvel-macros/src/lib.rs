@@ -2,48 +2,103 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, ItemStruct};
 
-#[proc_macro_derive(Resource)]
+fn resource_name_from_ident(name: &syn::Ident) -> String {
+    let s = name.to_string();
+    s.strip_suffix("Controller")
+        .unwrap_or(&s)
+        .to_lowercase()
+}
+
+#[proc_macro_derive(Resource, attributes(resource))]
 pub fn derive_resource(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
 
+    let resource_name = resource_name_from_ident(name);
+
     let expanded = quote! {
-        impl #name {
-            pub fn routes() -> Vec<(&'static str, &'static str)> {
-                vec![]
-            }
+        impl larastvel_core::routing::ResourceController for #name {
+            const RESOURCE_NAME: &'static str = #resource_name;
         }
 
-        impl larastvel_core::routing::ResourceController for #name
-        where
-            #name: Clone + Send + Sync + 'static,
-        {
-            fn index(&self) -> impl larastvel_core::axum::response::IntoResponse {
-                larastvel_core::axum::response::Json(serde_json::json!({"data": []}))
+        impl #name {
+            pub fn register_routes(
+                registrar: &larastvel_core::routing::Registrar,
+            ) {
+                let __name =
+                    <Self as larastvel_core::routing::ResourceController>::RESOURCE_NAME;
+
+                registrar.get(
+                    &format!("/{}", __name),
+                    Self::__resource_index,
+                );
+                registrar.get(
+                    &format!("/{}/create", __name),
+                    Self::__resource_create,
+                );
+                registrar.post(
+                    &format!("/{}", __name),
+                    Self::__resource_store,
+                );
+                registrar.get(
+                    &format!("/{}/{{id}}", __name),
+                    Self::__resource_show,
+                );
+                registrar.get(
+                    &format!("/{}/{{id}}/edit", __name),
+                    Self::__resource_edit,
+                );
+                registrar.put(
+                    &format!("/{}/{{id}}", __name),
+                    Self::__resource_update,
+                );
+                registrar.delete(
+                    &format!("/{}/{{id}}", __name),
+                    Self::__resource_destroy,
+                );
             }
 
-            fn create(&self) -> impl larastvel_core::axum::response::IntoResponse {
-                larastvel_core::axum::response::Json(serde_json::json!({"data": {}}))
+            async fn __resource_index(
+            ) -> larastvel_core::axum::response::Response {
+                <Self as larastvel_core::routing::ResourceController>::index().await
             }
 
-            fn store(&self) -> impl larastvel_core::axum::response::IntoResponse {
-                larastvel_core::axum::response::Json(serde_json::json!({"data": {}}))
+            async fn __resource_create(
+            ) -> larastvel_core::axum::response::Response {
+                <Self as larastvel_core::routing::ResourceController>::create().await
             }
 
-            async fn show(&self, _id: String) -> impl larastvel_core::axum::response::IntoResponse {
-                larastvel_core::axum::response::Json(serde_json::json!({"data": {}}))
+            async fn __resource_store(
+            ) -> larastvel_core::axum::response::Response {
+                <Self as larastvel_core::routing::ResourceController>::store().await
             }
 
-            async fn edit(&self, _id: String) -> impl larastvel_core::axum::response::IntoResponse {
-                larastvel_core::axum::response::Json(serde_json::json!({"data": {}}))
+            async fn __resource_show(
+                larastvel_core::axum::extract::Path(id):
+                    larastvel_core::axum::extract::Path<String>,
+            ) -> larastvel_core::axum::response::Response {
+                <Self as larastvel_core::routing::ResourceController>::show(id).await
             }
 
-            async fn update(&self, _id: String) -> impl larastvel_core::axum::response::IntoResponse {
-                larastvel_core::axum::response::Json(serde_json::json!({"data": {}}))
+            async fn __resource_edit(
+                larastvel_core::axum::extract::Path(id):
+                    larastvel_core::axum::extract::Path<String>,
+            ) -> larastvel_core::axum::response::Response {
+                <Self as larastvel_core::routing::ResourceController>::edit(id).await
             }
 
-            async fn destroy(&self, _id: String) -> impl larastvel_core::axum::response::IntoResponse {
-                larastvel_core::axum::response::Json(serde_json::json!({"data": {}}))
+            async fn __resource_update(
+                larastvel_core::axum::extract::Path(id):
+                    larastvel_core::axum::extract::Path<String>,
+            ) -> larastvel_core::axum::response::Response {
+                <Self as larastvel_core::routing::ResourceController>::update(id).await
+            }
+
+            async fn __resource_destroy(
+                larastvel_core::axum::extract::Path(id):
+                    larastvel_core::axum::extract::Path<String>,
+            ) -> larastvel_core::axum::response::Response {
+                <Self as larastvel_core::routing::ResourceController>::destroy(id).await
             }
         }
     };
@@ -60,9 +115,9 @@ pub fn controller(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #input
 
         impl #name {
-            pub fn register_routes(router: &larastvel_core::routing::Registrar) {
-                let ctrl = #name {};
-                router.resource(stringify!(#name).to_lowercase().replace("controller", ""), ctrl);
+            pub fn register_routes(
+                _registrar: &larastvel_core::routing::Registrar,
+            ) {
             }
         }
     };

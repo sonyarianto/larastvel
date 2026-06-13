@@ -1,3 +1,5 @@
+extern crate self as larastvel_core;
+
 pub mod config;
 pub mod console;
 pub mod database;
@@ -25,3 +27,4 @@ pub use database::DatabaseManager;
 pub use config::Config;
 pub use console::ConsoleKernel;
 pub use http::Request;
+pub use larastvel_macros::{Resource, controller, route};

@@ -1,9 +1,8 @@
-use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use axum::{
     handler::Handler,
-    response::{Html, IntoResponse, Json},
+    response::{Html, IntoResponse, Json, Response},
     routing::{delete, get, patch, post, put, MethodRouter},
     Router as AxumRouter,
 };
@@ -37,55 +36,55 @@ impl Registrar {
 
     pub fn get<H, T>(&self, uri: &str, handler: H)
     where
-        H: Handler<T, ()> + IntoRouteHandler,
+        H: Handler<T, ()>,
         T: 'static,
     {
         let uri = self.resolve_uri(uri);
-        let name = handler.name();
+        let name = std::any::type_name::<H>().to_string();
         let method_router = get(handler);
         self.add_method_route("GET", &uri, method_router, &name);
     }
 
     pub fn post<H, T>(&self, uri: &str, handler: H)
     where
-        H: Handler<T, ()> + IntoRouteHandler,
+        H: Handler<T, ()>,
         T: 'static,
     {
         let uri = self.resolve_uri(uri);
-        let name = handler.name();
+        let name = std::any::type_name::<H>().to_string();
         let method_router = post(handler);
         self.add_method_route("POST", &uri, method_router, &name);
     }
 
     pub fn put<H, T>(&self, uri: &str, handler: H)
     where
-        H: Handler<T, ()> + IntoRouteHandler,
+        H: Handler<T, ()>,
         T: 'static,
     {
         let uri = self.resolve_uri(uri);
-        let name = handler.name();
+        let name = std::any::type_name::<H>().to_string();
         let method_router = put(handler);
         self.add_method_route("PUT", &uri, method_router, &name);
     }
 
     pub fn patch<H, T>(&self, uri: &str, handler: H)
     where
-        H: Handler<T, ()> + IntoRouteHandler,
+        H: Handler<T, ()>,
         T: 'static,
     {
         let uri = self.resolve_uri(uri);
-        let name = handler.name();
+        let name = std::any::type_name::<H>().to_string();
         let method_router = patch(handler);
         self.add_method_route("PATCH", &uri, method_router, &name);
     }
 
     pub fn delete<H, T>(&self, uri: &str, handler: H)
     where
-        H: Handler<T, ()> + IntoRouteHandler,
+        H: Handler<T, ()>,
         T: 'static,
     {
         let uri = self.resolve_uri(uri);
-        let name = handler.name();
+        let name = std::any::type_name::<H>().to_string();
         let method_router = delete(handler);
         self.add_method_route("DELETE", &uri, method_router, &name);
     }
@@ -152,26 +151,46 @@ impl Registrar {
     }
 }
 
-pub trait IntoRouteHandler {
-    fn name(&self) -> String;
-}
+#[async_trait::async_trait]
+pub trait ResourceController: Send + Sync + 'static {
+    const RESOURCE_NAME: &'static str;
 
-impl<F, Fut, T> IntoRouteHandler for F
-where
-    F: Fn() -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = T> + Send + 'static,
-    T: IntoResponse + 'static,
-{
-    fn name(&self) -> String {
-        std::any::type_name::<F>().to_string()
+    async fn index() -> Response {
+        Json(serde_json::json!({"data": []})).into_response()
+    }
+
+    async fn create() -> Response {
+        Json(serde_json::json!({"data": {}})).into_response()
+    }
+
+    async fn store() -> Response {
+        Json(serde_json::json!({"data": {}})).into_response()
+    }
+
+    async fn show(id: String) -> Response {
+        Json(serde_json::json!({"data": {"id": id}})).into_response()
+    }
+
+    async fn edit(id: String) -> Response {
+        Json(serde_json::json!({"data": {"id": id}})).into_response()
+    }
+
+    async fn update(id: String) -> Response {
+        Json(serde_json::json!({"data": {"id": id}})).into_response()
+    }
+
+    async fn destroy(id: String) -> Response {
+        Json(serde_json::json!({"data": {"id": id}})).into_response()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Resource, controller};
     use axum::body::Body;
     use axum::http::Request;
+    use axum::response::Response;
     use std::sync::{Arc, Mutex};
     use tower::ServiceExt;
 
@@ -325,10 +344,329 @@ mod tests {
         assert_eq!(response.status(), 200);
     }
 
+    // --- ResourceController trait tests ---
+
+    struct TestResource;
+
+    #[async_trait::async_trait]
+    impl ResourceController for TestResource {
+        const RESOURCE_NAME: &'static str = "tests";
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_index_default() {
+        let resp = TestResource::index().await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_show_default() {
+        let resp = TestResource::show("42".to_string()).await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_store_default() {
+        let resp = TestResource::store().await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_update_default() {
+        let resp = TestResource::update("1".to_string()).await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_destroy_default() {
+        let resp = TestResource::destroy("1".to_string()).await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_create_default() {
+        let resp = TestResource::create().await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_edit_default() {
+        let resp = TestResource::edit("1".to_string()).await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_custom_resource_name() {
+        struct CustomResource;
+
+        #[async_trait::async_trait]
+        impl ResourceController for CustomResource {
+            const RESOURCE_NAME: &'static str = "custom-items";
+        }
+
+        assert_eq!(CustomResource::RESOURCE_NAME, "custom-items");
+    }
+
+    #[tokio::test]
+    async fn test_resource_controller_custom_index() {
+        struct CustomIndex;
+
+        #[async_trait::async_trait]
+        impl ResourceController for CustomIndex {
+            const RESOURCE_NAME: &'static str = "custom";
+
+            async fn index() -> Response {
+                Json(serde_json::json!({"custom": true})).into_response()
+            }
+        }
+
+        let resp = CustomIndex::index().await;
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["custom"], true);
+    }
+
+    #[derive(Resource)]
+    struct TestDerivedResource;
+
+    #[tokio::test]
+    async fn test_derive_resource_generates_trait_impl() {
+        assert_eq!(
+            <TestDerivedResource as ResourceController>::RESOURCE_NAME,
+            "testderivedresource"
+        );
+        let resp = TestDerivedResource::index().await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_derive_resource_generates_register_routes() {
+        // register_routes should compile and not panic
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        TestDerivedResource::register_routes(&registrar);
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 7);
+    }
+
+    #[tokio::test]
+    async fn test_derive_resource_routes_respond() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        TestDerivedResource::register_routes(&registrar);
+
+        let app = registrar.build();
+
+        // Test index
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/testderivedresource")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // Test create
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/testderivedresource/create")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // Test store
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/testderivedresource")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // Test show
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/testderivedresource/42")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // Test edit
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/testderivedresource/42/edit")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // Test update
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/testderivedresource/42")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // Test destroy
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/testderivedresource/42")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    struct UserController;
+
+    #[async_trait::async_trait]
+    impl ResourceController for UserController {
+        const RESOURCE_NAME: &'static str = "users";
+
+        async fn index() -> Response {
+            Json(serde_json::json!({"users": ["alice", "bob"]})).into_response()
+        }
+
+        async fn show(id: String) -> Response {
+            Json(serde_json::json!({"user": {"id": id}})).into_response()
+        }
+    }
+
+    impl UserController {
+        fn register_routes(registrar: &Registrar) {
+            let name = <Self as ResourceController>::RESOURCE_NAME;
+
+            registrar.get(&format!("/{}", name), Self::__users_index);
+            registrar.get(&format!("/{}/{{id}}", name), Self::__users_show);
+            registrar.post(&format!("/{}", name), Self::__users_store);
+            registrar.put(&format!("/{}/{{id}}", name), Self::__users_update);
+            registrar.delete(&format!("/{}/{{id}}", name), Self::__users_destroy);
+        }
+
+        async fn __users_index() -> Response {
+            <Self as ResourceController>::index().await
+        }
+
+        async fn __users_show(
+            axum::extract::Path(id): axum::extract::Path<String>,
+        ) -> Response {
+            <Self as ResourceController>::show(id).await
+        }
+
+        async fn __users_store() -> Response {
+            <Self as ResourceController>::store().await
+        }
+
+        async fn __users_update(
+            axum::extract::Path(id): axum::extract::Path<String>,
+        ) -> Response {
+            <Self as ResourceController>::update(id).await
+        }
+
+        async fn __users_destroy(
+            axum::extract::Path(id): axum::extract::Path<String>,
+        ) -> Response {
+            <Self as ResourceController>::destroy(id).await
+        }
+    }
+
+    #[tokio::test]
+    async fn test_manual_resource_controller() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        UserController::register_routes(&registrar);
+
+        let app = registrar.build();
+
+        // Test custom index
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/users")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // Test custom show with path param
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/users/42")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[controller]
+    struct MyController;
+
     #[test]
-    fn test_into_route_handler_for_closure() {
-        let handler = || async { "ok" };
-        let name = handler.name();
-        assert!(!name.is_empty());
+    fn test_controller_attribute_compiles() {
+        // Just test that the attribute compiles and generates register_routes
+        assert_eq!(std::mem::size_of::<MyController>(), 0);
+    }
+
+    #[test]
+    fn test_controller_generates_register_routes() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        MyController::register_routes(&registrar);
+        // No routes registered (it's empty by default from the macro)
+        assert!(registrar.list_routes().is_empty());
     }
 }

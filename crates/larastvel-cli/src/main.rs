@@ -106,7 +106,7 @@ async fn main() {
                     make_model(&name);
                 }
                 Some(MakeTarget::Controller { name }) => {
-                    println!("{}", format!("Creating controller: {}", name).green());
+                    make_controller(&name);
                 }
                 Some(MakeTarget::Migration { name }) => {
                     make_migration(&name);
@@ -165,6 +165,7 @@ async fn create_project(name: &str) {
 
     std::fs::create_dir_all(&path).unwrap();
     std::fs::create_dir_all(path.join("src/models")).unwrap();
+    std::fs::create_dir_all(path.join("src/controllers")).unwrap();
     std::fs::create_dir_all(path.join("resources/views")).unwrap();
     std::fs::create_dir_all(path.join("resources/js")).unwrap();
     std::fs::create_dir_all(path.join("resources/css")).unwrap();
@@ -177,7 +178,9 @@ async fn create_project(name: &str) {
 
     let main_rs = format!(r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
 
+mod controllers;
 mod models;
+mod routes;
 
 #[tokio::main]
 async fn main() {{
@@ -346,6 +349,24 @@ pub fn api(router: &Registrar) {
 }
 "#;
 
+    let controllers_mod = "pub mod home_controller;\n";
+
+    let home_controller = r#"use larastvel_core::axum::response::{IntoResponse, Json, Response};
+use larastvel_core::Resource;
+use serde_json::json;
+
+#[derive(Resource)]
+pub struct HomeController;
+
+impl larastvel_core::routing::ResourceController for HomeController {
+    const RESOURCE_NAME: &'static str = "home";
+
+    async fn index() -> Response {
+        Json(json!({"message": "Welcome to Larastvel"})).into_response()
+    }
+}
+"#;
+
     let env_file = r#"APP_NAME=Larastvel
 APP_ENV=local
 APP_KEY=
@@ -388,6 +409,8 @@ impl larastvel_core::models::DbModel for User {
 }
 "#;
 
+    std::fs::write(path.join("src/controllers/mod.rs"), controllers_mod).unwrap();
+    std::fs::write(path.join("src/controllers/home_controller.rs"), home_controller).unwrap();
     std::fs::write(path.join("src/models/mod.rs"), models_mod).unwrap();
     std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
     std::fs::write(path.join("Cargo.toml"), cargo_toml).unwrap();
@@ -485,6 +508,79 @@ impl larastvel_core::models::DbModel for {name} {{
         format!("✓ Model [{}] created at '{}'.", name, file_path.display())
             .green()
             .bold()
+    );
+}
+
+fn make_controller(name: &str) {
+    let controllers_dir = std::path::Path::new("src/controllers");
+    std::fs::create_dir_all(controllers_dir).unwrap();
+
+    let snake_name = {
+        let mut result = String::new();
+        for (i, ch) in name.chars().enumerate() {
+            if ch.is_uppercase() {
+                if i > 0 {
+                    result.push('_');
+                }
+                result.push(ch.to_ascii_lowercase());
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    };
+
+    let controller_content = format!(
+        r#"use larastvel_core::axum::response::{{IntoResponse, Json, Response}};
+use larastvel_core::Resource;
+use serde_json::json;
+
+#[derive(Resource)]
+pub struct {name};
+
+impl larastvel_core::routing::ResourceController for {name} {{
+    const RESOURCE_NAME: &'static str = "{resource_name}";
+}}
+"#,
+        name = name,
+        resource_name = snake_name
+    );
+
+    let file_path = controllers_dir.join(format!("{}.rs", snake_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!("Error: Controller '{}' already exists at '{}'.", name, file_path.display()).red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, controller_content).unwrap();
+
+    // Update mod.rs
+    let mod_path = controllers_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", snake_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!("✓ Controller [{}] created at '{}'.", name, file_path.display())
+            .green()
+            .bold()
+    );
+    println!(
+        "{}",
+        "  Override resource methods in the `impl ResourceController` block to add custom logic."
+            .dimmed()
+    );
+    println!(
+        "{}",
+        "  Register routes: MyController::register_routes(&registrar);".dimmed()
     );
 }
 
