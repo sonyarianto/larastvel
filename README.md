@@ -4,7 +4,7 @@ A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
 
 ## Status
 
-Active development (~85% feature parity). Core architecture is solid with most framework features implemented.
+Active development (~88% feature parity). Core architecture is solid with most framework features implemented.
 
 ## Features
 
@@ -32,7 +32,10 @@ Active development (~85% feature parity). Core architecture is solid with most f
 - **Rate Limiting** — Token bucket with `RateLimiter`, `RateLimiterRegistry`, Axum middleware
 - **Localization** — JSON translation files, `__()` / `trans_choice()`, pluralization, locale switching
 - **Task Scheduling** — Cron expression parser, `Schedule` builder, `ScheduleManager`
-- **Testing** — 336+ unit tests across all modules
+- **Cache** — `CacheManager` with multiple stores (array, file, database), TTL support, remember, batch operations
+- **Password Reset** — `PasswordResetBroker` with token generation, database-backed token storage, throttle/expiry, reset link email via `Mailable`, `reset()` with password update callback
+- **Email Verification** — `EmailVerificationBroker` with JWT-signed tokens / `VerifiedUser` Axum extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` callback / `email_verified_at` column in users table
+- **Testing** — 445+ unit tests across all modules
 
 ## Quick Start
 
@@ -134,8 +137,8 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | `.env` | `.env` | ✅ |
 | `bootstrap/app.php` | `foundation::Application` | ⚠️ Partial |
 | `app/Providers/*` | `ServiceProvider` trait | ⚠️ Stub |
-| `artisan` CLI | `larastvel-cli` | ⚠️ Stub |
-| `php artisan make:model` | `larastvel make:model` | ✅ |
+| `artisan` CLI (15+ commands) | `larastvel-cli` (serve, route:list, key:generate, migrate*, db:seed, schedule:run, version, new, make:*) | ⚠️ Partial |
+| `make:*` (model, controller, migration, seeder, policy, test, job, event, notification, rule, command) | `larastvel make:*` — 12 generators | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | `app/Models/User.php` | `src/models/user.rs` | ✅ |
 | Eloquent ORM | `DbModel` trait + SeaORM | ⚠️ Partial |
@@ -145,7 +148,9 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Seeders | `Seeder` trait + `DatabaseManager::seed::<S>()` + `make:seeder` | ✅ |
 | Session | `SessionHandle` extractor / `SessionLayer` middleware / flash / CSRF / encrypted cookie store | ✅ |
 | Authentication / Auth | JWT `Auth` service + `AuthenticatedUser` extractor + `auth_middleware` | ✅ |
-| Authorization / Gates | `auth_middleware` guards routes | ⚠️ Partial |
+| Password Reset | `PasswordResetBroker` / token generation / throttle / expiry / `send_reset_link()` / `reset()` with callback / `password_reset_tokens` table | ✅ |
+| Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` / `email_verified_at` column | ✅ |
+| Authorization / Gates | `Gate` / `Policy` trait / `require_ability` middleware / `authorize()` / `check_ability()` / before/after hooks / ability inspection | ✅ |
 | Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `QueueManager` / `dispatch()` / `ShouldQueue` trait | ✅ |
 | Notifications / Mail | `Mailer` trait / `Mailable` builder / `SmtpMailer` / `LogMailer` / `MailManager` | ✅ |
 | File Storage (Flysystem) | `Filesystem` trait / `LocalDisk` driver / `StorageManager` / put/get/delete/copy/move/list/dirs | ✅ |
@@ -155,6 +160,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / `rate_limit_middleware` / token bucket | ✅ |
 | Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
 | Broadcasting | `BroadcastManager` / `PusherBroadcaster` / `LogBroadcaster` / `Channel` (public/private/presence) / `BroadcastEvent` trait | ✅ |
+| Cache (config/cache.php) | `CacheManager` / `ArrayStore` / `FileStore` / `DatabaseStore` / `CacheStore` trait / `CacheItem` with TTL / `remember()` / `many()` / increment/decrement | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / `set_locale()` / JSON files | ✅ |
 | Testing (PHPUnit) | `TestClient` / `TestResponse` / `RefreshDatabase` / PHPUnit-like assertions | ✅ |
 | Task Scheduling (Cron) | `Schedule` / `ScheduleManager` / cron parser / `ScheduledEvent` / `schedule:run` CLI | ✅ |

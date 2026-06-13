@@ -7,8 +7,10 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub app: AppConfig,
     pub broadcasting: BroadcastingConfig,
+    pub cache: CacheConfig,
     pub database: DatabaseConfig,
     pub logging: LoggingConfig,
+    pub password_reset: PasswordResetConfig,
     pub view: ViewConfig,
     #[serde(flatten)]
     pub extra: HashMap<String, toml::Value>,
@@ -55,6 +57,31 @@ pub struct BroadcastingConfig {
     pub encrypted: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasswordResetConfig {
+    pub table: String,
+    pub expire_seconds: u64,
+    pub throttle_seconds: u64,
+}
+
+impl Default for PasswordResetConfig {
+    fn default() -> Self {
+        Self {
+            table: "password_reset_tokens".to_string(),
+            expire_seconds: 3600,
+            throttle_seconds: 60,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheConfig {
+    pub default: String,
+    pub prefix: String,
+    pub table: String,
+    pub file_path: String,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -88,6 +115,17 @@ impl Default for Config {
                 secret: String::new(),
                 cluster: "mt1".to_string(),
                 encrypted: true,
+            },
+            cache: CacheConfig {
+                default: "array".to_string(),
+                prefix: String::new(),
+                table: "cache".to_string(),
+                file_path: "storage/framework/cache/data".to_string(),
+            },
+            password_reset: PasswordResetConfig {
+                table: "password_reset_tokens".to_string(),
+                expire_seconds: 3600,
+                throttle_seconds: 60,
             },
             extra: HashMap::new(),
         }

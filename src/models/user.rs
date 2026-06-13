@@ -11,6 +11,7 @@ pub struct Model {
     pub name: String,
     pub email: String,
     pub password: String,
+    pub email_verified_at: Option<DateTime>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }

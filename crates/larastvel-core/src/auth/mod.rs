@@ -1,8 +1,19 @@
+pub mod email_verification;
+mod gates;
 mod jwt;
 mod middleware;
+pub mod password_reset;
 
+pub use email_verification::{
+    require_verified_email, EmailVerificationBroker, EmailVerificationError, MarkVerifiedCallback,
+    VerificationChecker, VerifiedUser,
+};
+pub use gates::{authorize, check_ability, require_ability, Gate, GateCheck, Policy};
 pub use jwt::Claims;
 pub use middleware::auth_middleware;
+pub use password_reset::{
+    PasswordResetBroker, PasswordResetConfig, PasswordResetError, PasswordResetToken,
+};
 
 use axum::{
     extract::FromRequestParts,
@@ -80,6 +91,7 @@ impl Auth {
     }
 }
 
+#[derive(Clone)]
 pub struct AuthenticatedUser {
     pub user_id: String,
     pub claims: Claims,

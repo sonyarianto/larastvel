@@ -2,6 +2,7 @@ extern crate self as larastvel_core;
 
 pub mod auth;
 pub mod broadcasting;
+pub mod cache;
 pub mod config;
 pub mod console;
 pub mod database;
@@ -33,10 +34,18 @@ pub use serde;
 pub use serde_json;
 pub use tokio;
 
-pub use auth::{Auth, AuthError, AuthenticatedUser, Claims};
+pub use auth::{
+    authorize, check_ability, require_ability, require_verified_email, Auth, AuthError,
+    AuthenticatedUser, Claims, EmailVerificationBroker, EmailVerificationError, Gate, GateCheck,
+    PasswordResetBroker, PasswordResetConfig, PasswordResetError, PasswordResetToken, Policy,
+    VerificationChecker, VerifiedUser,
+};
 pub use broadcasting::{
     BroadcastError, BroadcastEvent, BroadcastManager, BroadcastMessage, Broadcaster, Channel,
     PresenceChannelData,
+};
+pub use cache::{
+    prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, DEFAULT_TTL_SECONDS, FOREVER_TTL,
 };
 pub use config::Config;
 pub use console::ConsoleKernel;

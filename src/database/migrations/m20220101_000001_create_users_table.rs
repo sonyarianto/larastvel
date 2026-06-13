@@ -36,12 +36,14 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(Iden)]
+#[allow(dead_code)]
 enum Users {
     Table,
     Id,
     Name,
     Email,
     Password,
+    EmailVerifiedAt,
     CreatedAt,
     UpdatedAt,
 }
