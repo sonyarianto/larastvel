@@ -1,5 +1,6 @@
 extern crate self as larastvel_core;
 
+pub mod auth;
 pub mod config;
 pub mod console;
 pub mod database;
@@ -23,6 +24,7 @@ pub use tokio;
 
 pub use foundation::{Application, Kernel, ServiceProvider};
 pub use routing::Registrar;
+pub use auth::{Auth, AuthError, AuthenticatedUser, Claims};
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
 pub use config::Config;
 pub use console::ConsoleKernel;

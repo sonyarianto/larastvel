@@ -131,8 +131,8 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | `php artisan migrate` | `larastvel migrate` | ✅ |
 | Seeders | `Seeder` trait + `DatabaseManager::seed::<S>()` + `make:seeder` | ✅ |
 | Session | — | ❌ |
-| Authentication / Auth | — | ❌ |
-| Authorization / Gates | — | ❌ |
+| Authentication / Auth | JWT `Auth` service + `AuthenticatedUser` extractor + `auth_middleware` | ✅ |
+| Authorization / Gates | `auth_middleware` guards routes | ⚠️ Partial |
 | Queue / Jobs | — | ❌ |
 | Notifications / Mail | — | ❌ |
 | File Storage (Flysystem) | — | ❌ |

@@ -39,6 +39,7 @@ bcrypt.workspace = true
 aes-gcm.workspace = true
 base64.workspace = true
 rand.workspace = true
+jsonwebtoken.workspace = true
 
 [dev-dependencies]
 tower.workspace = true
