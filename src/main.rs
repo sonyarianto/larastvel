@@ -1,3 +1,4 @@
+mod models;
 mod routes;
 
 use larastvel_core::{Application, DatabaseManager, logging};
@@ -9,7 +10,10 @@ async fn main() {
 
     let db = DatabaseManager::new(&app.config());
     match db.connect().await {
-        Ok(_) => tracing::info!("Database connected successfully"),
+        Ok(conn) => {
+            tracing::info!("Database connected successfully");
+            let _ = larastvel_core::models::set_global_database(conn);
+        }
         Err(e) => tracing::warn!("Database connection failed: {} (app will still run)", e),
     }
     let app = app.with_database(db);

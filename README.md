@@ -122,9 +122,10 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | `bootstrap/app.php` | `foundation::Application` | ⚠️ Partial |
 | `app/Providers/*` | `ServiceProvider` trait | ⚠️ Stub |
 | `artisan` CLI | `larastvel-cli` | ⚠️ Stub |
+| `php artisan make:model` | `larastvel make:model` | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ⚠️ Stub |
-| `app/Models/User.php` | — | ❌ |
-| Eloquent ORM | SeaORM (connection only) | ⚠️ Partial |
+| `app/Models/User.php` | `src/models/user.rs` | ✅ |
+| Eloquent ORM | `DbModel` trait + SeaORM | ⚠️ Partial |
 | Blade templating | Tera | ⚠️ Partial |
 | Migrations (`database/migrations/`) | sea-orm-migration (not wired) | ❌ |
 | Seeders | `DatabaseManager::seed()` stub | ❌ |

@@ -55,7 +55,8 @@ async fn main() {
 
 fn create_project(path: &PathBuf, name: &str, database: &str, with_vite: bool) {
     let dirs = [
-        "src",
+        "src/models",
+        "src/routes",
         "resources/views",
         "resources/js",
         "resources/css",
@@ -95,6 +96,7 @@ tracing = "0.1"
         r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
 use larastvel_core::routing::Registrar;
 
+mod models;
 mod routes;
 
 #[tokio::main]
@@ -116,6 +118,38 @@ async fn main() {{
 "#,
         name = name
     );
+
+    // models/mod.rs
+    let models_mod = r#"pub mod user;
+"#;
+
+    // models/user.rs
+    let user_model = r#"use larastvel_core::sea_orm;
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "users")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    pub id: i32,
+    pub name: String,
+    pub email: String,
+    pub password: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+pub struct User;
+
+impl larastvel_core::models::DbModel for User {
+    type Entity = Entity;
+}
+"#;
 
     // routes/mod.rs
     let routes_mod = r#"pub mod web;
@@ -192,6 +226,8 @@ DB_PASSWORD=
     // Write files
     std::fs::write(path.join("Cargo.toml"), cargo).unwrap();
     std::fs::write(path.join("src/main.rs"), main_rs).unwrap();
+    std::fs::write(path.join("src/models/mod.rs"), models_mod).unwrap();
+    std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
     std::fs::write(path.join("src/routes/mod.rs"), routes_mod).unwrap();
     std::fs::write(path.join("src/routes/web.rs"), routes_web).unwrap();
     std::fs::write(path.join("src/routes/api.rs"), routes_api).unwrap();

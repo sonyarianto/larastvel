@@ -81,7 +81,7 @@ async fn main() {
         Some(Commands::Make { target }) => {
             match target {
                 Some(MakeTarget::Model { name }) => {
-                    println!("{}", format!("Creating model: {}", name).green());
+                    make_model(&name);
                 }
                 Some(MakeTarget::Controller { name }) => {
                     println!("{}", format!("Creating controller: {}", name).green());
@@ -139,7 +139,7 @@ async fn create_project(name: &str) {
     }
 
     std::fs::create_dir_all(&path).unwrap();
-    std::fs::create_dir_all(path.join("src")).unwrap();
+    std::fs::create_dir_all(path.join("src/models")).unwrap();
     std::fs::create_dir_all(path.join("resources/views")).unwrap();
     std::fs::create_dir_all(path.join("resources/js")).unwrap();
     std::fs::create_dir_all(path.join("resources/css")).unwrap();
@@ -152,14 +152,21 @@ async fn create_project(name: &str) {
 
     let main_rs = format!(r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
 
+mod models;
+
 #[tokio::main]
 async fn main() {{
     let app = Application::new(None);
     logging::init(&app.config());
 
     let db = DatabaseManager::new(&app.config());
-    db.connect().await.expect("Failed to connect to database");
-
+    match db.connect().await {{
+        Ok(conn) => {{
+            tracing::info!("Database connected successfully");
+            let _ = larastvel_core::models::set_global_database(conn);
+        }}
+        Err(e) => tracing::warn!("Database connection failed: {{}} (app will still run)", e),
+    }}
     let app = app.with_database(db);
 
     println!("⚡ {name} starting up...");
@@ -177,6 +184,7 @@ larastvel-core = {{ path = "../crates/larastvel-core" }}
 tokio = {{ version = "1", features = ["full"] }}
 serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
+tracing = "0.1"
 "#, name = name);
 
     let config_toml = r#"[app]
@@ -326,6 +334,36 @@ DB_USERNAME=root
 DB_PASSWORD=
 "#;
 
+    let models_mod = "pub mod user;\n";
+    let user_model = r#"use larastvel_core::sea_orm;
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "users")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    pub id: i32,
+    pub name: String,
+    pub email: String,
+    pub password: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+pub struct User;
+
+impl larastvel_core::models::DbModel for User {
+    type Entity = Entity;
+}
+"#;
+
+    std::fs::write(path.join("src/models/mod.rs"), models_mod).unwrap();
+    std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
     std::fs::write(path.join("Cargo.toml"), cargo_toml).unwrap();
     std::fs::write(path.join("src/main.rs"), main_rs).unwrap();
     std::fs::write(path.join("config.toml"), config_toml).unwrap();
@@ -346,4 +384,80 @@ DB_PASSWORD=
     println!("  cd {}", name);
     println!("  npm install");
     println!("  larastvel serve");
+}
+
+fn make_model(name: &str) {
+    let models_dir = std::path::Path::new("src/models");
+    std::fs::create_dir_all(models_dir).unwrap();
+
+    let snake_name = {
+        let mut result = String::new();
+        for (i, ch) in name.chars().enumerate() {
+            if ch.is_uppercase() {
+                if i > 0 {
+                    result.push('_');
+                }
+                result.push(ch.to_ascii_lowercase());
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    };
+
+    let model_content = format!(
+        r#"use larastvel_core::sea_orm;
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "{table}")]
+pub struct Model {{
+    #[sea_orm(primary_key)]
+    pub id: i32,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+}}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {{}}
+
+impl ActiveModelBehavior for ActiveModel {{}}
+
+pub struct {name};
+
+impl larastvel_core::models::DbModel for {name} {{
+        type Entity = Entity;
+    }}
+"#,
+        name = name,
+        table = snake_name
+    );
+
+    let file_path = models_dir.join(format!("{}.rs", snake_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!("Error: Model '{}' already exists at '{}'.", name, file_path.display()).red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, model_content).unwrap();
+
+    // Update mod.rs
+    let mod_path = models_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", snake_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!("✓ Model [{}] created at '{}'.", name, file_path.display())
+            .green()
+            .bold()
+    );
 }
