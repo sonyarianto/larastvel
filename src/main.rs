@@ -2,8 +2,10 @@ mod database;
 mod models;
 mod routes;
 
+use std::sync::Arc;
+
 use database::migrator::Migrator;
-use larastvel_core::{logging, Application, DatabaseManager};
+use larastvel_core::{logging, Application, DatabaseManager, RouteServiceProvider};
 
 #[tokio::main]
 async fn main() {
@@ -25,9 +27,12 @@ async fn main() {
 
     let app = app.with_database(db);
 
-    let router = app.router();
-    routes::web::web(&router);
-    routes::api::api(&router);
+    // Register service providers
+    app.register_provider(Arc::new(
+        RouteServiceProvider::new()
+            .web(|r| routes::web::web(r))
+            .api(|r| routes::api::api(r)),
+    ));
 
     app.run().await;
 }

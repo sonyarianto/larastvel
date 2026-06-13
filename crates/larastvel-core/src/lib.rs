@@ -53,7 +53,7 @@ pub use config::Config;
 pub use console::ConsoleKernel;
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
 pub use events::EventService;
-pub use foundation::{Application, Kernel, ServiceProvider};
+pub use foundation::{Application, EventServiceProvider, Kernel, RouteServiceProvider, ServiceProvider};
 pub use http::Request;
 pub use larastvel_macros::{controller, route, Resource};
 pub use notifications::{

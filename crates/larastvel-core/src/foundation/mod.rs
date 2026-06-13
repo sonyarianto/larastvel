@@ -1,3 +1,6 @@
+pub mod event_service_provider;
+pub mod route_service_provider;
+
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -10,6 +13,9 @@ use crate::config::Config;
 use crate::console::ConsoleKernel;
 use crate::database::DatabaseManager;
 use crate::routing::{Registrar, RouteDefinition};
+
+pub use event_service_provider::EventServiceProvider;
+pub use route_service_provider::RouteServiceProvider;
 
 pub trait ServiceProvider: Send + Sync {
     fn register(&self, app: &Application);
@@ -33,6 +39,7 @@ struct AppInner {
     booted: bool,
     router: Arc<Mutex<AxumRouter>>,
     routes: Arc<Mutex<Vec<RouteDefinition>>>,
+    providers: Vec<Arc<dyn ServiceProvider>>,
 }
 
 impl Application {
@@ -49,6 +56,7 @@ impl Application {
             booted: false,
             router: Arc::new(Mutex::new(AxumRouter::new())),
             routes: Arc::new(Mutex::new(vec![])),
+            providers: Vec::new(),
         }));
 
         Self { inner }
@@ -62,13 +70,27 @@ impl Application {
         self.inner.lock().unwrap().config.clone()
     }
 
-    pub fn boot(&self) {
+    pub fn register_provider(&self, provider: Arc<dyn ServiceProvider>) {
+        provider.register(self);
         let mut inner = self.inner.lock().unwrap();
-        if inner.booted {
-            return;
-        }
-        inner.booted = true;
+        inner.providers.push(provider);
+    }
+
+    pub fn boot(&self) {
+        let providers_to_boot = {
+            let mut inner = self.inner.lock().unwrap();
+            if inner.booted {
+                return;
+            }
+            inner.booted = true;
+            inner.providers.clone()
+        };
+
         info!("Application booted");
+
+        for provider in &providers_to_boot {
+            provider.boot(self);
+        }
     }
 
     pub fn bind<T: Any + Send + Sync>(&self, instance: T) {
