@@ -1512,6 +1512,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_pusher_registers_when_env_vars_present() {
+        // Set env vars inside a block so they're cleaned up after build_app() returns
+        let app = {
+            let _prev_app_id = std::env::var("PUSHER_APP_ID").ok();
+            let _prev_key = std::env::var("PUSHER_KEY").ok();
+            let _prev_secret = std::env::var("PUSHER_SECRET").ok();
+            let _prev_cluster = std::env::var("PUSHER_CLUSTER").ok();
+
+            std::env::set_var("PUSHER_APP_ID", "test-id");
+            std::env::set_var("PUSHER_KEY", "test-key");
+            std::env::set_var("PUSHER_SECRET", "test-secret");
+            std::env::set_var("PUSHER_CLUSTER", "mt1");
+
+            let (app, _) = build_app().await;
+
+            // Restore original env vars (or remove if they weren't set)
+            match _prev_app_id { Some(v) => std::env::set_var("PUSHER_APP_ID", v), None => std::env::remove_var("PUSHER_APP_ID") }
+            match _prev_key { Some(v) => std::env::set_var("PUSHER_KEY", v), None => std::env::remove_var("PUSHER_KEY") }
+            match _prev_secret { Some(v) => std::env::set_var("PUSHER_SECRET", v), None => std::env::remove_var("PUSHER_SECRET") }
+            match _prev_cluster { Some(v) => std::env::set_var("PUSHER_CLUSTER", v), None => std::env::remove_var("PUSHER_CLUSTER") }
+
+            app
+        };
+
+        // Sending with driver=pusher should NOT return 422 (which means "unknown driver")
+        // It may return 500 because the Pusher API call will fail with dummy creds
+        let resp = app.clone().oneshot(Request::builder().method("POST").uri("/api/broadcast/send")
+            .header("content-type","application/x-www-form-urlencoded")
+            .body(Body::from("channel=test&event=e&data=%7B%7D&driver=pusher")).unwrap()).await.unwrap();
+        assert_ne!(resp.status(), 422, "Pusher driver should be registered when env vars are present");
+    }
+
+    #[tokio::test]
+    async fn test_ably_registers_when_env_vars_present() {
+        // Set env vars inside a block so they're cleaned up after build_app() returns
+        let app = {
+            let _prev_key = std::env::var("ABLY_API_KEY").ok();
+            std::env::set_var("ABLY_API_KEY", "test-app-id:test-api-key");
+            let (app, _) = build_app().await;
+            match _prev_key { Some(v) => std::env::set_var("ABLY_API_KEY", v), None => std::env::remove_var("ABLY_API_KEY") }
+            app
+        };
+
+        // Sending with driver=ably should NOT return 422 (which means "unknown driver")
+        let resp = app.clone().oneshot(Request::builder().method("POST").uri("/api/broadcast/send")
+            .header("content-type","application/x-www-form-urlencoded")
+            .body(Body::from("channel=test&event=e&data=%7B%7D&driver=ably")).unwrap()).await.unwrap();
+        assert_ne!(resp.status(), 422, "Ably driver should be registered when ABLY_API_KEY is set");
+    }
+
+    #[tokio::test]
     async fn test_broadcast_does_not_affect_other_stores() {
         let (app, state) = build_app().await;
         let resp = app.clone().oneshot(Request::builder().method("POST").uri("/api/broadcast/send")
