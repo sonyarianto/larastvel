@@ -27,7 +27,9 @@ Active development (~88% feature parity). Core architecture is solid with most f
 - **Session** — Encrypted cookie-based sessions with flash, CSRF, `SessionLayer` middleware
 - **Events / Listeners** — `EventService` with `dispatch()`, `listen()`, `fake()` / `assertDispatched()`
 - **File Storage** — `Filesystem` trait, `LocalDisk` driver, `StorageManager`
-- **Notifications / Mail** — `Mailable` builder, `SmtpMailer` (STARTTLS), `LogMailer`
+- **Notifications** — `NotificationSender`, `Notification` trait, `Notifiable` trait, 5 channels (Mail, Database, Broadcast, SMS, Webhook), multi-channel `via()`, per-channel result inspection, `send_all()`
+- **SMS** — `SmsSender` trait, `LogSmsSender`, `VonageSmsSender` (REST API), `SmsMessage` builder
+- **Mail** — `Mailable` builder, `SmtpMailer` (STARTTLS), `LogMailer`, `MailManager`
 - **Queue / Jobs** — `SyncQueue`, `InMemoryQueue`, `DatabaseQueue`, `QueueWorker`, `dispatch()`
 - **Rate Limiting** — Token bucket with `RateLimiter`, `RateLimiterRegistry`, Axum middleware
 - **Localization** — JSON translation files, `__()` / `trans_choice()`, pluralization, locale switching
@@ -35,7 +37,7 @@ Active development (~88% feature parity). Core architecture is solid with most f
 - **Cache** — `CacheManager` with multiple stores (array, file, database), TTL support, remember, batch operations
 - **Password Reset** — `PasswordResetBroker` with token generation, database-backed token storage, throttle/expiry, reset link email via `Mailable`, `reset()` with password update callback
 - **Email Verification** — `EmailVerificationBroker` with JWT-signed tokens / `VerifiedUser` Axum extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` callback / `email_verified_at` column in users table
-- **Testing** — 445+ unit tests across all modules
+- **Testing** — 580+ unit tests + 90+ example tests across all modules
 
 ## Quick Start
 
@@ -108,6 +110,7 @@ crates/
 src/                  Application entrypoint
 resources/            Views, CSS, JS (Laravel resources/ equivalent)
 config.toml           Application configuration
+examples/             Controllers (mail, SMS, notification, password-reset, unified dashboard)
 ```
 
 ## Tech Stack
@@ -152,7 +155,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` / `email_verified_at` column | ✅ |
 | Authorization / Gates | `Gate` / `Policy` trait / `require_ability` middleware / `authorize()` / `check_ability()` / before/after hooks / ability inspection | ✅ |
 | Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `QueueManager` / `dispatch()` / `ShouldQueue` trait | ✅ |
-| Notifications / Mail | `Mailer` trait / `Mailable` builder / `SmtpMailer` / `LogMailer` / `MailManager` | ✅ |
+| Notifications / Mail | `NotificationSender` / `Notification` trait / `Notifiable` trait / 5 channels (Mail, Database, Broadcast, SMS, Webhook) / `SmsSender` trait / `LogSmsSender` / `VonageSmsSender` / `Mailer` trait / `Mailable` builder / `SmtpMailer` / `LogMailer` / `MailManager` | ✅ |
 | File Storage (Flysystem) | `Filesystem` trait / `LocalDisk` driver / `StorageManager` / put/get/delete/copy/move/list/dirs | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
 | Form Validation | `Validator` / `validate()` / `ValidationErrors` + 20 built-in rules | ✅ |

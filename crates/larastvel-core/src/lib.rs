@@ -15,12 +15,14 @@ pub mod logging;
 pub mod mail;
 pub mod middleware;
 pub mod models;
+pub mod notifications;
 pub mod pagination;
 pub mod queue;
 pub mod rate_limiter;
 pub mod routing;
 pub mod scheduling;
 pub mod session;
+pub mod sms;
 pub mod storage;
 pub mod support;
 pub mod translation;
@@ -54,6 +56,10 @@ pub use events::EventService;
 pub use foundation::{Application, Kernel, ServiceProvider};
 pub use http::Request;
 pub use larastvel_macros::{controller, route, Resource};
+pub use notifications::{
+    BroadcastPayload, DatabaseNotification, Notifiable, Notification, NotificationChannel,
+    NotificationError, NotificationSender,
+};
 pub use queue::{
     dispatch, DatabaseQueue, InMemoryQueue, JobResolver, Queue, QueueManager, QueueWorker,
     ShouldQueue, SyncQueue,

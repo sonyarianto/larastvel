@@ -1,8 +1,11 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use axum::response::{IntoResponse, Json, Response};
+use axum::http::StatusCode;
 use rand::Rng;
 use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+use serde_json::json;
 use thiserror::Error;
 
 use crate::mail::{Mailable, Mailer};
@@ -32,6 +35,35 @@ pub enum PasswordResetError {
     Mail(String),
     #[error("Invalid email address")]
     InvalidEmail,
+}
+
+impl IntoResponse for PasswordResetError {
+    fn into_response(self) -> Response {
+        let (status, message) = match &self {
+            PasswordResetError::UserNotFound(_) => {
+                (StatusCode::NOT_FOUND, self.to_string())
+            }
+            PasswordResetError::InvalidToken => {
+                (StatusCode::BAD_REQUEST, "The password reset token is invalid.".to_string())
+            }
+            PasswordResetError::TokenExpired => {
+                (StatusCode::BAD_REQUEST, "The password reset token has expired.".to_string())
+            }
+            PasswordResetError::Throttle(seconds) => {
+                (StatusCode::TOO_MANY_REQUESTS, format!("Too many reset attempts. Please wait {} seconds.", seconds))
+            }
+            PasswordResetError::Database(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "An internal error occurred.".to_string())
+            }
+            PasswordResetError::Mail(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send password reset email.".to_string())
+            }
+            PasswordResetError::InvalidEmail => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "The email address is invalid.".to_string())
+            }
+        };
+        (status, Json(json!({"error": message}))).into_response()
+    }
 }
 
 /// Configuration for password reset behavior.

@@ -23,6 +23,10 @@ serde_json = "1"
 tracing = "0.1"
 sea-orm-migration.workspace = true
 
+[dev-dependencies]
+axum.workspace = true
+tower.workspace = true
+
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }
 axum = "0.8"
