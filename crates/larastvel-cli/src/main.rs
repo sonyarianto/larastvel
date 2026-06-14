@@ -24,37 +24,49 @@ enum Commands {
         host: Option<String>,
     },
     /// List all registered routes
+    #[command(name = "route:list")]
     RouteList,
     /// Display framework version
     Version,
     /// Run scheduled tasks
+    #[command(name = "schedule:run")]
     ScheduleRun,
     /// Create a new Larastvel application
     New { name: String },
     /// Generate a new application key
+    #[command(name = "key:generate")]
     KeyGenerate,
     /// Run database migrations
     Migrate,
     /// Drop all tables and re-run all migrations
+    #[command(name = "migrate:fresh")]
     MigrateFresh,
     /// Rollback the last migration (or N steps)
+    #[command(name = "migrate:rollback")]
     MigrateRollback {
         #[arg(short, long)]
         steps: Option<u32>,
     },
     /// Run database seeders
+    #[command(name = "db:seed")]
     DbSeed,
     /// Create a symbolic link from public/storage to storage/app/public
+    #[command(name = "storage:link")]
     StorageLink,
     /// Create a migration for the notifications table
+    #[command(name = "notifications:table")]
     NotificationsTable,
     /// Cache config values into a single file for faster loading
+    #[command(name = "config:cache")]
     ConfigCache,
     /// Clear the cached config file
+    #[command(name = "config:clear")]
     ConfigClear,
     /// Cache all registered routes into a single file
+    #[command(name = "route:cache")]
     RouteCache,
     /// Clear the cached routes file
+    #[command(name = "route:clear")]
     RouteClear,
     /// Display the current environment variables (.env + config)
     Env,
@@ -73,8 +85,10 @@ enum Commands {
     /// Bring the application out of maintenance mode
     Up,
     /// List all registered scheduled tasks
+    #[command(name = "schedule:list")]
     ScheduleList,
     /// Start processing jobs on the queue
+    #[command(name = "queue:work")]
     QueueWork {
         /// Process only a single job from the queue
         #[arg(short, long)]
@@ -391,7 +405,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-larastvel-core = {{ path = "../crates/larastvel-core" }}
+larastvel-core = "0.1"
 tokio = {{ version = "1", features = ["full"] }}
 serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
@@ -401,8 +415,9 @@ sea-orm-migration = "1"
         name = name
     );
 
-    let config_toml = r#"[app]
-name = "larastvel"
+    let config_toml = format!(
+        r#"[app]
+name = "{name}"
 url = "http://localhost:8080"
 env = "local"
 debug = true
@@ -422,7 +437,9 @@ format = "text"
 [view]
 engine = "tera"
 paths = ["resources/views"]
-"#;
+"#,
+        name = name
+    );
 
     let vite_config = r#"import { defineConfig } from 'vite';
 import laravel from 'vite-plugin-laravel';

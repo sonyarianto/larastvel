@@ -54,18 +54,24 @@ pub use cache::{
 pub use config::Config;
 pub use console::{Command, ConsoleKernel};
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
+pub use encryption::{generate_key, EncryptError, Encrypter};
 pub use events::EventService;
 pub use foundation::{
-    Application, EventServiceProvider, Kernel, RouteServiceProvider, ServiceProvider,
+    Application, DeferrableProvider, EventServiceProvider, Kernel, RouteServiceProvider,
+    ServiceProvider,
 };
-pub use http::Request;
+pub use hash::{check as hash_check, is_hashed, make as hash_make, needs_rehash, HashError};
+pub use http::{Error as HttpError, JsonResponse, LarastvelResult, Request};
 pub use larastvel_macros::{controller, route, Resource};
+pub use logging::init as logging_init;
+pub use middleware::{cors_middleware, request_logger};
 pub use models::factory::{Faker, ModelFactory};
 pub use models::serialization::{ApiResource, JsonResource, ResourceCollection, SerializesToArray};
 pub use notifications::{
     BroadcastPayload, DatabaseNotification, Notifiable, Notification, NotificationChannel,
     NotificationError, NotificationSender,
 };
+pub use pagination::{paginate, PaginationParams, Paginator};
 pub use queue::{
     dispatch, DatabaseQueue, InMemoryQueue, JobResolver, Queue, QueueManager, QueueWorker,
     ShouldQueue, SyncQueue,
@@ -76,8 +82,16 @@ pub use rate_limiter::{
 };
 pub use routing::Registrar;
 pub use scheduling::{parse_cron, CronExpression, Schedule, ScheduleManager, ScheduledEvent};
+pub use session::{Session, SessionHandle};
+pub use sms::{LogSmsSender, SmsError, SmsMessage, SmsSender, VonageSmsSender};
+pub use storage::{Filesystem, LocalDisk, StorageError, StorageManager};
+pub use support::{
+    app_path, base_path, config_path, public_path, resource_path, storage_path, Vite,
+};
 pub use translation::{
     __with, has_translation, load_translation_directory, load_translation_file,
     load_translation_json, locale, set_fallback_locale, set_locale, trans_choice,
     trans_choice_with, Translator, __,
 };
+pub use validation::{validate, ValidatedJson, ValidatedQuery, ValidationErrors, Validator};
+pub use view::{ViewError, ViewFactory};
