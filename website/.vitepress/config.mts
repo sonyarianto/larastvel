@@ -6,6 +6,7 @@ export default defineConfig({
   ignoreDeadLinks: true,
   base: process.env.VERCEL ? '/' : '/larastvel/',
   themeConfig: {
+    appearance: 'dark',
     logo: '/favicon.svg',
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
