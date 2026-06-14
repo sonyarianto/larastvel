@@ -96,8 +96,7 @@ sea-orm-migration = "1"
 
     // src/main.rs
     let main_rs = format!(
-        r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
-use larastvel_core::routing::Registrar;
+        r#"use larastvel_core::{{Application, DatabaseManager, logging}};
 
 mod database;
 mod models;
@@ -124,8 +123,8 @@ async fn main() {{
     let app = app.with_database(db);
 
     let router = app.router();
-    routes::web(&router);
-    routes::api(&router);
+    routes::web::web(&router);
+    routes::api::api(&router);
 
     println!("⚡ {name} starting up...");
     app.run().await;
@@ -176,7 +175,7 @@ pub mod api;
 
 pub fn web(router: &Registrar) {
     router.get("/", || async {
-        axum::response::Html("<h1>Welcome to Larastvel</h1>")
+        larastvel_core::axum::response::Html("<h1>Welcome to Larastvel</h1>")
     });
 }
 "#;
@@ -187,7 +186,7 @@ pub fn web(router: &Registrar) {
 pub fn api(router: &Registrar) {
     router.group("/api", |r| {
         r.get("/health", || async {
-            axum::response::Json(serde_json::json!({"status": "ok", "framework": "Larastvel"}))
+            larastvel_core::axum::response::Json(serde_json::json!({"status": "ok", "framework": "Larastvel"}))
         });
     });
 }
