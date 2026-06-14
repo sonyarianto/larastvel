@@ -38,10 +38,7 @@ export default defineConfig({
           text: 'CLI Reference',
           link: '/reference/cli',
         },
-        {
-          text: 'Parity Tracking',
-          link: '/reference/parity',
-        },
+
       ],
     },
     socialLinks: [
