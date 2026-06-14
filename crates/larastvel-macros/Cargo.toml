@@ -3,6 +3,10 @@ name = "larastvel-macros"
 version = "0.1.0"
 edition = "2021"
 description = "Larastvel procedural macros"
+license = "MIT"
+repository = "https://github.com/sonyarianto/larastvel"
+homepage = "https://larastvel.vercel.app"
+authors = ["Sony AK <sony@sony-ak.com>"]
 
 [lib]
 proc-macro = true
