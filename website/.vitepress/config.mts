@@ -4,7 +4,7 @@ export default defineConfig({
   title: 'Larastvel',
   description: 'A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM',
   ignoreDeadLinks: true,
-  base: '/larastvel/',
+  base: process.env.VERCEL ? '/' : '/larastvel/',
   themeConfig: {
     logo: '/favicon.svg',
     nav: [
