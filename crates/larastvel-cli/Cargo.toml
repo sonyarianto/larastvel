@@ -1,8 +1,12 @@
 [package]
 name = "larastvel-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Larastvel CLI - artisan equivalent"
+license = "MIT"
+repository = "https://github.com/sonyarianto/larastvel"
+homepage = "https://larastvel.vercel.app"
+authors = ["Sony AK <sony@sony-ak.com>"]
 
 [[bin]]
 name = "larastvel"
@@ -16,4 +20,4 @@ serde_json.workspace = true
 tracing.workspace = true
 colored.workspace = true
 uuid.workspace = true
-larastvel-core = { path = "../larastvel-core" }
+larastvel-core = "0.2"

@@ -1,8 +1,12 @@
 [package]
 name = "larastvel-tinker"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Larastvel Tinker - interactive REPL"
+license = "MIT"
+repository = "https://github.com/sonyarianto/larastvel"
+homepage = "https://larastvel.vercel.app"
+authors = ["Sony AK <sony@sony-ak.com>"]
 
 [[bin]]
 name = "tinker"
@@ -12,4 +16,4 @@ path = "src/main.rs"
 tokio.workspace = true
 clap.workspace = true
 rustyline = "18"
-larastvel-core = { path = "../larastvel-core" }
+larastvel-core = "0.2"

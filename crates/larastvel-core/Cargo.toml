@@ -1,6 +1,6 @@
 [package]
 name = "larastvel-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Larastvel framework core - inspired by Laravel"
 license = "MIT"
@@ -29,7 +29,7 @@ toml.workspace = true
 tera.workspace = true
 
 reqwest.workspace = true
-larastvel-macros = "0.1"
+larastvel-macros = "0.2"
 async-trait = "0.1"
 
 bcrypt.workspace = true

@@ -11,9 +11,13 @@ resolver = "2"
 
 [package]
 name = "larastvel-app"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Larastvel - The Rust framework inspired by Laravel"
+license = "MIT"
+repository = "https://github.com/sonyarianto/larastvel"
+homepage = "https://larastvel.vercel.app"
+authors = ["Sony AK <sony@sony-ak.com>"]
 
 [dependencies]
 larastvel-core = { path = "crates/larastvel-core" }
