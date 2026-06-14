@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use axum::{
@@ -7,11 +8,15 @@ use axum::{
     Router as AxumRouter,
 };
 
+type MiddlewareFactory = Arc<dyn Fn(MethodRouter) -> MethodRouter + Send + Sync>;
+
 #[derive(Clone)]
 pub struct Registrar {
     router: Arc<Mutex<AxumRouter>>,
     routes: Arc<Mutex<Vec<RouteDefinition>>>,
     group_prefix: Arc<Mutex<Option<String>>>,
+    middleware_aliases: Arc<Mutex<HashMap<String, MiddlewareFactory>>>,
+    current_middleware: Arc<Mutex<Vec<String>>>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -31,7 +36,42 @@ impl Registrar {
             router,
             routes,
             group_prefix: Arc::new(Mutex::new(None)),
+            middleware_aliases: Arc::new(Mutex::new(HashMap::new())),
+            current_middleware: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    /// Register a named middleware alias.
+    ///
+    /// The closure receives a `MethodRouter` and must return a `MethodRouter`
+    /// with the middleware applied via `.layer()` or other transformations.
+    ///
+    /// ```rust,ignore
+    /// registrar.middleware("session", |r| r.layer(SessionLayer::new(config)));
+    /// registrar.middleware("csrf", |r| r.layer(CsrfLayer::new()));
+    /// ```
+    pub fn middleware(
+        &self,
+        name: &str,
+        f: impl Fn(MethodRouter) -> MethodRouter + Send + Sync + 'static,
+    ) {
+        self.middleware_aliases
+            .lock()
+            .unwrap()
+            .insert(name.to_string(), Arc::new(f));
+    }
+
+    /// Set middleware to apply to all routes registered after this call.
+    ///
+    /// Each name must have been previously registered via
+    /// [`middleware`](Self::middleware).
+    ///
+    /// ```rust,ignore
+    /// registrar.with_middleware(vec!["session", "csrf"]);
+    /// ```
+    pub fn with_middleware(&self, names: Vec<&str>) {
+        *self.current_middleware.lock().unwrap() =
+            names.into_iter().map(|n| n.to_string()).collect();
     }
 
     pub fn get<H, T>(&self, uri: &str, handler: H)
@@ -128,9 +168,11 @@ impl Registrar {
 
     pub fn group(&self, prefix: &str, f: impl FnOnce(&Registrar)) {
         let prev_prefix = self.group_prefix.lock().unwrap().take();
+        let prev_middleware = self.current_middleware.lock().unwrap().clone();
         *self.group_prefix.lock().unwrap() = Some(prefix.to_string());
         f(self);
         *self.group_prefix.lock().unwrap() = prev_prefix;
+        *self.current_middleware.lock().unwrap() = prev_middleware;
     }
 
     fn resolve_uri(&self, uri: &str) -> String {
@@ -154,6 +196,20 @@ impl Registrar {
         method_router: MethodRouter,
         handler_name: &str,
     ) {
+        let current = self.current_middleware.lock().unwrap().clone();
+        let middleware_names = current.clone();
+        let aliases = self.middleware_aliases.lock().unwrap();
+
+        let method_router = current
+            .iter()
+            .fold(method_router, |r, name| match aliases.get(name) {
+                Some(f) => f(r),
+                None => r,
+            });
+
+        drop(aliases);
+        drop(current);
+
         {
             let mut router = self.router.lock().unwrap();
             *router = std::mem::take(&mut *router).route(uri, method_router);
@@ -162,7 +218,7 @@ impl Registrar {
             method: method.to_string(),
             uri: uri.to_string(),
             handler_name: handler_name.to_string(),
-            middleware: vec![],
+            middleware: middleware_names,
         });
     }
 
@@ -371,6 +427,173 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_middleware_register_and_apply() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.middleware("add-header", |r| {
+            r.layer(axum::middleware::from_fn(
+                |req: axum::http::Request<axum::body::Body>,
+                 next: axum::middleware::Next| async move {
+                    let mut resp = next.run(req).await;
+                    resp.headers_mut()
+                        .insert("X-Test", "applied".parse().unwrap());
+                    resp
+                },
+            ))
+        });
+
+        registrar.with_middleware(vec!["add-header"]);
+        registrar.get("/guarded", || async { "ok" });
+
+        let app = registrar.build();
+        let resp = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.oneshot(
+                    axum::http::Request::builder()
+                        .method("GET")
+                        .uri("/guarded")
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(resp.status(), 200);
+        assert_eq!(
+            resp.headers().get("X-Test").map(|v| v.to_str().unwrap()),
+            Some("applied")
+        );
+    }
+
+    #[test]
+    fn test_middleware_unknown_name_is_noop() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.with_middleware(vec!["does-not-exist"]);
+        registrar.get("/noop", || async { "ok" });
+
+        let app = registrar.build();
+        let resp = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.oneshot(
+                    axum::http::Request::builder()
+                        .method("GET")
+                        .uri("/noop")
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[test]
+    fn test_group_saves_and_restores_middleware() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.middleware("add-header", |r| {
+            r.layer(axum::middleware::from_fn(
+                |req: axum::http::Request<axum::body::Body>,
+                 next: axum::middleware::Next| async move {
+                    let mut resp = next.run(req).await;
+                    resp.headers_mut()
+                        .insert("X-Test", "applied".parse().unwrap());
+                    resp
+                },
+            ))
+        });
+
+        // Outside group — no middleware
+        registrar.get("/public", || async { "open" });
+
+        // Inside group — middleware applied
+        registrar.group("/admin", |r| {
+            r.with_middleware(vec!["add-header"]);
+            r.get("/dashboard", || async { "admin" });
+        });
+
+        // After group — middleware restored to none
+        registrar.get("/also-public", || async { "open" });
+
+        let app = registrar.build();
+
+        // Public routes should NOT have the header
+        let resp = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.clone().oneshot(
+                    axum::http::Request::builder()
+                        .method("GET")
+                        .uri("/public")
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        assert!(resp.headers().get("X-Test").is_none());
+
+        // Admin route should have the header
+        let resp = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.clone().oneshot(
+                    axum::http::Request::builder()
+                        .method("GET")
+                        .uri("/admin/dashboard")
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        assert_eq!(
+            resp.headers().get("X-Test").map(|v| v.to_str().unwrap()),
+            Some("applied")
+        );
+
+        // After-group public should NOT have the header
+        let resp = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(
+                app.clone().oneshot(
+                    axum::http::Request::builder()
+                        .method("GET")
+                        .uri("/also-public")
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        assert!(resp.headers().get("X-Test").is_none());
+    }
+
+    #[test]
+    fn test_middleware_recorded_in_route_definition() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.middleware("m1", |r| r);
+        registrar.with_middleware(vec!["m1"]);
+        registrar.get("/mw", || async { "ok" });
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].middleware, vec!["m1"]);
     }
 
     // --- ResourceController trait tests ---
