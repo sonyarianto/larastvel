@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Larastvel
   text: Laravel-inspired Rust web framework
-  tagline: Built on Axum, Tokio, and SeaORM. 611+ tests.
+  tagline: Built on Axum, Tokio, and SeaORM.
   actions:
     - theme: brand
       text: Get Started
