@@ -2,19 +2,28 @@
 
 ## Installation
 
+### Scaffold a new project
+
 ```bash
 cargo install larastvel-new
 larastvel-new my-app
 cd my-app
-cargo run
+cargo build
 ```
 
-Or clone and run the main app directly:
+### Run the main application
 
 ```bash
 git clone https://github.com/sonyarianto/larastvel.git
 cd larastvel
 cargo run
+```
+
+### Install the CLI globally
+
+```bash
+cargo install larastvel-cli
+larastvel serve
 ```
 
 Visit **http://localhost:8080** — you're up!

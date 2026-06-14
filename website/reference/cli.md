@@ -57,3 +57,11 @@ The `serve` command starts the Axum server with auto-reload support:
 cargo run -p larastvel-cli -- serve
 # Listening on http://localhost:8080
 ```
+
+## Global Installation
+
+```bash
+cargo install larastvel-cli
+larastvel serve
+larastvel make:controller PostController
+```
