@@ -7,7 +7,7 @@ export default defineConfig({
   base: process.env.VERCEL ? '/' : '/larastvel/',
   themeConfig: {
     appearance: 'dark',
-    logo: '/favicon.svg',
+    logo: '/logo.svg',
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Reference', link: '/reference/cli' },

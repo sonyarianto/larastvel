@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff2d20"/>
+      <stop offset="100%" style="stop-color:#e0261a"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="url(#g)"/>
+  <text x="32" y="46" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#fff" text-anchor="middle">L</text>
+  <text x="78" y="46" font-family="system-ui,sans-serif" font-size="32" font-weight="700" fill="#ff2d20">Larastvel</text>
+  <text x="78" y="72" font-family="system-ui,sans-serif" font-size="14" fill="#666">Rust web framework</text>
+</svg>

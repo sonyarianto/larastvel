@@ -1,4 +1,6 @@
-# Larastvel
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sonyarianto/larastvel/main/website/public/logo.svg" alt="Larastvel" width="400">
+</p>
 
 [![CI](https://github.com/sonyarianto/larastvel/actions/workflows/ci.yml/badge.svg)](https://github.com/sonyarianto/larastvel/actions)
 ![Rust](https://img.shields.io/badge/rust-stable-orange)
