@@ -3,7 +3,7 @@ pub mod log;
 pub mod native;
 pub mod pusher;
 
-pub use native::{NativeBroadcaster, SubscriberRegistry};
+pub use native::{ws_handler, NativeBroadcaster, SubscriberRegistry};
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -70,10 +70,10 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Json},
     routing::{get, post},
-    Router,
+    Extension, Router,
 };
 use larastvel_core::broadcasting::{
-    native::ws_handler, BroadcastMessage, Broadcaster, NativeBroadcaster, SubscriberRegistry,
+    ws_handler, BroadcastMessage, Broadcaster, NativeBroadcaster, SubscriberRegistry,
 };
 use larastvel_core::serde::{Deserialize, Serialize};
 use larastvel_core::serde_json::json;
@@ -111,19 +111,13 @@ async fn main() {
         broadcast_log: Arc::new(Mutex::new(Vec::new())),
     };
 
-    // Build the WebSocket router with SubscriberRegistry state,
-    // and the app router with AppState. They're merged after both
-    // have .with_state() called (becoming Router<()>).
-    let ws_router = Router::new()
-        .route("/ws", get(ws_handler))
-        .with_state(state.registry.clone());
-
     let app = Router::new()
         .route("/", get(dashboard))
+        .route("/ws", get(ws_handler))
         .route("/broadcast", post(broadcast_event))
         .route("/broadcast/log", get(broadcast_log_list))
-        .with_state(state)
-        .merge(ws_router);
+        .layer(Extension(state.registry.clone()))
+        .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080")
         .await

@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
 use axum::response::IntoResponse;
+use axum::Extension;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, RwLock};
 
@@ -198,7 +198,7 @@ impl Broadcaster for NativeBroadcaster {
 /// ```
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
-    State(registry): State<SubscriberRegistry>,
+    Extension(registry): Extension<SubscriberRegistry>,
 ) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, registry))
 }

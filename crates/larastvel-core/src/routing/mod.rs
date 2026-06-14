@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use axum::{
     handler::Handler,
     response::{Html, IntoResponse, Json, Response},
-    routing::{delete, get, patch, post, put, MethodRouter},
+    routing::{any, delete, get, patch, post, put, MethodRouter},
     Router as AxumRouter,
 };
 
@@ -87,6 +87,35 @@ impl Registrar {
         let name = std::any::type_name::<H>().to_string();
         let method_router = delete(handler);
         self.add_method_route("DELETE", &uri, method_router, &name);
+    }
+
+    /// Register a WebSocket upgrade handler.
+    ///
+    /// The handler should accept `WebSocketUpgrade` as its first argument
+    /// and extract shared state via `Extension<T>` (not `State<T>`).
+    ///
+    /// ```ignore
+    /// use larastvel_core::broadcasting::ws_handler;
+    /// use larastvel_core::axum::Extension;
+    ///
+    /// router.ws("/ws", ws_handler);
+    /// ```
+    ///
+    /// The `SubscriberRegistry` must be provided as an `Extension` layer on
+    /// the final router:
+    ///
+    /// ```ignore
+    /// router.layer(Extension(registry));
+    /// ```
+    pub fn ws<H, T>(&self, uri: &str, handler: H)
+    where
+        H: Handler<T, ()>,
+        T: 'static,
+    {
+        let uri = self.resolve_uri(uri);
+        let name = std::any::type_name::<H>().to_string();
+        let method_router = any(handler);
+        self.add_method_route("WS", &uri, method_router, &name);
     }
 
     pub fn view(&self, uri: &str, template: &str) {
