@@ -4,7 +4,7 @@ A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
 
 ## Status
 
-Active development (~97% feature parity). Core architecture is solid with most framework features implemented.
+Active development (~97% feature parity, 600+ unit tests). Core architecture is solid with most framework features implemented.
 
 ## Features
 
@@ -37,7 +37,7 @@ Active development (~97% feature parity). Core architecture is solid with most f
 - **Cache** — `CacheManager` with multiple stores (array, file, database), TTL support, remember, batch operations
 - **Password Reset** — `PasswordResetBroker` with token generation, database-backed token storage, throttle/expiry, reset link email via `Mailable`, `reset()` with password update callback
 - **Email Verification** — `EmailVerificationBroker` with JWT-signed tokens / `VerifiedUser` Axum extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` callback / `email_verified_at` column in users table
-- **Testing** — 500+ unit tests + 100 example tests across all modules
+- **Testing** — 600+ unit tests + 3 doc-tests across all modules
 
 ## Quick Start
 
@@ -69,19 +69,56 @@ pub fn api(router: &Registrar) {
 
 ### Configuration
 
-Edit `config.toml` or set environment variables in `.env`.
+Edit `config.toml` at the project root. Missing sections fall back to
+built-in defaults, so scaffolded projects get a minimal 4-section file.
 
 ```toml
 [app]
-name = "Larastvel"
-url = "http://localhost:8080"
-env = "local"
-debug = true
+name = "Larastvel"           # Application name (used in mail, notifications)
+url = "http://localhost:8080" # Base URL for link generation
+env = "local"                 # Environment: local, production, testing
+debug = true                  # Enable debug output on errors
 
 [database]
-driver = "sqlite"
-database = "larastvel.db"
+driver = "sqlite"             # sqlite, postgres, mysql
+host = "127.0.0.1"            # Database host
+port = 3306                   # Database port
+database = "larastvel.db"     # Database name / SQLite filename
+username = "root"             # Database user
+password = ""                 # Database password
+
+[logging]
+level = "debug"               # Trace filter: trace, debug, info, warn, error
+format = "text"               # Output format: text, json
+
+[view]
+engine = "tera"               # Template engine: tera
+paths = ["resources/views"]   # Template search paths
+
+[broadcasting]
+default = "log"               # Default broadcast driver: log, pusher, ably, native
+app_id = ""                   # Pusher app ID
+key = ""                      # Pusher / Ably key
+secret = ""                   # Pusher / Ably secret
+cluster = "mt1"               # Pusher cluster
+encrypted = true              # Use TLS for Pusher connections
+
+[cache]
+default = "array"             # Cache driver: array, file, database
+prefix = ""                   # Cache key prefix
+table = "cache"               # Database table name (database driver)
+file_path = "storage/framework/cache/data"  # File path (file driver)
+
+[password_reset]
+table = "password_reset_tokens"            # Database table name
+expire_seconds = 3600                      # Token lifetime (1 hour)
+throttle_seconds = 60                      # Min seconds between resets
 ```
+
+**Scaffolding note:** `larastvel new my-app` generates a minimal `config.toml`
+with only `[app]`, `[database]`, `[logging]`, and `[view]` sections. The
+`[broadcasting]`, `[cache]`, and `[password_reset]` sections use their
+built-in defaults unless you add them manually.
 
 ### CLI
 
@@ -110,7 +147,7 @@ crates/
 src/                  Application entrypoint
 resources/            Views, CSS, JS (Laravel resources/ equivalent)
 config.toml           Application configuration
-examples/             Controllers & examples (mail, SMS, notification, password-reset, auth service provider, multi-channel, unified dashboard)
+examples/             Controllers & examples (mail, SMS, notification, password-reset, auth service provider, multi-channel, unified dashboard, WebSocket broadcast)
 ```
 
 ## Tech Stack
