@@ -11,7 +11,5 @@ path = "src/main.rs"
 [dependencies]
 tokio.workspace = true
 clap.workspace = true
-anyhow.workspace = true
-colored.workspace = true
 rustyline = "18"
 larastvel-core = { path = "../larastvel-core" }

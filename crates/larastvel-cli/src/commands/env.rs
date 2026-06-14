@@ -42,11 +42,18 @@ pub fn env_display() {
 
     println!();
 
-    // --- Config (config.toml) ---
-    println!("{}", "Config (config.toml)".yellow().bold());
+    // --- Config (config/ or config.toml) ---
+    let config_dir = std::path::Path::new("config");
+    let legacy_config = std::path::Path::new("config.toml");
+    if config_dir.is_dir() {
+        println!("{}", "Config (config/)".yellow().bold());
+    } else if legacy_config.exists() {
+        println!("{}", "Config (config.toml — legacy format)".yellow().bold());
+    } else {
+        println!("{}", "Config".yellow().bold());
+    }
 
-    let config_path = std::path::Path::new("config.toml");
-    if config_path.exists() {
+    if config_dir.is_dir() || legacy_config.exists() {
         let config = larastvel_core::config::Config::load(std::path::Path::new("."));
         println!("  {} = {}", "APP_NAME".cyan(), config.app.name);
         println!("  {} = {}", "APP_URL".cyan(), config.app.url);
@@ -80,6 +87,6 @@ pub fn env_display() {
             config.view.paths.join(", ")
         );
     } else {
-        println!("  {}", "(no config.toml found)".dimmed());
+        println!("  {}", "(no config found)".dimmed());
     }
 }

@@ -193,32 +193,34 @@ pub fn api(router: &Registrar) {
 }
 "#;
 
-    // config.toml
-    let config_toml = format!(
-        r#"[app]
-name = "{}"
+    // config/app.toml
+    let config_app = format!(
+        r#"name = "{}"
 url = "http://localhost:8080"
 env = "local"
 debug = true
+"#,
+        name
+    );
 
-[database]
-driver = "{}"
+    let config_database = format!(
+        r#"driver = "{}"
 host = "127.0.0.1"
 port = 3306
 database = "{}.db"
 username = "root"
 password = ""
-
-[logging]
-level = "debug"
-format = "text"
-
-[view]
-engine = "tera"
-paths = ["resources/views"]
 "#,
-        name, database, name
+        database, name
     );
+
+    let config_logging = r#"level = "debug"
+format = "text"
+"#;
+
+    let config_view = r#"engine = "tera"
+paths = ["resources/views"]
+"#;
 
     // .env
     let env = format!(
@@ -332,7 +334,11 @@ enum Users {
     std::fs::write(path.join("src/routes/mod.rs"), routes_mod).unwrap();
     std::fs::write(path.join("src/routes/web.rs"), routes_web).unwrap();
     std::fs::write(path.join("src/routes/api.rs"), routes_api).unwrap();
-    std::fs::write(path.join("config.toml"), config_toml).unwrap();
+    std::fs::create_dir_all(path.join("config")).unwrap();
+    std::fs::write(path.join("config/app.toml"), config_app).unwrap();
+    std::fs::write(path.join("config/database.toml"), config_database).unwrap();
+    std::fs::write(path.join("config/logging.toml"), config_logging).unwrap();
+    std::fs::write(path.join("config/view.toml"), config_view).unwrap();
     std::fs::write(path.join(".env"), env).unwrap();
 
     if with_vite {

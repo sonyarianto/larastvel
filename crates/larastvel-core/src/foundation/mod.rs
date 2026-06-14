@@ -12,7 +12,10 @@ use tracing::info;
 use crate::config::Config;
 use crate::console::ConsoleKernel;
 use crate::database::DatabaseManager;
+use crate::encryption::Encrypter;
 use crate::routing::{Registrar, RouteDefinition};
+use crate::session::csrf::CsrfLayer;
+use crate::session::middleware::{SessionConfig, SessionLayer};
 
 pub use event_service_provider::EventServiceProvider;
 pub use route_service_provider::RouteServiceProvider;
@@ -285,6 +288,26 @@ impl Application {
             let registrar = Registrar::new(inner.router.clone(), inner.routes.clone());
             registrar.build()
         };
+
+        // Auto-wire SessionLayer and CsrfLayer when an app key is configured.
+        {
+            let config = self.config();
+            if let Some(key) = &config.app.key {
+                if let Ok(encrypter) = Encrypter::new(key.as_bytes()) {
+                    let session_layer =
+                        SessionLayer::new(SessionConfig::default(), Some(Arc::new(encrypter)));
+                    let csrf_layer =
+                        CsrfLayer::new().except(vec!["/api/*".to_string(), "/health".to_string()]);
+
+                    let mut inner = self.inner.lock().unwrap();
+                    inner
+                        .layers
+                        .push(Box::new(move |router: AxumRouter| -> AxumRouter {
+                            router.layer(csrf_layer).layer(session_layer)
+                        }));
+                }
+            }
+        }
 
         // Apply user-registered layers/extensions to the final router.
         let router = {

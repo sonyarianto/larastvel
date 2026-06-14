@@ -70,31 +70,30 @@ sea-orm-migration = "1"
         name = name
     );
 
-    let config_toml = format!(
-        r#"[app]
-name = "{name}"
+    let config_app = format!(
+        r#"name = "{name}"
 url = "http://localhost:8080"
 env = "local"
 debug = true
+"#,
+        name = name
+    );
 
-[database]
-driver = "sqlite"
+    let config_database = r#"driver = "sqlite"
 host = "127.0.0.1"
 port = 3306
 database = "larastvel.db"
 username = "root"
 password = ""
+"#;
 
-[logging]
-level = "debug"
+    let config_logging = r#"level = "debug"
 format = "text"
+"#;
 
-[view]
-engine = "tera"
+    let config_view = r#"engine = "tera"
 paths = ["resources/views"]
-"#,
-        name = name
-    );
+"#;
 
     let vite_config = r#"import { defineConfig } from 'vite';
 import laravel from 'vite-plugin-laravel';
@@ -276,7 +275,11 @@ impl larastvel_core::models::DbModel for User {
     std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
     std::fs::write(path.join("Cargo.toml"), cargo_toml).unwrap();
     std::fs::write(path.join("src/main.rs"), main_rs).unwrap();
-    std::fs::write(path.join("config.toml"), config_toml).unwrap();
+    std::fs::create_dir_all(path.join("config")).unwrap();
+    std::fs::write(path.join("config/app.toml"), config_app).unwrap();
+    std::fs::write(path.join("config/database.toml"), config_database).unwrap();
+    std::fs::write(path.join("config/logging.toml"), config_logging).unwrap();
+    std::fs::write(path.join("config/view.toml"), config_view).unwrap();
     std::fs::write(path.join("vite.config.js"), vite_config).unwrap();
     std::fs::write(path.join("package.json"), package_json).unwrap();
     std::fs::write(path.join("resources/views/welcome.html"), welcome_view).unwrap();

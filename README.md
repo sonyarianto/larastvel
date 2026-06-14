@@ -1,60 +1,32 @@
 # Larastvel
 
+[![CI](https://github.com/sonyarianto/larastvel/actions/workflows/ci.yml/badge.svg)](https://github.com/sonyarianto/larastvel/actions)
+![Rust](https://img.shields.io/badge/rust-stable-orange)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
 A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
+~100% feature parity with 611+ unit tests.
 
-## Status
-
-Active development (~97% feature parity, 600+ unit tests). Core architecture is solid with most framework features implemented.
-
-## Features
-
-- **Routing** — Expressively define routes with groups, inspired by Laravel's Router
-- **Database** — SeaORM-powered connection manager (SQLite, PostgreSQL, MySQL) with migrations
-- **Config** — TOML-based config with dot-notation access + `.env` support
-- **Templating** — Tera template engine (Blade-like syntax)
-- **CLI** — Artisan-equivalent tool for `serve`, `make:*`, `key:generate`, `route:list`, `migrate:*`, `db:seed`
-- **Service Container** — TypeId-based IoC container with `bind`/`singleton`/`make`
-- **Logging** — Structured tracing with env-filter support
-- **Middleware** — CORS, request logging, auth, rate limiting, session (Tower-based)
-- **Vite Integration** — Asset bundling with manifest-based tag generation
-- **Macros** — `#[derive(Resource)]`, `#[controller]`, `#[route]` proc macros
-- **Tinker** — Interactive REPL (early stage)
-- **Scaffolding** — `larastvel-new` to generate new projects
-- **Authentication** — JWT-based `Auth` service + `AuthenticatedUser` extractor + auth middleware
-- **Encryption / Hashing** — AES-256-GCM encryption + bcrypt hashing
-- **Form Validation** — 20 built-in rules, `ValidatedJson`/`ValidatedQuery` extractors, 422 response
-- **Pagination** — Laravel-compatible JSON with `Paginator<T>`, `PaginationParams` extractor
-- **Session** — Encrypted cookie-based sessions with flash, CSRF, `SessionLayer` middleware
-- **Events / Listeners** — `EventService` with `dispatch()`, `listen()`, `fake()` / `assertDispatched()`
-- **File Storage** — `Filesystem` trait, `LocalDisk` driver, `StorageManager`
-- **Notifications** — `NotificationSender`, `Notification` trait, `Notifiable` trait, 5 channels (Mail, Database, Broadcast, SMS, Webhook), multi-channel `via()`, per-channel result inspection, `send_all()`
-- **SMS** — `SmsSender` trait, `LogSmsSender`, `VonageSmsSender` (REST API), `SmsMessage` builder
-- **Mail** — `Mailable` builder, `SmtpMailer` (STARTTLS), `LogMailer`, `MailManager`
-- **Queue / Jobs** — `SyncQueue`, `InMemoryQueue`, `DatabaseQueue`, `QueueWorker`, `dispatch()`
-- **Rate Limiting** — Token bucket with `RateLimiter`, `RateLimiterRegistry`, Axum middleware
-- **Localization** — JSON translation files, `__()` / `trans_choice()`, pluralization, locale switching
-- **Task Scheduling** — Cron expression parser, `Schedule` builder, `ScheduleManager`
-- **Cache** — `CacheManager` with multiple stores (array, file, database), TTL support, remember, batch operations
-- **Password Reset** — `PasswordResetBroker` with token generation, database-backed token storage, throttle/expiry, reset link email via `Mailable`, `reset()` with password update callback
-- **Email Verification** — `EmailVerificationBroker` with JWT-signed tokens / `VerifiedUser` Axum extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` callback / `email_verified_at` column in users table
-- **Testing** — 600+ unit tests + 3 doc-tests across all modules
+---
 
 ## Quick Start
 
 ```bash
+# Clone and run
 cargo run
+# → http://localhost:8080
 ```
-
-Then visit `http://localhost:8080`.
 
 ### Routes
 
-Defined in `src/routes/`:
+Define routes in `src/routes/`:
 
 ```rust
 // src/routes/web.rs
 pub fn web(router: &Registrar) {
-    router.get("/", || async { axum::response::Html("<h1>Welcome</h1>") });
+    router.get("/", || async {
+        axum::response::Html("<h1>Welcome</h1>")
+    });
 }
 
 // src/routes/api.rs
@@ -69,73 +41,151 @@ pub fn api(router: &Registrar) {
 
 ### Configuration
 
-Edit `config.toml` at the project root. Missing sections fall back to
-built-in defaults, so scaffolded projects get a minimal 4-section file.
+The `config/` directory holds per-section TOML files. Missing sections use
+built-in defaults.
 
 ```toml
-[app]
-name = "Larastvel"           # Application name (used in mail, notifications)
-url = "http://localhost:8080" # Base URL for link generation
-env = "local"                 # Environment: local, production, testing
-debug = true                  # Enable debug output on errors
-
-[database]
-driver = "sqlite"             # sqlite, postgres, mysql
-host = "127.0.0.1"            # Database host
-port = 3306                   # Database port
-database = "larastvel.db"     # Database name / SQLite filename
-username = "root"             # Database user
-password = ""                 # Database password
-
-[logging]
-level = "debug"               # Trace filter: trace, debug, info, warn, error
-format = "text"               # Output format: text, json
-
-[view]
-engine = "tera"               # Template engine: tera
-paths = ["resources/views"]   # Template search paths
-
-[broadcasting]
-default = "log"               # Default broadcast driver: log, pusher, ably, native
-app_id = ""                   # Pusher app ID
-key = ""                      # Pusher / Ably key
-secret = ""                   # Pusher / Ably secret
-cluster = "mt1"               # Pusher cluster
-encrypted = true              # Use TLS for Pusher connections
-
-[cache]
-default = "array"             # Cache driver: array, file, database
-prefix = ""                   # Cache key prefix
-table = "cache"               # Database table name (database driver)
-file_path = "storage/framework/cache/data"  # File path (file driver)
-
-[password_reset]
-table = "password_reset_tokens"            # Database table name
-expire_seconds = 3600                      # Token lifetime (1 hour)
-throttle_seconds = 60                      # Min seconds between resets
+# config/app.toml
+name = "Larastvel"
+url = "http://localhost:8080"
+env = "local"
+debug = true
+key = ""    # generate with `larastvel key:generate`
 ```
 
-**Scaffolding note:** `larastvel new my-app` generates a minimal `config.toml`
-with only `[app]`, `[database]`, `[logging]`, and `[view]` sections. The
-`[broadcasting]`, `[cache]`, and `[password_reset]` sections use their
-built-in defaults unless you add them manually.
+```toml
+# config/database.toml
+driver = "sqlite"   # sqlite, postgres, mysql
+host = "127.0.0.1"
+port = 3306
+database = "larastvel.db"
+username = "root"
+password = ""
+```
+
+See [Configuration Reference](#configuration-reference) for all options.
+
+### Generate a new project
+
+```bash
+cargo run -p larastvel-new -- my-app
+cd my-app
+cargo run
+```
 
 ### CLI
 
 ```bash
-cargo run -p larastvel-cli -- serve
-cargo run -p larastvel-cli -- key:generate
-cargo run -p larastvel-cli -- make:model User
+cargo run -p larastvel-cli -- serve          # Start dev server
+cargo run -p larastvel-cli -- key:generate   # Generate encryption key
+cargo run -p larastvel-cli -- make model User
 cargo run -p larastvel-cli -- route:list
 ```
 
-### Scaffold a new project
+---
 
-```bash
-cargo run -p larastvel-new -- my-app
+## Features
+
+| Area | Capabilities |
+|---|---|
+| **Routing** | Groups, prefixes, middleware stack, `#[controller]` / `#[derive(Resource)]` macros, WebSocket routes |
+| **Database** | SQLite/Postgres/MySQL via SeaORM, migrations, seeders, model factories (Faker) |
+| **Auth** | JWT tokens, `AuthenticatedUser` extractor, auth middleware, password reset, email verification |
+| **Authorization** | Gates, policies, before/after hooks, `authorize()` / `require_ability` |
+| **Session** | Encrypted cookie store, flash data, CSRF protection, `SessionLayer` middleware (auto-wired) |
+| **Caching** | `CacheManager` with array, file, database stores, TTL, `remember()`, batch ops |
+| **Queue** | Sync, in-memory, database queues, worker, `dispatch()`, `ShouldQueue` |
+| **Notifications** | Mail, Database, Broadcast, SMS, Webhook channels, multi-channel `via()` |
+| **Mail** | SMTP (STARTTLS) and log mailers, `Mailable` builder, `MailManager` |
+| **SMS** | Log and Vonage senders, `SmsMessage` builder |
+| **Broadcasting** | Pusher, Ably, Log, Native (self-hosted WebSocket) broadcast drivers |
+| **Validation** | 20 built-in rules, `ValidatedJson`/`ValidatedQuery` extractors |
+| **Templating** | Tera engine + Blade directives (`@auth`, `@csrf`, `@error`, `@guest`, `@method`) |
+| **Localization** | JSON translation files, `__()`, `trans_choice()`, pluralization |
+| **Task Scheduling** | Cron expression parser, `Schedule` builder, `ScheduleManager` |
+| **Rate Limiting** | Token bucket, `RateLimiterRegistry`, Axum middleware |
+| **File Storage** | `Filesystem` trait, `LocalDisk` driver, `StorageManager` |
+| **Events** | `EventService`, `dispatch()`, `listen()`, `fake()` / `assertDispatched()` |
+| **Encryption** | AES-256-GCM (`Encrypter`), bcrypt hashing (`hash::make` / `hash::check`) |
+| **CLI** | 12 `make:*` generators, `serve`, `migrate`, `route:list`, `config:cache`, `schedule:run`, `queue:work`, and more |
+| **Testing** | `TestClient`, `TestResponse`, `RefreshDatabase`, 611+ tests |
+| **Vite** | Manifest-based asset tag generation |
+| **Scaffolding** | `larastvel-new` generates a complete project with routes, models, migrations, Vite |
+
+---
+
+## Configuration Reference
+
+| File | Key | Default | Description |
+|---|---|---|---|
+| `app.toml` | `name` | `"Larastvel"` | Application name |
+| | `url` | `"http://localhost:8080"` | Base URL |
+| | `env` | `"local"` | Environment (`local`, `production`, `testing`) |
+| | `debug` | `true` | Enable debug output |
+| | `key` | none | 32-byte base64 encryption key (generate via `key:generate`) |
+| `database.toml` | `driver` | `"sqlite"` | `sqlite`, `postgres`, `mysql` |
+| | `host` | `"127.0.0.1"` | Database host |
+| | `port` | `3306` | Database port |
+| | `database` | `"larastvel"` | Database name / SQLite filename |
+| | `username` | `"root"` | Database user |
+| | `password` | `""` | Database password |
+| `logging.toml` | `level` | `"debug"` | Log level |
+| | `format` | `"text"` | Output format (`text`, `json`) |
+| `view.toml` | `engine` | `"tera"` | Template engine |
+| | `paths` | `["resources/views"]` | Template search paths |
+| `broadcasting.toml` | `default` | `"log"` | Default driver |
+| | `app_id` / `key` / `secret` | `""` | Pusher/Ably credentials |
+| | `cluster` | `"mt1"` | Pusher cluster |
+| | `encrypted` | `true` | TLS for Pusher |
+| `cache.toml` | `default` | `"array"` | Cache driver |
+| | `prefix` | `""` | Key prefix |
+| | `table` | `"cache"` | DB table (database driver) |
+| | `file_path` | `"storage/framework/cache/data"` | File path (file driver) |
+| `password_reset.toml` | `table` | `"password_reset_tokens"` | DB table |
+| | `expire_seconds` | `3600` | Token lifetime |
+| | `throttle_seconds` | `60` | Min seconds between resets |
+
+A single `config.toml` at the project root still works (legacy format), but
+`config/` takes precedence.
+
+---
+
+## Examples
+
+Ready-to-run examples in `examples/`:
+
+| Example | What it demonstrates |
+|---|---|
+| `auth_service_provider` | Auth, password reset, email verification working together |
+| `multi_channel` | Broadcasting on multiple channels |
+| `unified_dashboard` | WebSocket dashboard with broadcast log, auth, rate limiting |
+| `websocket_broadcast` | Self-hosted WebSocket via NativeBroadcaster |
+| `mail`, `sms`, `notification` | Mail/SMS/Notification sending |
+| `password_reset` | Password reset flow |
+
+Run any example: `cargo run --example <name>`
+
+---
+
+## Architecture
+
 ```
-
-## Workspace Structure
+┌──────────────────────────────────────────────────────┐
+│                   Application                         │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  │
+│  │  Config   │  │   DB     │  │  Service Container │  │
+│  │  (TOML)   │  │  (SeaORM)│  │  (TypeId-based)    │  │
+│  └──────────┘  └──────────┘  └────────────────────┘  │
+│  ┌──────────────────────────────────────────────────┐ │
+│  │              Router (Axum + Registrar)            │ │
+│  │  Routes → Groups → Middleware → Controllers      │ │
+│  └──────────────────────────────────────────────────┘ │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  │
+│  │ Session  │  │  Cache   │  │  Queue / Events    │  │
+│  │ + CSRF   │  │  (stores)│  │  + Notifications   │  │
+│  └──────────┘  └──────────┘  └────────────────────┘  │
+└──────────────────────────────────────────────────────┘
+```
 
 ```
 crates/
@@ -144,11 +194,14 @@ crates/
   larastvel-macros/   Procedural macros (Resource, controller, route)
   larastvel-tinker/   Interactive REPL binary
   larastvel-new/      Project scaffolding binary
+  larastvel-testing/  Test utilities (TestClient, TestResponse, RefreshDatabase)
 src/                  Application entrypoint
-resources/            Views, CSS, JS (Laravel resources/ equivalent)
-config.toml           Application configuration
-examples/             Controllers & examples (mail, SMS, notification, password-reset, auth service provider, multi-channel, unified dashboard, WebSocket broadcast)
+config/               Per-section TOML config files
+resources/            Views, CSS, JS
+examples/             Self-contained example apps
 ```
+
+---
 
 ## Tech Stack
 
@@ -162,49 +215,72 @@ examples/             Controllers & examples (mail, SMS, notification, password-
 | Config | PHP arrays / `.env` | TOML / `.env` |
 | Logging | Monolog | Tracing |
 | Migrations | Phinx | sea-orm-migration |
-| Asset bundling | Vite | Vite (via rust-embed) |
+| Asset bundling | Vite | Vite (manifest-based) |
+
+---
 
 ## Parity Tracking
 
-A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-skeleton/) for side-by-side comparison. Use it to verify directory structure, config defaults, routing conventions, and feature behavior.
+A fresh Laravel 13 installation lives at `../laravel-skeleton/` for
+side-by-side comparison.
 
 | Laravel Feature | Larastvel Equivalent | Status |
 |---|---|---|
 | `routes/web.php` | `src/routes/web.rs` | ✅ |
 | `routes/api.php` | `src/routes/api.rs` | ✅ |
-| `routes/console.php` | `Command` trait / `ConsoleKernel` (add_command, load, call) / `routes/console.rs` convention | ✅ |
-| `config/*.php` (10 files) | `config.toml` (single file) | ⚠️ Partial |
+| `routes/console.php` | `Command` trait / `ConsoleKernel` / `routes/console.rs` | ✅ |
+| `config/*.php` (10 files) | `config/*.toml` (per-section files) | ✅ |
 | `.env` | `.env` | ✅ |
-| `bootstrap/app.php` | `foundation::Application` / `bootstrap::App` fluent builder | ✅ |
-| `app/Providers/*` | `EventServiceProvider` / `RouteServiceProvider` / `ServiceProvider` trait / `DeferrableProvider` trait / deferred registration & boot | ✅ |
-| `artisan` CLI (25+ commands) | `larastvel-cli` (serve, route:list, key:generate, migrate*, db:seed, storage:link, notifications:table, queue:work, config:cache/clear, route:cache/clear, schedule:list/run, version, new, make:*) | ✅ |
-| `make:*` (model, controller, migration, seeder, policy, test, job, event, notification, rule, command) | `larastvel make:*` — 12 generators | ✅ |
+| `bootstrap/app.php` | `Application` / `App` fluent builder | ✅ |
+| `app/Providers/*` | `ServiceProvider` trait, `EventServiceProvider`, `RouteServiceProvider`, deferred providers | ✅ |
+| `artisan` CLI (25+ commands) | `larastvel-cli` — serve, route:list, key:generate, migrate*, db:seed, storage:link, notifications:table, queue:work, config:cache/clear, route:cache/clear, schedule:list/run, version, new, make:* | ✅ |
+| `make:*` (12 generators) | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, notification, rule, command | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | `app/Models/User.php` | `src/models/user.rs` | ✅ |
-| Eloquent ORM | `DbModel` trait + SeaORM / `SerializesToArray` (toArray/toJson/hidden/appends) / `ApiResource` trait / `JsonResource` / `ResourceCollection` | ✅ |
-| Model Factories (Faker) | `ModelFactory` trait / `factory_create()` / `factory_create_count()` / `Faker` (name/email/sentence/etc.) | ✅ |
-| Blade templating | Tera + Blade directive compiler (@auth/@csrf/@error/@guest/@method) | ✅ |
-| Migrations (`database/migrations/`) | `src/database/migrations/` + Migrator | ✅ |
+| Eloquent ORM | `DbModel` trait + SeaORM + `SerializesToArray` / `ApiResource` / `JsonResource` / `ResourceCollection` | ✅ |
+| Model Factories (Faker) | `ModelFactory` trait, `factory_create()`, `Faker` helpers | ✅ |
+| Blade templating | Tera + Blade directives (`@auth`/`@csrf`/`@error`/`@guest`/`@method`) | ✅ |
+| Migrations | `src/database/migrations/` + Migrator | ✅ |
 | `php artisan migrate` | `larastvel migrate` | ✅ |
 | Seeders | `Seeder` trait + `DatabaseManager::seed::<S>()` + `make:seeder` | ✅ |
-| Session | `SessionHandle` extractor / `SessionLayer` middleware / flash / CSRF / encrypted cookie store | ✅ |
-| Authentication / Auth | JWT `Auth` service + `AuthenticatedUser` extractor + `auth_middleware` | ✅ |
-| Password Reset | `PasswordResetBroker` / token generation / throttle / expiry / `send_reset_link()` / `reset()` with callback / `password_reset_tokens` table | ✅ |
-| Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / `require_verified_email` middleware / `send_verification_email()` / `mark_verified()` / `email_verified_at` column | ✅ |
-| Authorization / Gates | `Gate` / `Policy` trait / `require_ability` middleware / `authorize()` / `check_ability()` / before/after hooks / ability inspection | ✅ |
-| Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `QueueManager` / `dispatch()` / `ShouldQueue` trait | ✅ |
-| Notifications / Mail | `NotificationSender` / `Notification` trait / `Notifiable` trait / 5 channels (Mail, Database, Broadcast, SMS, Webhook) / `SmsSender` trait / `LogSmsSender` / `VonageSmsSender` / `Mailer` trait / `Mailable` builder / `SmtpMailer` / `LogMailer` / `MailManager` | ✅ |
-| File Storage (Flysystem) | `Filesystem` trait / `LocalDisk` driver / `StorageManager` / put/get/delete/copy/move/list/dirs | ✅ |
+| Session | `SessionHandle` extractor / `SessionLayer` middleware / flash / CSRF / encrypted cookies | ✅ |
+| Authentication | JWT `Auth` service + `AuthenticatedUser` extractor + `auth_middleware` | ✅ |
+| Password Reset | `PasswordResetBroker` / tokens / throttle / expiry / reset email / callback | ✅ |
+| Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / middleware | ✅ |
+| Authorization / Gates | `Gate` / `Policy` / `require_ability` middleware / before/after hooks | ✅ |
+| Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `dispatch()` / `ShouldQueue` | ✅ |
+| Notifications / Mail | 5 channels (Mail, Database, Broadcast, SMS, Webhook), `Mailable` builder, `SmtpMailer` / `LogMailer` | ✅ |
+| File Storage | `Filesystem` trait / `LocalDisk` driver / `StorageManager` | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
-| Form Validation | `Validator` / `validate()` / `ValidationErrors` + 20 built-in rules | ✅ |
-| Pagination | `Paginator<T>` / `PaginationParams` extractor / `to_json()` / `IntoResponse` | ✅ |
-| Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / `rate_limit_middleware` / token bucket | ✅ |
-| Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
-| Broadcasting | `BroadcastManager` / `PusherBroadcaster` / `LogBroadcaster` / `AblyBroadcaster` / `NativeBroadcaster` (self-hosted WebSocket) / `SubscriberRegistry` / `ws_handler` / `Channel` (public/private/presence) / `BroadcastEvent` trait | ✅ |
-| Cache (config/cache.php) | `CacheManager` / `ArrayStore` / `FileStore` / `DatabaseStore` / `CacheStore` trait / `CacheItem` with TTL / `remember()` / `many()` / increment/decrement | ✅ |
-| Localization | `Translator` / `__()` / `trans_choice()` / pluralization / `set_locale()` / JSON files | ✅ |
-| Testing (PHPUnit) | `TestClient` / `TestResponse` / `RefreshDatabase` / PHPUnit-like assertions | ✅ |
-| Task Scheduling (Cron) | `Schedule` / `ScheduleManager` / cron parser / `ScheduledEvent` / `schedule:run` CLI | ✅ |
+| Form Validation | 20 rules, `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
+| Pagination | `Paginator<T>` / `PaginationParams` / `to_json()` / `IntoResponse` | ✅ |
+| Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / middleware / token bucket | ✅ |
+| Encryption / Hashing | AES-256-GCM `Encrypter` / bcrypt `hash::make()` / `hash::check()` | ✅ |
+| Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` | ✅ |
+| Cache | `CacheManager` / Array / File / Database stores / `remember()` / batch ops | ✅ |
+| Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
+| Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
+| Task Scheduling | `Schedule` / `ScheduleManager` / cron parser / `schedule:run` CLI | ✅ |
+
+---
+
+## Development
+
+```bash
+# Run all tests
+cargo test --workspace
+
+# Check formatting
+cargo fmt --check
+
+# Lint
+cargo clippy --workspace
+
+# Run a specific example
+cargo run --example unified_dashboard
+```
+
+---
 
 ## License
 

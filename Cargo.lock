@@ -1630,7 +1630,6 @@ dependencies = [
 name = "larastvel-cli"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
  "colored",
  "larastvel-core",
@@ -1694,7 +1693,6 @@ dependencies = [
 name = "larastvel-new"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
  "colored",
  "reqwest",
@@ -1726,9 +1724,7 @@ dependencies = [
 name = "larastvel-tinker"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
- "colored",
  "larastvel-core",
  "rustyline",
  "tokio",

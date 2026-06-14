@@ -1,0 +1,4 @@
+default = "array"
+prefix = ""
+table = "cache"
+file_path = "storage/framework/cache/data"

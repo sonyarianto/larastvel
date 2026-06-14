@@ -1,0 +1,4 @@
+name = "Larastvel"
+url = "http://localhost:8080"
+env = "local"
+debug = true

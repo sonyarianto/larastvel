@@ -1,0 +1,2 @@
+engine = "tera"
+paths = ["resources/views"]

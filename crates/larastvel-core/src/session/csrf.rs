@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -58,10 +59,10 @@ impl<S> Service<AxumRequest<Body>> for CsrfService<S>
 where
     S: Service<AxumRequest<Body>, Response = Response> + Clone + Send + 'static,
     S::Future: Send + 'static,
-    S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    S::Error: Into<Infallible>,
 {
     type Response = Response;
-    type Error = Box<dyn std::error::Error + Send + Sync>;
+    type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -74,19 +75,23 @@ where
 
         Box::pin(async move {
             if !is_mutating(request.method()) {
-                return inner.call(request).await.map_err(Into::into);
+                return Ok(inner
+                    .call(request)
+                    .await
+                    .unwrap_or_else(|e| match e.into() {}));
             }
 
             if is_excepted(request.uri(), &except) {
-                return inner.call(request).await.map_err(Into::into);
+                return Ok(inner
+                    .call(request)
+                    .await
+                    .unwrap_or_else(|e| match e.into() {}));
             }
 
             let session = match request.extensions().get::<SessionHandle>().cloned() {
                 Some(s) => s,
                 None => {
-                    return Err("Session not initialized: add SessionLayer before CsrfLayer"
-                        .to_string()
-                        .into());
+                    return Ok(csrf_misconfigured_response());
                 }
             };
 
@@ -98,7 +103,10 @@ where
                 .and_then(|v| v.to_str().ok())
             {
                 if constant_time_eq(token, &expected) {
-                    return inner.call(request).await.map_err(Into::into);
+                    return Ok(inner
+                        .call(request)
+                        .await
+                        .unwrap_or_else(|e| match e.into() {}));
                 }
             }
 
@@ -108,7 +116,10 @@ where
                 .and_then(|v| v.to_str().ok())
             {
                 if constant_time_eq(token, &expected) {
-                    return inner.call(request).await.map_err(Into::into);
+                    return Ok(inner
+                        .call(request)
+                        .await
+                        .unwrap_or_else(|e| match e.into() {}));
                 }
             }
 
@@ -120,7 +131,10 @@ where
                     if let Some(token) = extract_form_token(&body_str) {
                         if constant_time_eq(token, &expected) {
                             let request = AxumRequest::from_parts(parts, Body::from(bytes));
-                            return inner.call(request).await.map_err(Into::into);
+                            return Ok(inner
+                                .call(request)
+                                .await
+                                .unwrap_or_else(|e| match e.into() {}));
                         }
                     }
 
@@ -130,6 +144,19 @@ where
             }
         })
     }
+}
+
+fn csrf_misconfigured_response() -> Response {
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::json!({
+                "message": "Session not initialized: ensure SessionLayer is configured before CsrfLayer",
+            })
+            .to_string(),
+        ))
+        .unwrap()
 }
 
 fn csrf_failed_response() -> Response {

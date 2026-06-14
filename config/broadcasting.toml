@@ -1,0 +1,6 @@
+default = "log"
+app_id = ""
+key = ""
+secret = ""
+cluster = "mt1"
+encrypted = true
