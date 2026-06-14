@@ -9,6 +9,7 @@ use axum::{
 use rand::RngCore;
 use serde_json::Value;
 
+pub mod csrf;
 pub mod middleware;
 
 #[derive(Debug, Clone)]
