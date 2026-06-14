@@ -3,18 +3,17 @@
 ## Installation
 
 ```bash
-git clone https://github.com/sonyarianto/larastvel.git
-cd larastvel
+cargo install larastvel-new
+larastvel-new my-app
+cd my-app
 cargo run
 ```
 
-Or scaffold a new project:
+Or clone and run the main app directly:
 
 ```bash
 git clone https://github.com/sonyarianto/larastvel.git
 cd larastvel
-cargo run -p larastvel-cli -- new my-app
-cd ../my-app
 cargo run
 ```
 
