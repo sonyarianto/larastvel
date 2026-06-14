@@ -1,3 +1,4 @@
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -6,14 +7,32 @@ use chrono::{Datelike, Timelike};
 
 use crate::queue::JobError;
 
-pub fn parse_cron(expr: &str) -> Result<CronExpression, String> {
+#[derive(Debug, Clone)]
+pub struct SchedulingError(pub String);
+
+impl fmt::Display for SchedulingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for SchedulingError {}
+
+impl From<String> for SchedulingError {
+    fn from(s: String) -> Self {
+        SchedulingError(s)
+    }
+}
+
+pub fn parse_cron(expr: &str) -> Result<CronExpression, SchedulingError> {
     let parts: Vec<&str> = expr.split_whitespace().collect();
     if parts.len() != 5 {
         return Err(format!(
             "Invalid cron expression '{}': expected 5 fields, got {}",
             expr,
             parts.len()
-        ));
+        )
+        .into());
     }
 
     Ok(CronExpression {
@@ -57,13 +76,13 @@ enum CronField {
 }
 
 impl CronField {
-    fn parse(field: &str, min: i32, max: i32) -> Result<Self, String> {
+    fn parse(field: &str, min: i32, max: i32) -> Result<Self, SchedulingError> {
         match field {
             "*" => Ok(CronField::All),
             _ if field.contains('/') => {
                 let parts: Vec<&str> = field.split('/').collect();
                 if parts.len() != 2 {
-                    return Err(format!("Invalid step expression: {}", field));
+                    return Err(format!("Invalid step expression: {}", field).into());
                 }
                 let step: i32 = parts[1]
                     .parse()
@@ -73,7 +92,7 @@ impl CronField {
                 } else if parts[0].contains('-') {
                     let range_parts: Vec<&str> = parts[0].split('-').collect();
                     if range_parts.len() != 2 {
-                        return Err(format!("Invalid step range: {}", field));
+                        return Err(format!("Invalid step range: {}", field).into());
                     }
                     let start: i32 = range_parts[0]
                         .parse()
@@ -99,7 +118,7 @@ impl CronField {
             _ if field.contains('-') => {
                 let parts: Vec<&str> = field.split('-').collect();
                 if parts.len() != 2 {
-                    return Err(format!("Invalid range: {}", field));
+                    return Err(format!("Invalid range: {}", field).into());
                 }
                 let start: i32 = parts[0]
                     .parse()
@@ -229,7 +248,7 @@ impl Schedule {
         }
     }
 
-    pub fn call<F, Fut>(&self, cron: &str, description: &str, f: F) -> Result<(), String>
+    pub fn call<F, Fut>(&self, cron: &str, description: &str, f: F) -> Result<(), SchedulingError>
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), JobError>> + Send + 'static,
@@ -247,7 +266,7 @@ impl Schedule {
         cron: &str,
         description: &str,
         job: Box<dyn crate::queue::ShouldQueue>,
-    ) -> Result<(), String> {
+    ) -> Result<(), SchedulingError> {
         let cron_expr = parse_cron(cron).map_err(|e| format!("Invalid cron expression: {}", e))?;
         let mut event = ScheduledEvent::new(cron_expr, description);
         let shared = Arc::new(job);
@@ -303,7 +322,7 @@ impl EventBuilder {
         self
     }
 
-    pub fn call<F, Fut>(self, f: F) -> Result<(), String>
+    pub fn call<F, Fut>(self, f: F) -> Result<(), SchedulingError>
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), JobError>> + Send + 'static,
@@ -311,7 +330,7 @@ impl EventBuilder {
         self.schedule.call(&self.cron, &self.description, f)
     }
 
-    pub fn job(self, job: Box<dyn crate::queue::ShouldQueue>) -> Result<(), String> {
+    pub fn job(self, job: Box<dyn crate::queue::ShouldQueue>) -> Result<(), SchedulingError> {
         self.schedule.job(&self.cron, &self.description, job)
     }
 }

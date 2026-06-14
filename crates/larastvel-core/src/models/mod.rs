@@ -12,6 +12,7 @@ static GLOBAL_DB: OnceLock<DatabaseConnection> = OnceLock::new();
 
 pub fn set_global_database(db: DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     GLOBAL_DB.set(db).map_err(|_| {
+        tracing::warn!("Global database connection already initialized. Ignoring duplicate.");
         sea_orm::DbErr::Custom("Global database connection already initialized".to_string())
     })
 }

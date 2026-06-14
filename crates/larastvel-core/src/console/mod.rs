@@ -1,7 +1,26 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::{Arc, RwLock};
 
 use crate::foundation::Application;
+
+/// Error type for console command execution.
+#[derive(Debug, Clone)]
+pub struct ConsoleError(pub String);
+
+impl fmt::Display for ConsoleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ConsoleError {}
+
+impl From<String> for ConsoleError {
+    fn from(s: String) -> Self {
+        ConsoleError(s)
+    }
+}
 
 /// A registered CLI command — the Rust equivalent of a Laravel `Artisan`
 /// console command.
@@ -20,7 +39,7 @@ use crate::foundation::Application;
 ///     fn description(&self) -> &'static str {
 ///         "Display an inspiring quote"
 ///     }
-///     fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), String> {
+///     fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
 ///         println!("“Simplicity is the ultimate sophistication.” — Leonardo da Vinci");
 ///         Ok(())
 ///     }
@@ -35,7 +54,7 @@ pub trait Command: Send + Sync {
 
     /// Execute the command with the given arguments (excluding the binary and
     /// command name).
-    fn handle(&self, app: &Application, args: &[String]) -> Result<(), String>;
+    fn handle(&self, app: &Application, args: &[String]) -> Result<(), ConsoleError>;
 }
 
 /// The console kernel — registers and dispatches CLI commands.
@@ -131,7 +150,7 @@ impl ConsoleKernel {
     /// Execute a command by name with the given arguments.
     ///
     /// Returns `Ok(())` on success, or `Err(message)` on failure.
-    pub fn call(&self, name: &str, args: &[String]) -> Result<(), String> {
+    pub fn call(&self, name: &str, args: &[String]) -> Result<(), ConsoleError> {
         let cmd = self
             .commands
             .read()
@@ -172,7 +191,7 @@ macro_rules! stub_command {
             fn description(&self) -> &'static str {
                 $desc
             }
-            fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), String> {
+            fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
                 println!("[stub] {} — {}", $cmd, $desc);
                 Ok(())
             }
@@ -221,7 +240,7 @@ mod tests {
         fn description(&self) -> &'static str {
             "Greet someone"
         }
-        fn handle(&self, _app: &Application, args: &[String]) -> Result<(), String> {
+        fn handle(&self, _app: &Application, args: &[String]) -> Result<(), ConsoleError> {
             let name = args.first().map(|s| s.as_str()).unwrap_or("world");
             println!("Hello, {}!", name);
             Ok(())
@@ -236,8 +255,8 @@ mod tests {
         fn description(&self) -> &'static str {
             "Always fails"
         }
-        fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), String> {
-            Err("Something went wrong".to_string())
+        fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
+            Err("Something went wrong".to_string().into())
         }
     }
 
@@ -295,7 +314,7 @@ mod tests {
         let kernel = ConsoleKernel::new(app);
         let result = kernel.call("unknown", &[]);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Unknown command: unknown");
+        assert_eq!(result.unwrap_err().0, "Unknown command: unknown");
     }
 
     #[test]
@@ -314,7 +333,7 @@ mod tests {
         kernel.add_command(Arc::new(FailCommand));
         let result = kernel.call("fail", &[]);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Something went wrong");
+        assert_eq!(result.unwrap_err().0, "Something went wrong");
     }
 
     #[test]
@@ -349,7 +368,7 @@ mod tests {
             fn description(&self) -> &'static str {
                 "first"
             }
-            fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), String> {
+            fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
                 Ok(())
             }
         }
@@ -362,7 +381,7 @@ mod tests {
             fn description(&self) -> &'static str {
                 "second"
             }
-            fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), String> {
+            fn handle(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
                 Ok(())
             }
         }

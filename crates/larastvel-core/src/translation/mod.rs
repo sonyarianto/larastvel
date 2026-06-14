@@ -1,8 +1,26 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
+
+#[derive(Debug, Clone)]
+pub struct TranslationError(pub String);
+
+impl fmt::Display for TranslationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for TranslationError {}
+
+impl From<String> for TranslationError {
+    fn from(s: String) -> Self {
+        TranslationError(s)
+    }
+}
 
 static GLOBAL_TRANSLATOR: OnceLock<Mutex<Translator>> = OnceLock::new();
 
@@ -82,13 +100,13 @@ impl Translator {
         }
     }
 
-    pub fn load_file(&mut self, locale: &str, path: &str) -> Result<(), String> {
+    pub fn load_file(&mut self, locale: &str, path: &str) -> Result<(), TranslationError> {
         let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         self.load_json(locale, &content);
         Ok(())
     }
 
-    pub fn load_directory(&mut self, dir: &str) -> Result<(), String> {
+    pub fn load_directory(&mut self, dir: &str) -> Result<(), TranslationError> {
         let dir_path = Path::new(dir);
         if !dir_path.exists() {
             return Ok(());
@@ -203,12 +221,12 @@ pub fn load_translation_json(locale: &str, json: &str) {
     t.load_json(locale, json);
 }
 
-pub fn load_translation_file(locale: &str, path: &str) -> Result<(), String> {
+pub fn load_translation_file(locale: &str, path: &str) -> Result<(), TranslationError> {
     let mut t = global_translator().lock().unwrap();
     t.load_file(locale, path)
 }
 
-pub fn load_translation_directory(dir: &str) -> Result<(), String> {
+pub fn load_translation_directory(dir: &str) -> Result<(), TranslationError> {
     let mut t = global_translator().lock().unwrap();
     t.load_directory(dir)
 }
