@@ -86,30 +86,30 @@ cargo run -p larastvel-cli -- route:list
 ## Features
 
 | Area | Capabilities |
-|---|---|
-| **Routing** | Groups, prefixes, middleware stack, `#[controller]` / `#[derive(Resource)]` macros, WebSocket routes |
-| **Database** | SQLite/Postgres/MySQL via SeaORM, migrations, seeders, model factories (Faker) |
+|---|---|---|
 | **Auth** | JWT tokens, `AuthenticatedUser` extractor, auth middleware, password reset, email verification |
 | **Authorization** | Gates, policies, before/after hooks, `authorize()` / `require_ability` |
-| **Session** | Encrypted cookie store, flash data, CSRF protection, `SessionLayer` middleware (auto-wired) |
-| **Caching** | `CacheManager` with array, file, database stores, TTL, `remember()`, batch ops |
-| **Queue** | Sync, in-memory, database queues, worker, `dispatch()`, `ShouldQueue` |
-| **Notifications** | Mail, Database, Broadcast, SMS, Webhook channels, multi-channel `via()` |
-| **Mail** | SMTP (STARTTLS) and log mailers, `Mailable` builder, `MailManager` |
-| **SMS** | Log and Vonage senders, `SmsMessage` builder |
 | **Broadcasting** | Pusher, Ably, Log, Native (self-hosted WebSocket) broadcast drivers |
-| **Validation** | 20 built-in rules, `ValidatedJson`/`ValidatedQuery` extractors |
-| **Templating** | Tera engine + Blade directives (`@auth`, `@csrf`, `@error`, `@guest`, `@method`) |
-| **Localization** | JSON translation files, `__()`, `trans_choice()`, pluralization |
-| **Task Scheduling** | Cron expression parser, `Schedule` builder, `ScheduleManager` |
-| **Rate Limiting** | Token bucket, `RateLimiterRegistry`, Axum middleware |
-| **File Storage** | `Filesystem` trait, `LocalDisk` driver, `StorageManager` |
-| **Events** | `EventService`, `dispatch()`, `listen()`, `fake()` / `assertDispatched()` |
-| **Encryption** | AES-256-GCM (`Encrypter`), bcrypt hashing (`hash::make` / `hash::check`) |
+| **Caching** | `CacheManager` with array, file, database stores, TTL, `remember()`, batch ops |
 | **CLI** | 12 `make:*` generators, `serve`, `migrate`, `route:list`, `config:cache`, `schedule:run`, `queue:work`, and more |
-| **Testing** | `TestClient`, `TestResponse`, `RefreshDatabase`, 611+ tests |
-| **Vite** | Manifest-based asset tag generation |
+| **Database** | SQLite/Postgres/MySQL via SeaORM, migrations, seeders, model factories (Faker) |
+| **Encryption** | AES-256-GCM (`Encrypter`), bcrypt hashing (`hash::make` / `hash::check`) |
+| **Events** | `EventService`, `dispatch()`, `listen()`, `fake()` / `assertDispatched()` |
+| **File Storage** | `Filesystem` trait, `LocalDisk` driver, `StorageManager` |
+| **Localization** | JSON translation files, `__()`, `trans_choice()`, pluralization |
+| **Mail** | SMTP (STARTTLS) and log mailers, `Mailable` builder, `MailManager` |
+| **Notifications** | Mail, Database, Broadcast, SMS, Webhook channels, multi-channel `via()` |
+| **Queue** | Sync, in-memory, database queues, worker, `dispatch()`, `ShouldQueue` |
+| **Rate Limiting** | Token bucket, `RateLimiterRegistry`, Axum middleware |
+| **Routing** | Groups, prefixes, middleware stack, `#[controller]` / `#[derive(Resource)]` macros, WebSocket routes |
 | **Scaffolding** | `larastvel-new` generates a complete project with routes, models, migrations, Vite |
+| **Session** | Encrypted cookie store, flash data, CSRF protection, `SessionLayer` middleware (auto-wired) |
+| **SMS** | Log and Vonage senders, `SmsMessage` builder |
+| **Task Scheduling** | Cron expression parser, `Schedule` builder, `ScheduleManager` |
+| **Templating** | Tera engine + Blade directives (`@auth`, `@csrf`, `@error`, `@guest`, `@method`) |
+| **Testing** | `TestClient`, `TestResponse`, `RefreshDatabase`, 611+ tests |
+| **Validation** | 20 built-in rules, `ValidatedJson`/`ValidatedQuery` extractors |
+| **Vite** | Manifest-based asset tag generation |
 
 ---
 
