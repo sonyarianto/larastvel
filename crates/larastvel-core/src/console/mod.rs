@@ -388,7 +388,7 @@ mod tests {
         assert!(kernel.has_command("greet"));
 
         // Second call should be a no-op
-        kernel.load(|k| {
+        kernel.load(|_k| {
             counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         });
 

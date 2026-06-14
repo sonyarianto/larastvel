@@ -4,6 +4,7 @@ use crate::database::DatabaseManager;
 use crate::foundation::Application;
 use crate::logging;
 use crate::models;
+use crate::console::ConsoleKernel;
 use crate::routing::Registrar;
 
 /// Fluent application builder — the Rust equivalent of Laravel 11+'s
@@ -27,6 +28,9 @@ use crate::routing::Registrar;
 ///                     .web(|r| routes::web::web(r)),
 ///             ));
 ///         })
+///         .with_console_commands(|kernel| {
+///             kernel.add_command(Arc::new(MyCommand));
+///         })
 ///         .run()
 ///         .await;
 /// }
@@ -36,6 +40,7 @@ pub struct App {
     base_path: Option<PathBuf>,
     routing: Option<Box<dyn FnOnce(&Registrar) + Send>>,
     providers: Option<Box<dyn FnOnce(&Application) + Send>>,
+    console_commands: Option<Box<dyn FnOnce(&ConsoleKernel) + Send>>,
 }
 
 impl App {
@@ -47,6 +52,7 @@ impl App {
             base_path,
             routing: None,
             providers: None,
+            console_commands: None,
         }
     }
 
@@ -80,6 +86,22 @@ impl App {
         self
     }
 
+    /// Register console commands via a closure that receives the [`ConsoleKernel`].
+    ///
+    /// Multiple calls accumulate; each closure is called during boot.
+    pub fn with_console_commands(mut self, f: impl FnOnce(&ConsoleKernel) + Send + 'static) -> Self {
+        let prev = self.console_commands.take();
+        self.console_commands = Some(if let Some(prev) = prev {
+            Box::new(move |k| {
+                prev(k);
+                f(k);
+            })
+        } else {
+            Box::new(f)
+        });
+        self
+    }
+
     /// Build and run the application, consuming the builder.
     pub async fn run(self) {
         let app = Application::new(self.base_path.clone());
@@ -100,6 +122,12 @@ impl App {
         // Register providers
         if let Some(f) = self.providers {
             f(&app);
+        }
+
+        // Register console commands
+        if let Some(f) = self.console_commands {
+            let kernel = app.console_kernel();
+            f(&kernel);
         }
 
         // Register routes via routing closure
@@ -125,6 +153,7 @@ mod tests {
         let app_builder = App::configure(None);
         assert!(app_builder.routing.is_none());
         assert!(app_builder.providers.is_none());
+        assert!(app_builder.console_commands.is_none());
     }
 
     #[test]
@@ -143,5 +172,27 @@ mod tests {
     fn test_app_with_providers_stores_closure() {
         let app_builder = App::configure(None).with_providers(|_app| {});
         assert!(app_builder.providers.is_some());
+    }
+
+    #[test]
+    fn test_app_with_console_commands_stores_closure() {
+        let app_builder = App::configure(None).with_console_commands(|_kernel| {});
+        assert!(app_builder.console_commands.is_some());
+    }
+
+    #[test]
+    fn test_app_with_console_commands_accumulates() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let app = App::configure(None)
+            .with_console_commands({
+                let c = counter.clone();
+                move |_k| { c.fetch_add(1, Ordering::SeqCst); }
+            })
+            .with_console_commands(move |_k| { counter.fetch_add(1, Ordering::SeqCst); });
+
+        assert!(app.console_commands.is_some());
     }
 }
