@@ -17,21 +17,19 @@ async fn main() {
         Ok(conn) => {
             tracing::info!("Database connected successfully");
             let _ = larastvel_core::models::set_global_database(conn);
+            if let Err(e) = db.migrate::<Migrator>().await {
+                tracing::warn!("Migration failed: {} (app will still run)", e);
+            }
         }
         Err(e) => tracing::warn!("Database connection failed: {} (app will still run)", e),
     }
 
-    if let Err(e) = db.migrate::<Migrator>().await {
-        tracing::warn!("Migration failed: {} (app will still run)", e);
-    }
-
     let app = app.with_database(db);
 
-    // Register service providers
     app.register_provider(Arc::new(
         RouteServiceProvider::new()
-            .web(|r| routes::web::web(r))
-            .api(|r| routes::api::api(r)),
+            .web(routes::web::web)
+            .api(routes::api::api),
     ));
 
     app.run().await;

@@ -1,6 +1,7 @@
 extern crate self as larastvel_core;
 
 pub mod auth;
+pub mod bootstrap;
 pub mod broadcasting;
 pub mod cache;
 pub mod config;
@@ -42,6 +43,7 @@ pub use auth::{
     PasswordResetBroker, PasswordResetConfig, PasswordResetError, PasswordResetToken, Policy,
     VerificationChecker, VerifiedUser,
 };
+pub use bootstrap::App;
 pub use broadcasting::{
     BroadcastError, BroadcastEvent, BroadcastManager, BroadcastMessage, Broadcaster, Channel,
     NativeBroadcaster, PresenceChannelData, SubscriberRegistry,

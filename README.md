@@ -138,7 +138,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | `routes/console.php` | `crates/larastvel-cli/src/main.rs` | ⚠️ Partial |
 | `config/*.php` (10 files) | `config.toml` (single file) | ⚠️ Partial |
 | `.env` | `.env` | ✅ |
-| `bootstrap/app.php` | `foundation::Application` | ⚠️ Partial |
+| `bootstrap/app.php` | `foundation::Application` / `bootstrap::App` fluent builder | ✅ |
 | `app/Providers/*` | `EventServiceProvider` / `RouteServiceProvider` / `ServiceProvider` trait / `DeferrableProvider` trait / deferred registration & boot | ✅ |
 | `artisan` CLI (25+ commands) | `larastvel-cli` (serve, route:list, key:generate, migrate*, db:seed, storage:link, notifications:table, queue:work, config:cache/clear, route:cache/clear, schedule:list/run, version, new, make:*) | ✅ |
 | `make:*` (model, controller, migration, seeder, policy, test, job, event, notification, rule, command) | `larastvel make:*` — 12 generators | ✅ |
