@@ -13,7 +13,7 @@ side-by-side comparison.
 | `bootstrap/app.php` | `Application` / `App` fluent builder | ✅ |
 | `app/Providers/*` | `ServiceProvider` trait, `EventServiceProvider`, `RouteServiceProvider`, deferred providers | ✅ |
 | `artisan` CLI (25+ commands) | `larastvel-cli` — serve, route:list, key:generate, migrate*, db:seed, storage:link, notifications:table, queue:work, config:cache/clear, route:cache/clear, schedule:list/run, version, new, make:* | ✅ |
-| `make:*` (12 generators) | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, notification, rule, command | ✅ |
+| `make:*` (12 generators) | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, notification, rule, mail, command | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | `app/Models/User.php` | `src/models/user.rs` | ✅ |
 | Eloquent ORM | `DbModel` trait + SeaORM + `SerializesToArray` / `ApiResource` / `JsonResource` / `ResourceCollection` | ✅ |

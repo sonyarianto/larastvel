@@ -12,7 +12,7 @@ Larastvel aims for ~100% feature parity with Laravel. Below is a side-by-side co
 | `bootstrap/app.php` | `Application` / `App` builder | ✅ |
 | `app/Providers/*` | `ServiceProvider`, `EventServiceProvider`, `RouteServiceProvider` | ✅ |
 | Artisan CLI (25+ commands) | `larastvel-cli` — serve, route:list, key:generate, migrate, db:seed, make:*, queue:work, etc. | ✅ |
-| `make:*` generators | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, notification, rule, command | ✅ |
+| `make:*` generators | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, notification, rule, mail, command | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | Eloquent ORM | `DbModel` + SeaORM + `ApiResource` / `JsonResource` / `ResourceCollection` | ✅ |
 | Model Factories (Faker) | `ModelFactory`, `factory_create()`, Faker helpers | ✅ |

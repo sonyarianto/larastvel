@@ -24,6 +24,7 @@ Larastvel ships with an Artisan-like CLI.
 | `make:event` | Create a new event |
 | `make:notification` | Create a new notification |
 | `make:rule` | Create a new validation rule |
+| `make:mail` | Create a new mail class |
 | `make:command` | Create a new CLI command |
 | `db:seed` | Seed the database |
 | `notifications:table` | Create notifications migration |

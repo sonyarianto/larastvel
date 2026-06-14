@@ -32,6 +32,7 @@ The project is a Cargo workspace with 7 crates:
 | `larastvel-tinker` | Interactive REPL binary |
 | `larastvel-new` | Project scaffolding binary |
 | `larastvel-testing` | Test utilities (`TestClient`, `TestResponse`, `RefreshDatabase`) |
+| `larastvel-app` (root) | Application entrypoint |
 
 ## Request Lifecycle
 

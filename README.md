@@ -12,10 +12,32 @@ A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
 
 ## Quick Start
 
+### Scaffold a new project
+
 ```bash
-# Clone and run
+cargo install larastvel-new
+larastvel-new my-app
+cd my-app
+cargo build
 cargo run
 # → http://localhost:8080
+```
+
+### Or clone and run
+
+```bash
+git clone https://github.com/sonyarianto/larastvel.git
+cd larastvel
+cargo run
+# → http://localhost:8080
+```
+
+### Install the CLI globally
+
+```bash
+cargo install larastvel-cli
+larastvel serve
+larastvel make:controller PostController
 ```
 
 ### Routes
@@ -26,7 +48,7 @@ Define routes in `src/routes/`:
 // src/routes/web.rs
 pub fn web(router: &Registrar) {
     router.get("/", || async {
-        axum::response::Html("<h1>Welcome</h1>")
+        larastvel_core::axum::response::Html("<h1>Welcome</h1>")
     });
 }
 
@@ -34,7 +56,7 @@ pub fn web(router: &Registrar) {
 pub fn api(router: &Registrar) {
     router.group("/api", |r| {
         r.get("/health", || async {
-            axum::response::Json(serde_json::json!({"status": "ok"}))
+            larastvel_core::axum::response::Json(serde_json::json!({"status": "ok"}))
         });
     });
 }
@@ -59,29 +81,12 @@ key = ""    # generate with `larastvel key:generate`
 driver = "sqlite"   # sqlite, postgres, mysql
 host = "127.0.0.1"
 port = 3306
-database = "larastvel.db"
+database = "larastvel"
 username = "root"
 password = ""
 ```
 
 See [Configuration Reference](#configuration-reference) for all options.
-
-### Generate a new project
-
-```bash
-cargo run -p larastvel-new -- my-app
-cd my-app
-cargo run
-```
-
-### CLI
-
-```bash
-cargo run -p larastvel-cli -- serve          # Start dev server
-cargo run -p larastvel-cli -- key:generate   # Generate encryption key
-cargo run -p larastvel-cli -- make model User
-cargo run -p larastvel-cli -- route:list
-```
 
 ---
 
@@ -94,6 +99,7 @@ cargo run -p larastvel-cli -- route:list
 | **Broadcasting** | Pusher, Ably, Log, Native (self-hosted WebSocket) broadcast drivers |
 | **Caching** | `CacheManager` with array, file, database stores, TTL, `remember()`, batch ops |
 | **CLI** | 12 `make:*` generators, `serve`, `migrate`, `route:list`, `config:cache`, `schedule:run`, `queue:work`, and more |
+| **Console** | `routes/console.rs`, `Command` trait, `ConsoleKernel`, scheduled command registration |
 | **Database** | SQLite/Postgres/MySQL via SeaORM, migrations, seeders, model factories (Faker) |
 | **Encryption** | AES-256-GCM (`Encrypter`), bcrypt hashing (`hash::make` / `hash::check`) |
 | **Events** | `EventService`, `dispatch()`, `listen()`, `fake()` / `assertDispatched()` |
@@ -101,6 +107,7 @@ cargo run -p larastvel-cli -- route:list
 | **Localization** | JSON translation files, `__()`, `trans_choice()`, pluralization |
 | **Mail** | SMTP (STARTTLS) and log mailers, `Mailable` builder, `MailManager` |
 | **Notifications** | Mail, Database, Broadcast, SMS, Webhook channels, multi-channel `via()` |
+| **Pagination** | `Paginator<T>`, `PaginationParams`, `to_json()`, `IntoResponse` |
 | **Queue** | Sync, in-memory, database queues, worker, `dispatch()`, `ShouldQueue` |
 | **Rate Limiting** | Token bucket, `RateLimiterRegistry`, Axum middleware |
 | **Routing** | Groups, prefixes, middleware stack, `#[controller]` / `#[derive(Resource)]` macros, WebSocket routes |
