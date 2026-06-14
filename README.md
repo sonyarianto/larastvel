@@ -4,7 +4,7 @@ A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
 
 ## Status
 
-Active development (~88% feature parity). Core architecture is solid with most framework features implemented.
+Active development (~94% feature parity). Core architecture is solid with most framework features implemented.
 
 ## Features
 
