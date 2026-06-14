@@ -6,3 +6,8 @@ node_modules/
 public/build/
 storage/logs/*.log
 .DS_Store
+
+# VitePress website
+website/node_modules/
+website/.vitepress/dist/
+website/.vitepress/cache/
