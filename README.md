@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/sonyarianto/larastvel/main/website/public/logo.svg" alt="Larastvel" width="400">
+  <img src="larastvel.png" alt="Larastvel" width="400">
 </p>
 
 [![CI](https://github.com/sonyarianto/larastvel/actions/workflows/ci.yml/badge.svg)](https://github.com/sonyarianto/larastvel/actions)
