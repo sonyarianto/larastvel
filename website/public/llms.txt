@@ -1,0 +1,21 @@
+# Larastvel
+
+A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM. Batteries-included — routing, ORM, templating, auth, queues, caching, and more.
+
+## Docs
+
+- [Guide: Getting Started](https://larastvel.vercel.app/guide/getting-started): Quick start, project structure, first route and model
+- [Guide: Configuration](https://larastvel.vercel.app/guide/configuration): All config/*.toml files, environment variables, partial configs
+- [Guide: Architecture](https://larastvel.vercel.app/guide/architecture): System diagram, crate layout, request lifecycle
+- [Guide: Routing](https://larastvel.vercel.app/guide/routing): Basic routes, groups, middleware, controllers, resources, WebSocket
+- [Guide: Database & ORM](https://larastvel.vercel.app/guide/database): SeaORM models, migrations, seeders, model factories
+- [Guide: Authentication](https://larastvel.vercel.app/guide/auth): JWT auth, AuthenticatedUser extractor, gates, policies, password reset, email verification
+- [Guide: Session & CSRF](https://larastvel.vercel.app/guide/session): Encrypted sessions, flash data, CSRF tokens, @csrf directive
+- [Guide: Caching](https://larastvel.vercel.app/guide/caching): CacheManager, array/file/database stores, remember(), tags
+- [Reference: CLI](https://larastvel.vercel.app/reference/cli): All CLI commands (serve, make:*, migrate, queue:work, etc.)
+- [Reference: Parity Tracking](https://larastvel.vercel.app/reference/parity): Feature comparison with Laravel (all ✅)
+
+## GitHub
+
+- [Repository](https://github.com/sonyarianto/larastvel): Source code, issues, pull requests
+- [PARITY.md](https://github.com/sonyarianto/larastvel/blob/main/PARITY.md): Feature parity tracking with test counts
