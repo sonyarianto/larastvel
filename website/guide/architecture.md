@@ -4,18 +4,18 @@
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                   Application                         │
+│                     Application                        │
 │  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  │
-│  │  Config   │  │   DB     │  │  Service Container │  │
-│  │  (TOML)   │  │  (SeaORM)│  │  (TypeId-based)    │  │
+│  │  Config  │  │    DB    │  │  Service Container │  │
+│  │  (TOML)  │  │ (SeaORM) │  │  (TypeId-based)    │  │
 │  └──────────┘  └──────────┘  └────────────────────┘  │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │              Router (Axum + Registrar)            │ │
-│  │  Routes → Groups → Middleware → Controllers      │ │
-│  └──────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────┐  │
+│  │           Router (Axum + Registrar)            │  │
+│  │    Routes → Groups → Middleware → Controllers  │  │
+│  └────────────────────────────────────────────────┘  │
 │  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  │
 │  │ Session  │  │  Cache   │  │  Queue / Events    │  │
-│  │ + CSRF   │  │  (stores)│  │  + Notifications   │  │
+│  │ + CSRF   │  │ (stores) │  │  + Notifications   │  │
 │  └──────────┘  └──────────┘  └────────────────────┘  │
 └──────────────────────────────────────────────────────┘
 ```
