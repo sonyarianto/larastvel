@@ -52,7 +52,7 @@ pub use cache::{
     prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, DEFAULT_TTL_SECONDS, FOREVER_TTL,
 };
 pub use config::Config;
-pub use console::ConsoleKernel;
+pub use console::{Command, ConsoleKernel};
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
 pub use events::EventService;
 pub use foundation::{

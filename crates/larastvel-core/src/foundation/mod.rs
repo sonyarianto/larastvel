@@ -43,6 +43,7 @@ struct AppInner {
     instances: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
     aliases: HashMap<String, TypeId>,
     config: Config,
+    console: Option<ConsoleKernel>,
     db: Option<DatabaseManager>,
     base_path: PathBuf,
     booted: bool,
@@ -62,6 +63,7 @@ impl Application {
             instances: HashMap::new(),
             aliases: HashMap::new(),
             config,
+            console: None,
             db: None,
             base_path: path,
             booted: false,
@@ -230,7 +232,11 @@ impl Application {
     }
 
     pub fn console_kernel(&self) -> ConsoleKernel {
-        ConsoleKernel::new(self.clone())
+        let mut inner = self.inner.lock().unwrap();
+        inner
+            .console
+            .get_or_insert_with(|| ConsoleKernel::new(self.clone()))
+            .clone()
     }
 
     pub fn router(&self) -> Registrar {

@@ -4,7 +4,7 @@ A Rust web framework inspired by Laravel, built on Axum, Tokio, and SeaORM.
 
 ## Status
 
-Active development (~94% feature parity). Core architecture is solid with most framework features implemented.
+Active development (~97% feature parity). Core architecture is solid with most framework features implemented.
 
 ## Features
 
@@ -135,7 +135,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 |---|---|---|
 | `routes/web.php` | `src/routes/web.rs` | ✅ |
 | `routes/api.php` | `src/routes/api.rs` | ✅ |
-| `routes/console.php` | `crates/larastvel-cli/src/main.rs` | ⚠️ Partial |
+| `routes/console.php` | `Command` trait / `ConsoleKernel` (add_command, load, call) / `routes/console.rs` convention | ✅ |
 | `config/*.php` (10 files) | `config.toml` (single file) | ⚠️ Partial |
 | `.env` | `.env` | ✅ |
 | `bootstrap/app.php` | `foundation::Application` / `bootstrap::App` fluent builder | ✅ |
