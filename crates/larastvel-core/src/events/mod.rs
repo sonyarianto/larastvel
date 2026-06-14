@@ -36,7 +36,10 @@ impl EventService {
         let type_id = TypeId::of::<E>();
         let listener = Arc::new(listener);
         let fn_box: ListenerFn = Arc::new(move |payload: EventPayload| {
-            let event = *payload.downcast::<E>().expect("Event type mismatch");
+            let event = match payload.downcast::<E>() {
+                Ok(e) => *e,
+                Err(_) => return Box::pin(async {}),
+            };
             let listener = listener.clone();
             Box::pin(async move {
                 listener.handle(event).await;
@@ -54,7 +57,10 @@ impl EventService {
     {
         let type_id = TypeId::of::<E>();
         let fn_box: ListenerFn = Arc::new(move |payload: EventPayload| {
-            let event = *payload.downcast::<E>().expect("Event type mismatch");
+            let event = match payload.downcast::<E>() {
+                Ok(e) => *e,
+                Err(_) => return Box::pin(async {}),
+            };
             Box::pin(f(event))
         });
 

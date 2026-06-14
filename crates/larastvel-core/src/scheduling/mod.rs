@@ -229,20 +229,26 @@ impl Schedule {
         }
     }
 
-    pub fn call<F, Fut>(&self, cron: &str, description: &str, f: F)
+    pub fn call<F, Fut>(&self, cron: &str, description: &str, f: F) -> Result<(), String>
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), JobError>> + Send + 'static,
     {
-        let cron_expr = parse_cron(cron).expect("Invalid cron expression");
+        let cron_expr = parse_cron(cron).map_err(|e| format!("Invalid cron expression: {}", e))?;
         let mut event = ScheduledEvent::new(cron_expr, description);
         let cb: JobCallback = Arc::new(move || Box::pin(f()));
         event.callback = Some(cb);
         self.events.lock().unwrap().push(event);
+        Ok(())
     }
 
-    pub fn job(&self, cron: &str, description: &str, job: Box<dyn crate::queue::ShouldQueue>) {
-        let cron_expr = parse_cron(cron).expect("Invalid cron expression");
+    pub fn job(
+        &self,
+        cron: &str,
+        description: &str,
+        job: Box<dyn crate::queue::ShouldQueue>,
+    ) -> Result<(), String> {
+        let cron_expr = parse_cron(cron).map_err(|e| format!("Invalid cron expression: {}", e))?;
         let mut event = ScheduledEvent::new(cron_expr, description);
         let shared = Arc::new(job);
         let cb: JobCallback = Arc::new(move || {
@@ -251,6 +257,7 @@ impl Schedule {
         });
         event.callback = Some(cb);
         self.events.lock().unwrap().push(event);
+        Ok(())
     }
 
     pub fn push(&self, event: ScheduledEvent) {
@@ -296,16 +303,16 @@ impl EventBuilder {
         self
     }
 
-    pub fn call<F, Fut>(self, f: F)
+    pub fn call<F, Fut>(self, f: F) -> Result<(), String>
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), JobError>> + Send + 'static,
     {
-        self.schedule.call(&self.cron, &self.description, f);
+        self.schedule.call(&self.cron, &self.description, f)
     }
 
-    pub fn job(self, job: Box<dyn crate::queue::ShouldQueue>) {
-        self.schedule.job(&self.cron, &self.description, job);
+    pub fn job(self, job: Box<dyn crate::queue::ShouldQueue>) -> Result<(), String> {
+        self.schedule.job(&self.cron, &self.description, job)
     }
 }
 
@@ -475,13 +482,15 @@ mod tests {
         let ran = Arc::new(Mutex::new(false));
         let r = ran.clone();
 
-        schedule.call("* * * * *", "test task", move || {
-            let r = r.clone();
-            async move {
-                *r.lock().unwrap() = true;
-                Ok(())
-            }
-        });
+        schedule
+            .call("* * * * *", "test task", move || {
+                let r = r.clone();
+                async move {
+                    *r.lock().unwrap() = true;
+                    Ok(())
+                }
+            })
+            .unwrap();
 
         assert_eq!(schedule.events().len(), 1);
         let event = schedule.events().into_iter().next().unwrap();
@@ -504,7 +513,8 @@ mod tests {
                     *r.lock().unwrap() = true;
                     Ok(())
                 }
-            });
+            })
+            .unwrap();
 
         assert_eq!(schedule.events().len(), 1);
         let event = schedule.events().into_iter().next().unwrap();
@@ -517,13 +527,15 @@ mod tests {
         let ran = Arc::new(Mutex::new(false));
         let r = ran.clone();
 
-        schedule.call("* * * * *", "every minute", move || {
-            let r = r.clone();
-            async move {
-                *r.lock().unwrap() = true;
-                Ok(())
-            }
-        });
+        schedule
+            .call("* * * * *", "every minute", move || {
+                let r = r.clone();
+                async move {
+                    *r.lock().unwrap() = true;
+                    Ok(())
+                }
+            })
+            .unwrap();
 
         let manager = ScheduleManager::new(schedule);
         let results = manager.run_due();
@@ -535,7 +547,9 @@ mod tests {
     #[test]
     fn test_schedule_clear() {
         let schedule = Schedule::new();
-        schedule.call("* * * * *", "task", || async { Ok(()) });
+        schedule
+            .call("* * * * *", "task", || async { Ok(()) })
+            .unwrap();
         assert_eq!(schedule.events().len(), 1);
         schedule.clear();
         assert_eq!(schedule.events().len(), 0);
@@ -565,7 +579,9 @@ mod tests {
         let flag = Arc::new(AtomicBool::new(false));
         let job = TestScheduledJob { flag: flag.clone() };
 
-        schedule.job("* * * * *", "test job", Box::new(job));
+        schedule
+            .job("* * * * *", "test job", Box::new(job))
+            .unwrap();
         assert_eq!(schedule.events().len(), 1);
 
         let event = schedule.events().into_iter().next().unwrap();
@@ -582,13 +598,15 @@ mod tests {
         let ran = Arc::new(Mutex::new(false));
         let r = ran.clone();
 
-        schedule.call("* * * * *", "test", move || {
-            let r = r.clone();
-            async move {
-                *r.lock().unwrap() = true;
-                Ok(())
-            }
-        });
+        schedule
+            .call("* * * * *", "test", move || {
+                let r = r.clone();
+                async move {
+                    *r.lock().unwrap() = true;
+                    Ok(())
+                }
+            })
+            .unwrap();
 
         let manager = ScheduleManager::new(schedule);
         assert_eq!(manager.due_events().len(), 1);
@@ -597,7 +615,9 @@ mod tests {
     #[test]
     fn test_event_is_not_due() {
         let schedule = Schedule::new();
-        schedule.call("0 0 1 1 0", "yearly", || async { Ok(()) });
+        schedule
+            .call("0 0 1 1 0", "yearly", || async { Ok(()) })
+            .unwrap();
 
         let manager = ScheduleManager::new(schedule);
         assert!(manager.due_events().is_empty());
