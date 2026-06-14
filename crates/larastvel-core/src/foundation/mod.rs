@@ -393,8 +393,7 @@ mod tests {
     fn test_deferred_provider_activated_on_make_by_alias() {
         static REGISTERED: std::sync::atomic::AtomicBool =
             std::sync::atomic::AtomicBool::new(false);
-        static BOOTED: std::sync::atomic::AtomicBool =
-            std::sync::atomic::AtomicBool::new(false);
+        static BOOTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
         struct DeferredTest;
         impl ServiceProvider for DeferredTest {
@@ -426,8 +425,7 @@ mod tests {
 
     #[test]
     fn test_deferred_provider_not_activated_for_unrelated_types() {
-        static CALLED: std::sync::atomic::AtomicBool =
-            std::sync::atomic::AtomicBool::new(false);
+        static CALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
         struct DeferredTest;
         impl ServiceProvider for DeferredTest {
@@ -534,8 +532,7 @@ mod tests {
 
     #[test]
     fn test_deferred_provider_boot_not_called_if_not_resolved() {
-        static BOOTED: std::sync::atomic::AtomicBool =
-            std::sync::atomic::AtomicBool::new(false);
+        static BOOTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
         struct DeferredTest;
         impl ServiceProvider for DeferredTest {

@@ -1641,7 +1641,9 @@ fn config_cache() {
     );
     println!(
         "{}",
-        "  Use config:clear to remove the cached file.".to_string().dimmed()
+        "  Use config:clear to remove the cached file."
+            .to_string()
+            .dimmed()
     );
 }
 
@@ -1668,12 +1670,16 @@ async fn schedule_list() {
                 "{}",
                 "In your application's main.rs, add a --schedule:list argument handler:".dimmed()
             );
-            eprintln!("{}", "  let events = schedule.events();".to_string().dimmed());
+            eprintln!(
+                "{}",
+                "  let events = schedule.events();".to_string().dimmed()
+            );
             eprintln!("{}", "  for event in events {".to_string().dimmed());
             eprintln!(
                 "{}",
-                "    println!(\"  {}  {}\", event.description(), \"schedule expression\");".to_string()
-                .dimmed()
+                "    println!(\"  {}  {}\", event.description(), \"schedule expression\");"
+                    .to_string()
+                    .dimmed()
             );
             eprintln!("{}", "  }".to_string().dimmed());
         }
@@ -2189,16 +2195,25 @@ async fn queue_work(once: bool, queue: &str, sleep: u64) {
             );
             eprintln!(
                 "{}",
-                "  let mut db = DatabaseManager::new(&app.config());".to_string().dimmed()
-            );
-            eprintln!("{}", "  let conn = db.connect().await?;".to_string().dimmed());
-            eprintln!(
-                "{}",
-                "  let queue = DatabaseQueue::new(\"default\", conn, resolver);".to_string().dimmed()
+                "  let mut db = DatabaseManager::new(&app.config());"
+                    .to_string()
+                    .dimmed()
             );
             eprintln!(
                 "{}",
-                "  let worker = QueueWorker::new(Arc::new(queue));".to_string().dimmed()
+                "  let conn = db.connect().await?;".to_string().dimmed()
+            );
+            eprintln!(
+                "{}",
+                "  let queue = DatabaseQueue::new(\"default\", conn, resolver);"
+                    .to_string()
+                    .dimmed()
+            );
+            eprintln!(
+                "{}",
+                "  let worker = QueueWorker::new(Arc::new(queue));"
+                    .to_string()
+                    .dimmed()
             );
             eprintln!("{}", "  worker.work().await;".dimmed());
         }
