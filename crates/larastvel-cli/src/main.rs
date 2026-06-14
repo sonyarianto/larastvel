@@ -201,7 +201,11 @@ async fn main() {
         Some(Commands::Env) => {
             env_display();
         }
-        Some(Commands::Down { message, retry, force }) => {
+        Some(Commands::Down {
+            message,
+            retry,
+            force,
+        }) => {
             maintenance_down(message, retry, force);
         }
         Some(Commands::Up) => {
@@ -262,9 +266,9 @@ async fn main() {
                 println!("  make:event       Create a new event");
                 println!("  make:notification Create a new notification");
                 println!("  make:rule        Create a new validation rule");
-            println!("  make:command     Create a new console command");
-            println!("  make:mail        Create a new mail class");
-        }
+                println!("  make:command     Create a new console command");
+                println!("  make:mail        Create a new mail class");
+            }
         },
         None => {
             println!("{}", "Larastvel Framework CLI".cyan().bold());
@@ -297,7 +301,9 @@ async fn main() {
             println!("  config:clear     Clear the cached config file");
             println!("  route:cache      Cache all registered routes into a single file");
             println!("  route:clear      Clear the cached routes file");
-            println!("  env              Display the current environment variables (.env + config)");
+            println!(
+                "  env              Display the current environment variables (.env + config)"
+            );
             println!("  down             Put the application into maintenance mode");
             println!("  up               Bring the application out of maintenance mode");
             println!("  schedule:list    List all registered scheduled tasks");
@@ -1596,9 +1602,13 @@ impl {struct_name} {{
 
     println!(
         "{}",
-        format!("✓ Mail [{}] created at '{}'.", struct_name, file_path.display())
-            .green()
-            .bold()
+        format!(
+            "✓ Mail [{}] created at '{}'.",
+            struct_name,
+            file_path.display()
+        )
+        .green()
+        .bold()
     );
     println!(
         "{}",
@@ -1631,18 +1641,12 @@ fn config_cache() {
     );
     println!(
         "{}",
-        format!(
-            "  Use config:clear to remove the cached file."
-        )
-        .dimmed()
+        "  Use config:clear to remove the cached file.".to_string().dimmed()
     );
 }
 
 async fn schedule_list() {
-    println!(
-        "{}",
-        "Scheduled Tasks".cyan().bold()
-    );
+    println!("{}", "Scheduled Tasks".cyan().bold());
 
     let status = std::process::Command::new("cargo")
         .args(["run", "--", "--schedule:list"])
@@ -1662,46 +1666,22 @@ async fn schedule_list() {
             );
             eprintln!(
                 "{}",
-                "In your application's main.rs, add a --schedule:list argument handler:"
-                    .dimmed()
+                "In your application's main.rs, add a --schedule:list argument handler:".dimmed()
             );
+            eprintln!("{}", "  let events = schedule.events();".to_string().dimmed());
+            eprintln!("{}", "  for event in events {".to_string().dimmed());
             eprintln!(
                 "{}",
-                format!(
-                    "  let events = schedule.events();"
-                )
+                "    println!(\"  {}  {}\", event.description(), \"schedule expression\");".to_string()
                 .dimmed()
             );
-            eprintln!(
-                "{}",
-                format!(
-                    "  for event in events {{"
-                )
-                .dimmed()
-            );
-            eprintln!(
-                "{}",
-                format!(
-                    "    println!(\"  {{}}  {{}}\", event.description(), \"schedule expression\");"
-                )
-                .dimmed()
-            );
-            eprintln!(
-                "{}",
-                format!(
-                    "  }}"
-                )
-                .dimmed()
-            );
+            eprintln!("{}", "  }".to_string().dimmed());
         }
     }
 }
 
 async fn route_cache() {
-    println!(
-        "{}",
-        "⚡ Caching routes...".green().bold()
-    );
+    println!("{}", "⚡ Caching routes...".green().bold());
 
     let status = std::process::Command::new("cargo")
         .args(["run", "--", "--route:cache"])
@@ -1713,12 +1693,9 @@ async fn route_cache() {
         Ok(s) if s.success() => {
             println!(
                 "{}",
-                format!(
-                    "✓ Routes cached to '{}'.",
-                    "bootstrap/cache/routes.json"
-                )
-                .green()
-                .bold()
+                format!("✓ Routes cached to '{}'.", "bootstrap/cache/routes.json")
+                    .green()
+                    .bold()
             );
             println!(
                 "{}",
@@ -1732,29 +1709,18 @@ async fn route_cache() {
             );
             eprintln!(
                 "{}",
-                "In your application's main.rs, add a --route:cache argument handler:"
-                    .dimmed()
+                "In your application's main.rs, add a --route:cache argument handler:".dimmed()
             );
             eprintln!(
                 "{}",
-                format!(
-                    "  let registrar = Registrar::new(Arc::new(Mutex::new(AxumRouter::new())), Arc::new(Mutex::new(vec![])));"
-                )
+                "  let registrar = Registrar::new(Arc::new(Mutex::new(AxumRouter::new())), Arc::new(Mutex::new(vec![])));".to_string()
                 .dimmed()
             );
+            eprintln!("{}", "  routes::web(&registrar);".dimmed());
+            eprintln!("{}", "  routes::api(&registrar);".dimmed());
             eprintln!(
                 "{}",
-                "  routes::web(&registrar);".dimmed()
-            );
-            eprintln!(
-                "{}",
-                "  routes::api(&registrar);".dimmed()
-            );
-            eprintln!(
-                "{}",
-                format!(
-                    "  let routes_json = serde_json::to_string_pretty(&registrar.list_routes()).unwrap();"
-                )
+                "  let routes_json = serde_json::to_string_pretty(&registrar.list_routes()).unwrap();".to_string()
                 .dimmed()
             );
             eprintln!(
@@ -1763,8 +1729,7 @@ async fn route_cache() {
             );
             eprintln!(
                 "{}",
-                "  std::fs::write(\"bootstrap/cache/routes.json\", routes_json).unwrap();"
-                    .dimmed()
+                "  std::fs::write(\"bootstrap/cache/routes.json\", routes_json).unwrap();".dimmed()
             );
         }
     }
@@ -1777,19 +1742,13 @@ fn route_clear() {
             Ok(_) => {
                 println!(
                     "{}",
-                    format!(
-                        "✓ Cached routes cleared from '{}'.",
-                        cache_path.display()
-                    )
-                    .green()
-                    .bold()
+                    format!("✓ Cached routes cleared from '{}'.", cache_path.display())
+                        .green()
+                        .bold()
                 );
             }
             Err(e) => {
-                eprintln!(
-                    "{}",
-                    format!("Error clearing routes cache: {}", e).red()
-                );
+                eprintln!("{}", format!("Error clearing routes cache: {}", e).red());
             }
         }
     } else {
@@ -1807,19 +1766,13 @@ fn config_clear() {
             Ok(_) => {
                 println!(
                     "{}",
-                    format!(
-                        "✓ Cached config cleared from '{}'.",
-                        cache_path.display()
-                    )
-                    .green()
-                    .bold()
+                    format!("✓ Cached config cleared from '{}'.", cache_path.display())
+                        .green()
+                        .bold()
                 );
             }
             Err(e) => {
-                eprintln!(
-                    "{}",
-                    format!("Error clearing config cache: {}", e).red()
-                );
+                eprintln!("{}", format!("Error clearing config cache: {}", e).red());
             }
         }
     } else {
@@ -1881,11 +1834,7 @@ fn env_display() {
         println!("  {} = {}", "APP_NAME".cyan(), config.app.name);
         println!("  {} = {}", "APP_URL".cyan(), config.app.url);
         println!("  {} = {}", "APP_ENV".cyan(), config.app.env);
-        println!(
-            "  {} = {}",
-            "APP_DEBUG".cyan(),
-            config.app.debug
-        );
+        println!("  {} = {}", "APP_DEBUG".cyan(), config.app.debug);
         if config.app.key.is_some() {
             println!("  {} = (masked)", "APP_KEY".cyan());
         } else {
@@ -1901,29 +1850,13 @@ fn env_display() {
             config.database.port,
             config.database.database,
         );
-        println!(
-            "  {} = {}",
-            "DB_USERNAME".cyan(),
-            config.database.username
-        );
+        println!("  {} = {}", "DB_USERNAME".cyan(), config.database.username);
         println!("  {} = ******", "DB_PASSWORD".cyan());
         println!();
-        println!(
-            "  {} = {}",
-            "LOG_LEVEL".cyan(),
-            config.logging.level
-        );
-        println!(
-            "  {} = {}",
-            "LOG_FORMAT".cyan(),
-            config.logging.format
-        );
+        println!("  {} = {}", "LOG_LEVEL".cyan(), config.logging.level);
+        println!("  {} = {}", "LOG_FORMAT".cyan(), config.logging.format);
         println!();
-        println!(
-            "  {} = {}",
-            "VIEW_ENGINE".cyan(),
-            config.view.engine
-        );
+        println!("  {} = {}", "VIEW_ENGINE".cyan(), config.view.engine);
         println!(
             "  {} = {}",
             "VIEW_PATHS".cyan(),
@@ -1946,7 +1879,10 @@ fn maintenance_down(message: Option<String>, retry: Option<u64>, force: bool) {
             )
             .yellow()
         );
-        eprintln!("{}", "  Use --force to overwrite the existing down file.".dimmed());
+        eprintln!(
+            "{}",
+            "  Use --force to overwrite the existing down file.".dimmed()
+        );
         return;
     }
 
@@ -1983,10 +1919,7 @@ fn maintenance_up() {
     let down_file = std::path::Path::new("storage/framework/down");
 
     if !down_file.exists() {
-        println!(
-            "{}",
-            "Application is not in maintenance mode.".yellow()
-        );
+        println!("{}", "Application is not in maintenance mode.".yellow());
         return;
     }
 
@@ -2054,10 +1987,7 @@ fn storage_link() {
                 );
             }
             Err(e) => {
-                eprintln!(
-                    "{}",
-                    format!("Error creating symlink: {}", e).red()
-                );
+                eprintln!("{}", format!("Error creating symlink: {}", e).red());
             }
         }
     }
@@ -2067,8 +1997,7 @@ fn storage_link() {
         // Fallback: copy instead of symlink on non-Unix platforms
         eprintln!(
             "{}",
-            "Warning: Symlinks not supported on this platform. Using copy instead."
-                .yellow()
+            "Warning: Symlinks not supported on this platform. Using copy instead.".yellow()
         );
         println!(
             "{}",
@@ -2082,8 +2011,7 @@ fn storage_link() {
         );
         println!(
             "{}",
-            "  Copy files manually or use a storage driver that supports your platform."
-                .dimmed()
+            "  Copy files manually or use a storage driver that supports your platform.".dimmed()
         );
     }
 }
@@ -2230,10 +2158,7 @@ async fn queue_work(once: bool, queue: &str, sleep: u64) {
         .green()
         .bold()
     );
-    println!(
-        "{}",
-        "  Press Ctrl+C to stop.".dimmed()
-    );
+    println!("{}", "  Press Ctrl+C to stop.".dimmed());
 
     let status = std::process::Command::new("cargo")
         .args([
@@ -2264,36 +2189,18 @@ async fn queue_work(once: bool, queue: &str, sleep: u64) {
             );
             eprintln!(
                 "{}",
-                format!(
-                    "  let mut db = DatabaseManager::new(&app.config());"
-                )
-                .dimmed()
+                "  let mut db = DatabaseManager::new(&app.config());".to_string().dimmed()
+            );
+            eprintln!("{}", "  let conn = db.connect().await?;".to_string().dimmed());
+            eprintln!(
+                "{}",
+                "  let queue = DatabaseQueue::new(\"default\", conn, resolver);".to_string().dimmed()
             );
             eprintln!(
                 "{}",
-                format!(
-                    "  let conn = db.connect().await?;"
-                )
-                .dimmed()
+                "  let worker = QueueWorker::new(Arc::new(queue));".to_string().dimmed()
             );
-            eprintln!(
-                "{}",
-                format!(
-                    "  let queue = DatabaseQueue::new(\"default\", conn, resolver);"
-                )
-                .dimmed()
-            );
-            eprintln!(
-                "{}",
-                format!(
-                    "  let worker = QueueWorker::new(Arc::new(queue));"
-                )
-                .dimmed()
-            );
-            eprintln!(
-                "{}",
-                "  worker.work().await;".dimmed()
-            );
+            eprintln!("{}", "  worker.work().await;".dimmed());
         }
     }
 
@@ -2306,21 +2213,14 @@ async fn queue_work(once: bool, queue: &str, sleep: u64) {
     } else {
         println!(
             "{}",
-            "  Use --once to process a single job, or omit it to keep the worker running."
-                .dimmed()
+            "  Use --once to process a single job, or omit it to keep the worker running.".dimmed()
         );
     }
 }
 
 async fn run_schedule_command() {
-    println!(
-        "{}",
-        "⚡ Running scheduled tasks...".green().bold()
-    );
-    println!(
-        "{}",
-        "  Press Ctrl+C to stop.".dimmed()
-    );
+    println!("{}", "⚡ Running scheduled tasks...".green().bold());
+    println!("{}", "  Press Ctrl+C to stop.".dimmed());
 
     let status = std::process::Command::new("cargo")
         .args(["run", "--", "--schedule:run"])
@@ -2342,10 +2242,7 @@ async fn run_schedule_command() {
                 "{}",
                 "In your application's main.rs, add a --schedule:run argument handler:".dimmed()
             );
-            eprintln!(
-                "{}",
-                "  let schedule = Schedule::new();".dimmed()
-            );
+            eprintln!("{}", "  let schedule = Schedule::new();".dimmed());
             eprintln!(
                 "{}",
                 "  schedule.call(\"* * * * *\", \"log stats\", || async { Ok(()) });".dimmed()
@@ -2354,10 +2251,7 @@ async fn run_schedule_command() {
                 "{}",
                 "  let manager = ScheduleManager::new(schedule);".dimmed()
             );
-            eprintln!(
-                "{}",
-                "  manager.run_due_async().await;".dimmed()
-            );
+            eprintln!("{}", "  manager.run_due_async().await;".dimmed());
         }
     }
 }

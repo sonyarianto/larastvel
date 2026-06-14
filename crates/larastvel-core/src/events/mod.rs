@@ -138,6 +138,7 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_all_events() {
         test_minimal_arc_fn_call().await;
         test_listen_and_dispatch_with_struct().await;

@@ -48,11 +48,7 @@ impl RouteServiceProvider {
     ///
     /// The closure receives a `&Registrar` to register routes.
     /// It will be called during `boot()`.
-    pub fn group(
-        mut self,
-        name: &str,
-        f: impl Fn(&Registrar) + Send + Sync + 'static,
-    ) -> Self {
+    pub fn group(mut self, name: &str, f: impl Fn(&Registrar) + Send + Sync + 'static) -> Self {
         self.groups.push((name.to_string(), Arc::new(f)));
         self
     }
@@ -151,10 +147,9 @@ mod tests {
 
     #[test]
     fn test_route_service_provider_group_name() {
-        let provider = RouteServiceProvider::new()
-            .group("admin", |r| {
-                r.get("/admin", || async { "admin" });
-            });
+        let provider = RouteServiceProvider::new().group("admin", |r| {
+            r.get("/admin", || async { "admin" });
+        });
 
         assert_eq!(provider.groups[0].0, "admin");
     }
@@ -211,6 +206,10 @@ mod tests {
             r.get("/boot-second", || async { "second" });
         });
         provider2.boot(&app);
-        assert_eq!(app.router().list_routes().len(), 2, "second boot should add more routes");
+        assert_eq!(
+            app.router().list_routes().len(),
+            2,
+            "second boot should add more routes"
+        );
     }
 }

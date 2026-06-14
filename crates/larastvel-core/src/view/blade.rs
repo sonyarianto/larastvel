@@ -46,30 +46,22 @@ pub fn compile(input: &str) -> String {
     let mut output = input.to_string();
 
     // --- auth / endauth ---
-    static AUTH_START: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(?m)^\s*@auth\s*$").unwrap());
+    static AUTH_START: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*@auth\s*$").unwrap());
     output = AUTH_START
         .replace_all(&output, "{% if auth_check %}")
         .to_string();
 
-    static ENDAUTH: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(?m)^\s*@endauth\s*$").unwrap());
-    output = ENDAUTH
-        .replace_all(&output, "{% endif %}")
-        .to_string();
+    static ENDAUTH: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*@endauth\s*$").unwrap());
+    output = ENDAUTH.replace_all(&output, "{% endif %}").to_string();
 
     // --- guest / endguest ---
-    static GUEST_START: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(?m)^\s*@guest\s*$").unwrap());
+    static GUEST_START: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*@guest\s*$").unwrap());
     output = GUEST_START
         .replace_all(&output, "{% if not auth_check %}")
         .to_string();
 
-    static ENDGUEST: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(?m)^\s*@endguest\s*$").unwrap());
-    output = ENDGUEST
-        .replace_all(&output, "{% endif %}")
-        .to_string();
+    static ENDGUEST: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*@endguest\s*$").unwrap());
+    output = ENDGUEST.replace_all(&output, "{% endif %}").to_string();
 
     // --- error / enderror ---
     static ERROR_START: Lazy<Regex> =
@@ -81,22 +73,15 @@ pub fn compile(input: &str) -> String {
         })
         .to_string();
 
-    static ENDERROR: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(?m)^\s*@enderror\s*$").unwrap());
-    output = ENDERROR
-        .replace_all(&output, "{% endif %}")
-        .to_string();
+    static ENDERROR: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*@enderror\s*$").unwrap());
+    output = ENDERROR.replace_all(&output, "{% endif %}").to_string();
 
     // --- else (generic, inside any auth/error block) ---
-    static ELSE: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(?m)^\s*@else\s*$").unwrap());
-    output = ELSE
-        .replace_all(&output, "{% else %}")
-        .to_string();
+    static ELSE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*@else\s*$").unwrap());
+    output = ELSE.replace_all(&output, "{% else %}").to_string();
 
     // --- csrf ---
-    static CSRF: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"@csrf\b").unwrap());
+    static CSRF: Lazy<Regex> = Lazy::new(|| Regex::new(r"@csrf\b").unwrap());
     output = CSRF
         .replace_all(
             &output,
@@ -110,10 +95,7 @@ pub fn compile(input: &str) -> String {
     output = METHOD
         .replace_all(&output, |caps: &regex::Captures| {
             let method = &caps[1];
-            format!(
-                r#"<input type="hidden" name="_method" value="{}">"#,
-                method
-            )
+            format!(r#"<input type="hidden" name="_method" value="{}">"#, method)
         })
         .to_string();
 

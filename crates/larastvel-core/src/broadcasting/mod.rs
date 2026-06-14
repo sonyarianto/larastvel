@@ -1,6 +1,9 @@
 pub mod ably;
 pub mod log;
+pub mod native;
 pub mod pusher;
+
+pub use native::{NativeBroadcaster, SubscriberRegistry};
 
 use std::collections::HashMap;
 use std::sync::Arc;

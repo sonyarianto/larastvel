@@ -44,7 +44,7 @@ pub use auth::{
 };
 pub use broadcasting::{
     BroadcastError, BroadcastEvent, BroadcastManager, BroadcastMessage, Broadcaster, Channel,
-    PresenceChannelData,
+    NativeBroadcaster, PresenceChannelData, SubscriberRegistry,
 };
 pub use cache::{
     prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, DEFAULT_TTL_SECONDS, FOREVER_TTL,
@@ -53,9 +53,13 @@ pub use config::Config;
 pub use console::ConsoleKernel;
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
 pub use events::EventService;
-pub use foundation::{Application, EventServiceProvider, Kernel, RouteServiceProvider, ServiceProvider};
+pub use foundation::{
+    Application, EventServiceProvider, Kernel, RouteServiceProvider, ServiceProvider,
+};
 pub use http::Request;
 pub use larastvel_macros::{controller, route, Resource};
+pub use models::factory::{Faker, ModelFactory};
+pub use models::serialization::{ApiResource, JsonResource, ResourceCollection, SerializesToArray};
 pub use notifications::{
     BroadcastPayload, DatabaseNotification, Notifiable, Notification, NotificationChannel,
     NotificationError, NotificationSender,

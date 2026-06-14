@@ -114,8 +114,8 @@ pub fn register_event_listeners(
 mod tests {
     use super::*;
     use crate::foundation::Application;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     #[derive(Debug, Clone, PartialEq)]
     struct TestEvent {
@@ -128,12 +128,13 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Listener<TestEvent> for TestListener {
-        async fn handle(&self, event: TestEvent) {
+        async fn handle(&self, _event: TestEvent) {
             self.called.store(true, Ordering::SeqCst);
         }
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_all_event_provider_features() {
         // Run all async tests sequentially within one #[tokio::test] to avoid
         // parallel interference on the global EventService registry.
@@ -141,19 +142,27 @@ mod tests {
         // --- listen ---
         EventService::clear_all_listeners();
         let called = Arc::new(AtomicBool::new(false));
-        let _p = EventServiceProvider::new()
-            .listen::<TestEvent, TestListener>(TestListener { called: called.clone() });
-        EventService::dispatch(TestEvent { value: "listen".into() }).await;
+        let _p = EventServiceProvider::new().listen::<TestEvent, TestListener>(TestListener {
+            called: called.clone(),
+        });
+        EventService::dispatch(TestEvent {
+            value: "listen".into(),
+        })
+        .await;
         assert!(called.load(Ordering::SeqCst));
 
         // --- listen_fn ---
         EventService::clear_all_listeners();
         let called_fn = Arc::new(AtomicBool::new(false));
-        let _p = EventServiceProvider::new()
-            .listen_fn::<TestEvent, _, _>({
-                let c = called_fn.clone();
-                move |_| { let c = c.clone(); async move { c.store(true, Ordering::SeqCst); } }
-            });
+        let _p = EventServiceProvider::new().listen_fn::<TestEvent, _, _>({
+            let c = called_fn.clone();
+            move |_| {
+                let c = c.clone();
+                async move {
+                    c.store(true, Ordering::SeqCst);
+                }
+            }
+        });
         EventService::dispatch(TestEvent { value: "fn".into() }).await;
         assert!(called_fn.load(Ordering::SeqCst));
 
@@ -162,21 +171,35 @@ mod tests {
         let chain_a = Arc::new(AtomicBool::new(false));
         let chain_b = Arc::new(AtomicBool::new(false));
         let _p = EventServiceProvider::new()
-            .listen::<TestEvent, TestListener>(TestListener { called: chain_a.clone() })
+            .listen::<TestEvent, TestListener>(TestListener {
+                called: chain_a.clone(),
+            })
             .listen_fn::<TestEvent, _, _>({
                 let cb = chain_b.clone();
-                move |_| { let cb = cb.clone(); async move { cb.store(true, Ordering::SeqCst); } }
+                move |_| {
+                    let cb = cb.clone();
+                    async move {
+                        cb.store(true, Ordering::SeqCst);
+                    }
+                }
             });
-        EventService::dispatch(TestEvent { value: "chain".into() }).await;
+        EventService::dispatch(TestEvent {
+            value: "chain".into(),
+        })
+        .await;
         assert!(chain_a.load(Ordering::SeqCst));
         assert!(chain_b.load(Ordering::SeqCst));
 
         // --- registers immediately (no boot needed) ---
         EventService::clear_all_listeners();
         let immediate = Arc::new(AtomicBool::new(false));
-        let _p = EventServiceProvider::new()
-            .listen::<TestEvent, TestListener>(TestListener { called: immediate.clone() });
-        EventService::dispatch(TestEvent { value: "immediate".into() }).await;
+        let _p = EventServiceProvider::new().listen::<TestEvent, TestListener>(TestListener {
+            called: immediate.clone(),
+        });
+        EventService::dispatch(TestEvent {
+            value: "immediate".into(),
+        })
+        .await;
         assert!(immediate.load(Ordering::SeqCst));
 
         // --- convenience function ---
@@ -186,10 +209,18 @@ mod tests {
         register_event_listeners(&app, |p| {
             p.listen_fn::<TestEvent, _, _>({
                 let c = convenience.clone();
-                move |_| { let c = c.clone(); async move { c.store(true, Ordering::SeqCst); } }
+                move |_| {
+                    let c = c.clone();
+                    async move {
+                        c.store(true, Ordering::SeqCst);
+                    }
+                }
             })
         });
-        EventService::dispatch(TestEvent { value: "convenience".into() }).await;
+        EventService::dispatch(TestEvent {
+            value: "convenience".into(),
+        })
+        .await;
         assert!(convenience.load(Ordering::SeqCst));
     }
 

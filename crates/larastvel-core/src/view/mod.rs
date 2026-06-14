@@ -23,12 +23,7 @@ impl ViewFactory {
     pub fn new(config: &Config) -> Self {
         let engine = if config.view.engine == "tera" {
             let glob_pattern = "resources/views/**/*.html";
-            let mut tera = if let Ok(t) = Tera::parse(glob_pattern) {
-                t
-            } else {
-                Tera::default()
-            };
-
+            let tera = Tera::parse(glob_pattern).unwrap_or_default();
 
             ViewEngine::Tera(Box::new(tera))
         } else {
@@ -53,23 +48,22 @@ impl ViewFactory {
                 // Tera loads templates from resources/views/, so we read
                 // from the same base path.
                 let template_path = std::path::Path::new("resources/views").join(template);
-                let raw = std::fs::read_to_string(&template_path).map_err(|e| {
-                    ViewError::Render {
+                let raw =
+                    std::fs::read_to_string(&template_path).map_err(|e| ViewError::Render {
                         template: template.to_string(),
                         source: Box::new(e),
-                    }
-                })?;
+                    })?;
 
                 // 2) Compile Blade directives → Tera syntax
                 let compiled = blade::compile(&raw);
 
                 // 3) Render the pre-processed template string via render_str
-                let rendered = tera
-                    .render_str(&compiled, &context)
-                    .map_err(|e| ViewError::Render {
-                        template: template.to_string(),
-                        source: Box::new(e),
-                    })?;
+                let rendered =
+                    tera.render_str(&compiled, &context)
+                        .map_err(|e| ViewError::Render {
+                            template: template.to_string(),
+                            source: Box::new(e),
+                        })?;
 
                 Ok(rendered)
             }
@@ -85,8 +79,6 @@ impl ViewFactory {
         self.render(template, data).await.map(Html)
     }
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -128,6 +120,4 @@ mod tests {
         // test just verify the factory constructs without panic.
         let _ = factory;
     }
-
-
 }

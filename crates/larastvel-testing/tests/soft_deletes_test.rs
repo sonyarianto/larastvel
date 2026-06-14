@@ -7,9 +7,7 @@
 use larastvel_core::models::{DbModel, SoftDeletes};
 use larastvel_core::sea_orm;
 use larastvel_core::sea_orm::entity::prelude::*;
-use larastvel_core::sea_orm::{
-    ActiveModelTrait, Condition, EntityTrait, QueryFilter, Set,
-};
+use larastvel_core::sea_orm::{ActiveModelTrait, Condition, EntityTrait, QueryFilter, Set};
 use larastvel_core::sea_orm_migration;
 use larastvel_core::sea_orm_migration::MigratorTrait;
 
@@ -136,8 +134,7 @@ impl DbModel for Post {
 
 impl SoftDeletes for Post {
     fn only_trashed() -> sea_orm::Select<post::Entity> {
-        <post::Entity as EntityTrait>::find()
-            .filter(post::Column::DeletedAt.is_not_null())
+        <post::Entity as EntityTrait>::find().filter(post::Column::DeletedAt.is_not_null())
     }
 
     fn trashed(model: &post::Model) -> bool {
@@ -156,9 +153,7 @@ async fn test_soft_deletes_with_global_scope() {
         .await
         .expect("Failed to connect to in-memory SQLite");
 
-    TestMigrator::up(&db, None)
-        .await
-        .expect("Migration failed");
+    TestMigrator::up(&db, None).await.expect("Migration failed");
 
     // Seed: 2 active + 2 soft-deleted posts
     use chrono::Utc;
@@ -225,9 +220,7 @@ async fn test_soft_deletes_with_global_scope() {
     assert!(found_active.deleted_at.is_none());
 
     // find() a soft-deleted post should return None
-    let found_trashed = Post::find(all[2].id)
-        .await
-        .expect("find() failed");
+    let found_trashed = Post::find(all[2].id).await.expect("find() failed");
     assert!(
         found_trashed.is_none(),
         "Soft-deleted post should not be found via find() with global scope"
@@ -238,7 +231,11 @@ async fn test_soft_deletes_with_global_scope() {
         .all(Post::db())
         .await
         .expect("with_trashed() failed");
-    assert_eq!(with_trashed.len(), 4, "Expected all 4 posts from with_trashed()");
+    assert_eq!(
+        with_trashed.len(),
+        4,
+        "Expected all 4 posts from with_trashed()"
+    );
 
     // ---- test only_trashed() returns only soft-deleted ----
     let only_trashed = Post::only_trashed()
@@ -279,9 +276,7 @@ async fn test_soft_deletes_with_global_scope() {
 
     // ---- test force_delete() ----
     let am: post::ActiveModel = all[0].clone().into();
-    Post::force_delete(am)
-        .await
-        .expect("force_delete() failed");
+    Post::force_delete(am).await.expect("force_delete() failed");
 
     // Force-deleted post is permanently gone; soft-deleted post still exists.
     // Remaining: active2 (soft-deleted) + 2 originally trashed = 3 posts total.
@@ -302,5 +297,9 @@ async fn test_soft_deletes_with_global_scope() {
 
     // all() excludes everything since all remaining records are soft-deleted
     let none_active = Post::all().await.expect("all() after force_delete failed");
-    assert_eq!(none_active.len(), 0, "Expected 0 active posts after all deletions");
+    assert_eq!(
+        none_active.len(),
+        0,
+        "Expected 0 active posts after all deletions"
+    );
 }

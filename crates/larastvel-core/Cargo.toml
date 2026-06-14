@@ -47,6 +47,8 @@ hmac.workspace = true
 sha2.workspace = true
 md-5.workspace = true
 lettre.workspace = true
+futures-util = "0.3"
 
 [dev-dependencies]
 tower.workspace = true
+serial_test = "3"

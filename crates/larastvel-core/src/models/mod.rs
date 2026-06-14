@@ -1,9 +1,11 @@
+pub mod factory;
+pub mod serialization;
+
 use std::sync::OnceLock;
 
 use sea_orm::{
-    ActiveModelTrait, Condition, DatabaseConnection, DeleteResult, EntityTrait,
-    IntoActiveModel, LoaderTrait, ModelTrait, PrimaryKeyTrait, QueryFilter,
-    Related,
+    ActiveModelTrait, Condition, DatabaseConnection, DeleteResult, EntityTrait, IntoActiveModel,
+    LoaderTrait, ModelTrait, PrimaryKeyTrait, QueryFilter, Related,
 };
 
 static GLOBAL_DB: OnceLock<DatabaseConnection> = OnceLock::new();
@@ -405,9 +407,9 @@ pub trait Timestamps: DbModel {
 #[cfg(test)]
 mod tests {
     use super::{DbModel, SoftDeletes, Timestamps};
-    use sea_orm::IntoActiveModel;
     use sea_orm::entity::prelude::*;
     use sea_orm::Condition;
+    use sea_orm::IntoActiveModel;
 
     mod category {
         use sea_orm::entity::prelude::*;
@@ -465,8 +467,7 @@ mod tests {
 
     impl SoftDeletes for Post {
         fn only_trashed() -> sea_orm::Select<post::Entity> {
-            <post::Entity as EntityTrait>::find()
-                .filter(post::Column::DeletedAt.is_not_null())
+            <post::Entity as EntityTrait>::find().filter(post::Column::DeletedAt.is_not_null())
         }
 
         fn trashed(model: &post::Model) -> bool {
