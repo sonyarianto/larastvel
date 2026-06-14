@@ -139,12 +139,13 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | `config/*.php` (10 files) | `config.toml` (single file) | ⚠️ Partial |
 | `.env` | `.env` | ✅ |
 | `bootstrap/app.php` | `foundation::Application` | ⚠️ Partial |
-| `app/Providers/*` | `EventServiceProvider` / `RouteServiceProvider` / `ServiceProvider` trait | ⚠️ Partial |
+| `app/Providers/*` | `EventServiceProvider` / `RouteServiceProvider` / `ServiceProvider` trait / `DeferrableProvider` trait / deferred registration & boot | ✅ |
 | `artisan` CLI (25+ commands) | `larastvel-cli` (serve, route:list, key:generate, migrate*, db:seed, storage:link, notifications:table, queue:work, config:cache/clear, route:cache/clear, schedule:list/run, version, new, make:*) | ✅ |
 | `make:*` (model, controller, migration, seeder, policy, test, job, event, notification, rule, command) | `larastvel make:*` — 12 generators | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | `app/Models/User.php` | `src/models/user.rs` | ✅ |
-| Eloquent ORM | `DbModel` trait + SeaORM | ⚠️ Partial |
+| Eloquent ORM | `DbModel` trait + SeaORM / `SerializesToArray` (toArray/toJson/hidden/appends) / `ApiResource` trait / `JsonResource` / `ResourceCollection` | ✅ |
+| Model Factories (Faker) | `ModelFactory` trait / `factory_create()` / `factory_create_count()` / `Faker` (name/email/sentence/etc.) | ✅ |
 | Blade templating | Tera + Blade directive compiler (@auth/@csrf/@error/@guest/@method) | ✅ |
 | Migrations (`database/migrations/`) | `src/database/migrations/` + Migrator | ✅ |
 | `php artisan migrate` | `larastvel migrate` | ✅ |
@@ -162,7 +163,7 @@ A fresh Laravel 13 installation lives at [`../laravel-skeleton/`](../laravel-ske
 | Pagination | `Paginator<T>` / `PaginationParams` extractor / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / `rate_limit_middleware` / token bucket | ✅ |
 | Encryption / Hashing | `hash::make()` / `hash::check()` / `Encrypter` | ✅ |
-| Broadcasting | `BroadcastManager` / `PusherBroadcaster` / `LogBroadcaster` / `AblyBroadcaster` / `Channel` (public/private/presence) / `BroadcastEvent` trait | ✅ |
+| Broadcasting | `BroadcastManager` / `PusherBroadcaster` / `LogBroadcaster` / `AblyBroadcaster` / `NativeBroadcaster` (self-hosted WebSocket) / `SubscriberRegistry` / `ws_handler` / `Channel` (public/private/presence) / `BroadcastEvent` trait | ✅ |
 | Cache (config/cache.php) | `CacheManager` / `ArrayStore` / `FileStore` / `DatabaseStore` / `CacheStore` trait / `CacheItem` with TTL / `remember()` / `many()` / increment/decrement | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / `set_locale()` / JSON files | ✅ |
 | Testing (PHPUnit) | `TestClient` / `TestResponse` / `RefreshDatabase` / PHPUnit-like assertions | ✅ |
