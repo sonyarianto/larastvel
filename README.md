@@ -170,7 +170,7 @@ Run any example: `cargo run --example <name>`
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                     Application                        │
+│                     Application                      │
 │  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  │
 │  │  Config  │  │    DB    │  │  Service Container │  │
 │  │  (TOML)  │  │ (SeaORM) │  │  (TypeId-based)    │  │
