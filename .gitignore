@@ -11,3 +11,4 @@ storage/logs/*.log
 website/node_modules/
 website/.vitepress/dist/
 website/.vitepress/cache/
+website/.vercel/
