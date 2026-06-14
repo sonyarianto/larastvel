@@ -52,6 +52,7 @@ struct AppInner {
     deferred_providers_by_name: HashMap<String, Arc<dyn ServiceProvider>>,
     router: Arc<Mutex<AxumRouter>>,
     routes: Arc<Mutex<Vec<RouteDefinition>>>,
+    layers: Vec<Box<dyn FnOnce(AxumRouter) -> AxumRouter + Send>>,
 }
 
 impl Application {
@@ -72,6 +73,7 @@ impl Application {
             deferred_providers_by_name: HashMap::new(),
             router: Arc::new(Mutex::new(AxumRouter::new())),
             routes: Arc::new(Mutex::new(vec![])),
+            layers: Vec::new(),
         }));
 
         Self { inner }
@@ -260,6 +262,21 @@ impl Application {
         self.inner.lock().unwrap().deferred_providers.len()
     }
 
+    /// Add a Tower layer or Axum extension to the final router.
+    ///
+    /// The closure receives the fully-built `Router` (after all routes and
+    /// the `/health` endpoint are registered) and must return a router.
+    ///
+    /// This is used to add middleware, CORS, compression, or Axum
+    /// `Extension<T>` state to the application:
+    ///
+    /// ```rust,ignore
+    /// app.with_layer(|router| router.layer(Extension(my_state)));
+    /// ```
+    pub fn with_layer(&self, f: impl FnOnce(AxumRouter) -> AxumRouter + Send + 'static) {
+        self.inner.lock().unwrap().layers.push(Box::new(f));
+    }
+
     pub async fn run(self) {
         self.boot();
 
@@ -267,6 +284,13 @@ impl Application {
             let inner = self.inner.lock().unwrap();
             let registrar = Registrar::new(inner.router.clone(), inner.routes.clone());
             registrar.build()
+        };
+
+        // Apply user-registered layers/extensions to the final router.
+        let router = {
+            let mut inner = self.inner.lock().unwrap();
+            let layers = std::mem::take(&mut inner.layers);
+            layers.into_iter().fold(router, |r, layer| layer(r))
         };
 
         let addr = self

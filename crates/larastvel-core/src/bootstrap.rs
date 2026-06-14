@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use axum::Router as AxumRouter;
+
 use crate::console::ConsoleKernel;
 use crate::database::DatabaseManager;
 use crate::foundation::Application;
@@ -41,6 +43,7 @@ pub struct App {
     routing: Option<Box<dyn FnOnce(&Registrar) + Send>>,
     providers: Option<Box<dyn FnOnce(&Application) + Send>>,
     console_commands: Option<Box<dyn FnOnce(&ConsoleKernel) + Send>>,
+    layers: Vec<Box<dyn FnOnce(AxumRouter) -> AxumRouter + Send>>,
 }
 
 impl App {
@@ -53,6 +56,7 @@ impl App {
             routing: None,
             providers: None,
             console_commands: None,
+            layers: Vec::new(),
         }
     }
 
@@ -105,6 +109,25 @@ impl App {
         self
     }
 
+    /// Add a Tower layer or Axum extension to the final application router.
+    ///
+    /// The closure receives the fully-built `Router` after all routes are
+    /// registered and must return a router. Multiple calls accumulate.
+    ///
+    /// ```rust,ignore
+    /// use larastvel_core::axum::Extension;
+    ///
+    /// App::configure(None)
+    ///     .with_routing(|r| { /* routes */ })
+    ///     .with_layer(|router| router.layer(Extension(my_state)))
+    ///     .run()
+    ///     .await;
+    /// ```
+    pub fn with_layer(mut self, f: impl FnOnce(AxumRouter) -> AxumRouter + Send + 'static) -> Self {
+        self.layers.push(Box::new(f));
+        self
+    }
+
     /// Build and run the application, consuming the builder.
     pub async fn run(self) {
         let app = Application::new(self.base_path.clone());
@@ -137,6 +160,11 @@ impl App {
         if let Some(f) = self.routing {
             let registrar = app.router();
             f(&registrar);
+        }
+
+        // Apply user-registered layers/extensions
+        for layer in self.layers {
+            app.with_layer(layer);
         }
 
         app.run().await;
