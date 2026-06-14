@@ -86,7 +86,7 @@ cargo run -p larastvel-cli -- route:list
 ## Features
 
 | Area | Capabilities |
-|---|---|---|
+|---|---|
 | **Auth** | JWT tokens, `AuthenticatedUser` extractor, auth middleware, password reset, email verification |
 | **Authorization** | Gates, policies, before/after hooks, `authorize()` / `require_ability` |
 | **Broadcasting** | Pusher, Ably, Log, Native (self-hosted WebSocket) broadcast drivers |
