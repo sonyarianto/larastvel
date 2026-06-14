@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use axum::{
-    http::{header::SET_COOKIE, HeaderValue},
-};
+use axum::http::{header::SET_COOKIE, HeaderValue};
 use tower::Layer;
 
 use super::{Session, SessionHandle};
@@ -94,7 +92,12 @@ pub struct SessionService<S> {
 
 impl<S, ReqBody, ResBody> tower::Service<axum::extract::Request<ReqBody>> for SessionService<S>
 where
-    S: tower::Service<axum::extract::Request<ReqBody>, Response = axum::response::Response<ResBody>>,
+    S: tower::Service<
+            axum::extract::Request<ReqBody>,
+            Response = axum::response::Response<ResBody>,
+        > + Clone
+        + Send
+        + 'static,
     S::Future: Send + 'static,
     S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     ReqBody: Send + 'static,
@@ -102,14 +105,19 @@ where
 {
     type Response = axum::response::Response<ResBody>;
     type Error = S::Error;
-    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&self, request: axum::extract::Request<ReqBody>) -> Self::Future {
-        let inner = self.inner.clone();
+    fn call(&mut self, mut request: axum::extract::Request<ReqBody>) -> Self::Future {
+        let mut inner = self.inner.clone();
         let config = self.config.clone();
         let encrypter = self.encrypter.clone();
 
@@ -117,10 +125,9 @@ where
             let session = load_session_from_request(&request, &config, encrypter.as_deref());
             let handle = SessionHandle::new(session);
 
-            let mut request = request;
             request.extensions_mut().insert(handle.clone());
 
-            let mut response: axum::response::Response<ResBody> = inner.call(request).await.map_err(Into::into)?;
+            let mut response: axum::response::Response<ResBody> = inner.call(request).await?;
 
             save_session_to_response(&handle, &mut response, &config, encrypter.as_deref());
 
@@ -201,7 +208,7 @@ fn save_session_to_response<ResBody>(
             .as_ref()
             .map(|d| format!("; Domain={}", d))
             .unwrap_or_default(),
-        max_age = format!("; Max-Age={}", config.lifetime_minutes * 60),
+        max_age = format_args!("; Max-Age={}", config.lifetime_minutes * 60),
     );
 
     response

@@ -9,6 +9,8 @@ use axum::{
 use rand::RngCore;
 use serde_json::Value;
 
+pub mod middleware;
+
 #[derive(Debug, Clone)]
 pub struct Session {
     pub(crate) id: String,

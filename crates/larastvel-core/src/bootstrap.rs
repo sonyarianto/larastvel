@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
+use crate::console::ConsoleKernel;
 use crate::database::DatabaseManager;
 use crate::foundation::Application;
 use crate::logging;
 use crate::models;
-use crate::console::ConsoleKernel;
 use crate::routing::Registrar;
 
 /// Fluent application builder — the Rust equivalent of Laravel 11+'s
@@ -89,7 +89,10 @@ impl App {
     /// Register console commands via a closure that receives the [`ConsoleKernel`].
     ///
     /// Multiple calls accumulate; each closure is called during boot.
-    pub fn with_console_commands(mut self, f: impl FnOnce(&ConsoleKernel) + Send + 'static) -> Self {
+    pub fn with_console_commands(
+        mut self,
+        f: impl FnOnce(&ConsoleKernel) + Send + 'static,
+    ) -> Self {
         let prev = self.console_commands.take();
         self.console_commands = Some(if let Some(prev) = prev {
             Box::new(move |k| {
@@ -189,9 +192,13 @@ mod tests {
         let app = App::configure(None)
             .with_console_commands({
                 let c = counter.clone();
-                move |_k| { c.fetch_add(1, Ordering::SeqCst); }
+                move |_k| {
+                    c.fetch_add(1, Ordering::SeqCst);
+                }
             })
-            .with_console_commands(move |_k| { counter.fetch_add(1, Ordering::SeqCst); });
+            .with_console_commands(move |_k| {
+                counter.fetch_add(1, Ordering::SeqCst);
+            });
 
         assert!(app.console_commands.is_some());
     }
