@@ -1613,11 +1613,11 @@ dependencies = [
 
 [[package]]
 name = "larastvel-app"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "dotenvy",
- "larastvel-core",
+ "larastvel-core 0.2.0",
  "sea-orm-migration",
  "serde",
  "serde_json",
@@ -1628,11 +1628,11 @@ dependencies = [
 
 [[package]]
 name = "larastvel-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "colored",
- "larastvel-core",
+ "larastvel-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
  "tokio",
@@ -1642,7 +1642,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -1655,7 +1655,7 @@ dependencies = [
  "hex",
  "hmac",
  "jsonwebtoken",
- "larastvel-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "larastvel-macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lettre",
  "md-5",
  "once_cell",
@@ -1681,8 +1681,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "larastvel-core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2da43e590db67b6d659b439c9b701a141bd163553b91261ca6e5aad4e7aa01bd"
+dependencies = [
+ "aes-gcm",
+ "async-trait",
+ "axum",
+ "base64",
+ "bcrypt",
+ "chrono",
+ "clap",
+ "futures-util",
+ "hex",
+ "hmac",
+ "jsonwebtoken",
+ "larastvel-macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lettre",
+ "md-5",
+ "once_cell",
+ "rand 0.8.6",
+ "regex",
+ "reqwest",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sha2",
+ "sqlx",
+ "tera",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "larastvel-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1691,9 +1732,9 @@ dependencies = [
 
 [[package]]
 name = "larastvel-macros"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c02f13136fb18f1d8d7a424cbabb61343e213e66d550194d75b1637d4dde044"
+checksum = "f1f8898b1fbcd50b9e0a1ff6d90a2fa88c0ae18626edc11d914278bb993f14ea"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1702,7 +1743,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-new"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "clap",
  "colored",
@@ -1713,14 +1754,14 @@ dependencies = [
 
 [[package]]
 name = "larastvel-testing"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
  "base64",
  "bytes",
  "chrono",
- "larastvel-core",
+ "larastvel-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex",
  "sea-orm",
  "sea-orm-migration",
@@ -1733,10 +1774,10 @@ dependencies = [
 
 [[package]]
 name = "larastvel-tinker"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
- "larastvel-core",
+ "larastvel-core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustyline",
  "tokio",
 ]
