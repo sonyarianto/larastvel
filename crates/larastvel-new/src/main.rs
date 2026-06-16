@@ -80,7 +80,7 @@ fn create_project(path: &Path, name: &str, database: &str, with_vite: bool) {
     let cargo = format!(
         r#"[package]
 name = "{}"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
@@ -149,6 +149,7 @@ pub struct Model {
     pub name: String,
     pub email: String,
     pub password: String,
+    pub email_verified_at: Option<DateTime>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
@@ -287,6 +288,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Users::Name).string().not_null())
                     .col(ColumnDef::new(Users::Email).string().not_null())
                     .col(ColumnDef::new(Users::Password).string().not_null())
+                    .col(ColumnDef::new(Users::EmailVerifiedAt).date_time().null())
                     .col(ColumnDef::new(Users::CreatedAt).date_time().not_null())
                     .col(ColumnDef::new(Users::UpdatedAt).date_time().not_null())
                     .to_owned(),
@@ -308,6 +310,7 @@ enum Users {
     Name,
     Email,
     Password,
+    EmailVerifiedAt,
     CreatedAt,
     UpdatedAt,
 }

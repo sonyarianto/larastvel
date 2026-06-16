@@ -28,7 +28,7 @@ pub fn web(router: &Registrar) {
         <div class="info">
             <div class="card">
                 <h3>Version</h3>
-                <span>0.1.0</span>
+                <span>0.2.0</span>
             </div>
             <div class="card">
                 <h3>Runtime</h3>

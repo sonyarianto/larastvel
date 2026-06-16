@@ -1,6 +1,3 @@
-#[allow(unused_imports)]
-use std::path::PathBuf;
-
 use clap::Parser;
 use colored::*;
 

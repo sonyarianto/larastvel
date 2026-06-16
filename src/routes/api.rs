@@ -6,7 +6,7 @@ pub fn api(router: &Registrar) {
             axum::response::Json(serde_json::json!({
                 "status": "ok",
                 "framework": "Larastvel",
-                "version": "0.1.0",
+                "version": "0.2.0",
             }))
         });
     });

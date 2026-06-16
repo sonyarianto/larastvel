@@ -56,11 +56,11 @@ async fn main() {{
     let cargo_toml = format!(
         r#"[package]
 name = "{name}"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-larastvel-core = "0.1"
+larastvel-core = "0.2"
 tokio = {{ version = "1", features = ["full"] }}
 serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
@@ -249,6 +249,7 @@ pub struct Model {
     pub name: String,
     pub email: String,
     pub password: String,
+    pub email_verified_at: Option<DateTime>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
