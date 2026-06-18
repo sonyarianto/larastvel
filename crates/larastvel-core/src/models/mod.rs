@@ -487,8 +487,8 @@ mod tests {
 
     #[test]
     fn test_find_accepts_primary_key() {
-        let _ = Category::find(42);
-        let _ = Post::find(1);
+        drop(Category::find(42));
+        drop(Post::find(1));
     }
 
     #[test]
@@ -610,10 +610,7 @@ mod tests {
     #[test]
     fn test_soft_deletes_impl_requires_only_trashed_and_trashed() {
         // Verify Post implements both required methods
-        fn _check_required_methods<T>()
-        where
-            T: SoftDeletes,
-        {
+        fn _check_required_methods<T: SoftDeletes>() {
             // only_trashed() must exist
             fn _has_only_trashed<U: SoftDeletes>() {
                 let _ = U::only_trashed();
@@ -622,6 +619,7 @@ mod tests {
             fn _has_trashed<U: SoftDeletes>(model: &<U::Entity as EntityTrait>::Model) -> bool {
                 U::trashed(model)
             }
+            let _ = std::marker::PhantomData::<T>;
         }
         _check_required_methods::<Post>();
     }

@@ -194,7 +194,7 @@ async fn test_soft_deletes_with_global_scope() {
     .await
     .expect("Insert trashed2 failed");
 
-    let all = vec![active1, active2, trashed1, trashed2];
+    let all = [active1, active2, trashed1, trashed2];
 
     // Set the global DB connection so DbModel::db() works
     larastvel_core::models::set_global_database(db)

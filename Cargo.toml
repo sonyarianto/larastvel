@@ -54,7 +54,7 @@ toml = "1.1"
 tera = "1"
 hyper = "1"
 colored = "3"
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "form", "query", "rustls"] }
 bcrypt = "0.16"
 aes-gcm = "0.10"
 base64 = "0.22"

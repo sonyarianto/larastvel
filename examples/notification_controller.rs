@@ -208,7 +208,7 @@ impl NotificationController {
                         </td>
                     </tr>"#,
                     n.id.chars().take(8).collect::<String>() + "…",
-                    html_escape(&title),
+                    html_escape(title),
                     read_badge,
                     format_timestamp(n.created_at),
                 )

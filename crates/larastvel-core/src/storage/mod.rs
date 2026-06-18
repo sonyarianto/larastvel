@@ -550,10 +550,10 @@ mod tests {
         manager.register("local", disk);
 
         let retrieved = manager.disk("local").unwrap();
-        assert!(retrieved.exists("nonexistent").await == false);
+        assert!(!retrieved.exists("nonexistent").await);
 
         let default = manager.default_disk().unwrap();
-        assert!(default.exists("nonexistent").await == false);
+        assert!(!default.exists("nonexistent").await);
     }
 
     #[tokio::test]

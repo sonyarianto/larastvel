@@ -326,7 +326,7 @@ impl Config {
                 .into_iter()
                 .flatten()
                 .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().map_or(false, |ext| ext == "toml"))
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "toml"))
                 .collect();
             entries.sort_by_key(|e| e.file_name());
 

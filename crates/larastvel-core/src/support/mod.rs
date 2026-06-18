@@ -1,7 +1,11 @@
+pub mod collection;
 pub mod helpers;
+pub mod http_client;
 pub mod vite;
 
+pub use collection::{collect as collect_items, Collection};
 pub use helpers::*;
+pub use http_client::{Http, PendingRequest, Response};
 pub use vite::Vite;
 
 use std::path::PathBuf;

@@ -59,9 +59,11 @@ export default defineConfig({
           text: 'Digging Deeper',
           items: [
             { text: 'Caching', link: '/guide/caching' },
+            { text: 'Collections', link: '/guide/collections' },
             { text: 'Events', link: '/guide/events' },
             { text: 'Broadcasting', link: '/guide/broadcasting' },
             { text: 'File Storage', link: '/guide/filesystem' },
+            { text: 'HTTP Client', link: '/guide/http-client' },
             { text: 'Localization', link: '/guide/localization' },
             { text: 'Mail', link: '/guide/mail' },
             { text: 'Notifications', link: '/guide/notifications' },

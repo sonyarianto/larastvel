@@ -67,6 +67,12 @@ pub struct SmsStore {
     next_id: u64,
 }
 
+impl Default for SmsStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SmsStore {
     pub fn new() -> Self {
         Self {

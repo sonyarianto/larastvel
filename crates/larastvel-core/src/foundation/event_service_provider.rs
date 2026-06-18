@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_event_service_provider_default() {
-        let _provider = EventServiceProvider::default();
+        let _ = EventServiceProvider;
         // No-op: just shouldn't panic
     }
 
