@@ -272,7 +272,9 @@ pub trait ResourceController: Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{controller, Resource};
+    use crate::{controller, route, Resource};
+    #[allow(unused_imports)]
+    use crate::{delete, get, patch, post, put, ws};
     use axum::body::Body;
     use axum::http::Request;
     use axum::response::Response;
@@ -914,5 +916,133 @@ mod tests {
         MyController::register_routes(&registrar);
         // No routes registered (it's empty by default from the macro)
         assert!(registrar.list_routes().is_empty());
+    }
+
+    // --- #[route] attribute macro tests ---
+
+    struct RoutedController;
+
+    #[route]
+    impl RoutedController {
+        #[get("/items")]
+        async fn index() -> &'static str {
+            "index"
+        }
+
+        #[post("/items")]
+        async fn store() -> &'static str {
+            "created"
+        }
+
+        #[put("/items/{id}")]
+        async fn update() -> &'static str {
+            "updated"
+        }
+
+        #[delete("/items/{id}")]
+        async fn destroy() -> &'static str {
+            "deleted"
+        }
+
+        // A method without a route attribute — should be ignored
+        #[allow(dead_code)]
+        async fn internal() -> &'static str {
+            "internal"
+        }
+    }
+
+    #[tokio::test]
+    async fn test_route_macro_registers_routes() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        RoutedController::register_routes(&registrar);
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 4);
+
+        let methods: Vec<_> = listed.iter().map(|r| r.method.as_str()).collect();
+        assert!(methods.contains(&"GET"));
+        assert!(methods.contains(&"POST"));
+        assert!(methods.contains(&"PUT"));
+        assert!(methods.contains(&"DELETE"));
+
+        let uris: Vec<_> = listed.iter().map(|r| r.uri.as_str()).collect();
+        assert!(uris.contains(&"/items"));
+        assert!(uris.contains(&"/items/{id}"));
+    }
+
+    #[tokio::test]
+    async fn test_route_macro_http_methods() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        RoutedController::register_routes(&registrar);
+        let app = registrar.build();
+
+        // GET /items
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/items")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // POST /items
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/items")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // PUT /items/42
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/items/42")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+
+        // DELETE /items/42
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/items/42")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_route_macro_skips_unmarked_methods() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        RoutedController::register_routes(&registrar);
+        let listed = registrar.list_routes();
+        assert!(!listed.iter().any(|r| r.handler_name.contains("internal")));
     }
 }

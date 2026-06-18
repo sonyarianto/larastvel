@@ -29,7 +29,7 @@ toml.workspace = true
 tera.workspace = true
 
 reqwest.workspace = true
-larastvel-macros = "0.2"
+larastvel-macros = { path = "../larastvel-macros", version = "0.2" }
 async-trait = "0.1"
 
 bcrypt.workspace = true
