@@ -70,6 +70,7 @@ export default defineConfig({
             { text: 'Notifications', link: '/guide/notifications' },
             { text: 'Queues', link: '/guide/queues' },
             { text: 'Rate Limiting', link: '/guide/rate-limiting' },
+            { text: 'Str', link: '/guide/str' },
             { text: 'Task Scheduling', link: '/guide/scheduling' },
             { text: 'SMS', link: '/guide/sms' },
           ],
