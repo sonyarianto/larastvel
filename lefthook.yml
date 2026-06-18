@@ -3,7 +3,7 @@ pre-commit:
   commands:
     fmt:
       glob: "*.rs"
-      run: cargo fmt --check
+      run: cargo fmt
       stage_fixed: true
     clippy:
       glob: "*.rs"
