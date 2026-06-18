@@ -680,6 +680,54 @@ pub struct {name} {{
     );
 }
 
+pub fn make_scope(name: &str) {
+    let snake_name = to_snake_case(name);
+    let pascal_name = to_pascal_case(name);
+
+    let scope_content = format!(
+        r#"use larastvel_core::scope;
+use sea_orm::entity::prelude::Select;
+
+impl {model} {{
+    /// Apply query scope `{snake}`.
+    #[scope]
+    fn scope_{snake}(query: Select<{model}Entity>, /* TODO: Add filter params */) -> Select<{model}Entity> {{
+        // TODO: Scope logic — call query.filter(...) etc.
+        query
+    }}
+}}
+"#,
+        model = pascal_name,
+        snake = snake_name,
+    );
+
+    println!(
+        "{}",
+        format!("✓ Scope [{snake_name}] generated for model [{pascal_name}].")
+            .green()
+            .bold()
+    );
+    println!(
+        "{}",
+        "  Add this code to your model file or a separate scopes module.".dimmed()
+    );
+    println!("{}", "-".repeat(60));
+    print!("{}", scope_content);
+    println!("{}", "-".repeat(60));
+}
+
+fn to_pascal_case(s: &str) -> String {
+    s.split('_')
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().to_string() + c.as_str(),
+            }
+        })
+        .collect()
+}
+
 pub fn make_controller(name: &str) {
     let controllers_dir = std::path::Path::new("src/controllers");
     std::fs::create_dir_all(controllers_dir).unwrap();

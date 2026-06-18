@@ -903,6 +903,97 @@ pub fn table(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 // ---------------------------------------------------------------------------
+// Attribute: #[scope]
+//
+// Converts a query-scope function into a static method on a DbModel wrapper
+// struct (designed for use inside an `impl Model` block).
+//
+// The first parameter (the SeaORM Select builder) is removed from the
+// public signature; the generated method internally calls `Self::query()`
+// and passes it as that parameter.
+//
+// The function name may optionally start with `scope_` — the prefix is
+// stripped for the public name (matching Laravel conventions).
+//
+// Usage:
+//   impl User {
+//       #[scope]
+//       fn popular(query: Select<Entity>, min_likes: i64) -> Select<Entity> {
+//           query.filter(Column::Likes.gte(min_likes))
+//       }
+//   }
+//
+// Expands to:
+//   impl User {
+//       pub fn popular(min_likes: i64) -> Select<Entity> {
+//           let query = Self::query();
+//           query.filter(Column::Likes.gte(min_likes))
+//       }
+//   }
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn scope(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let func = parse_macro_input!(item as syn::ItemFn);
+
+    // Reject methods that take self.
+    for arg in &func.sig.inputs {
+        if matches!(arg, syn::FnArg::Receiver(_)) {
+            return syn::Error::new(
+                func.sig.span(),
+                "#[scope] cannot be used on methods with `self`",
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
+
+    // Require at least one parameter (the query).
+    if func.sig.inputs.is_empty() {
+        return syn::Error::new(
+            func.sig.span(),
+            "#[scope] requires at least one parameter (the SeaORM query)",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    let fn_name = &func.sig.ident;
+    let name_str = fn_name.to_string();
+
+    // Strip optional "scope_" prefix (Laravel convention).
+    let public_name_str = name_str.strip_prefix("scope_").unwrap_or(&name_str);
+    let public_name = syn::Ident::new(public_name_str, fn_name.span());
+
+    let vis = &func.vis;
+    let output_ty = &func.sig.output;
+
+    // Name of the first parameter (the query builder).
+    let first_pat = match func.sig.inputs.first().unwrap() {
+        syn::FnArg::Typed(pat_type) => pat_type.pat.as_ref().clone(),
+        _ => unreachable!(),
+    };
+
+    // Remaining params (everything after the query).
+    let remaining: Vec<_> = func.sig.inputs.iter().skip(1).cloned().collect();
+
+    // Prepend `let <query> = Self::query();` to the function body.
+    let mut stmts = func.block.stmts;
+    let query_stmt: syn::Stmt = syn::parse_quote! {
+        let #first_pat = Self::query();
+    };
+    stmts.insert(0, query_stmt);
+
+    let expanded = quote! {
+        #vis fn #public_name(#(#remaining),*) #output_ty {
+            #(#stmts)*
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
 // Attribute: #[route]  (on impl blocks)
 //
 // Scans method-level #[get("…")], #[post("…")] etc. markers and generates

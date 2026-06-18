@@ -43,6 +43,48 @@ User::update(1, update_data).await?;
 User::delete(1).await?;
 ```
 
+## Query Scopes
+
+Use the `#[scope]` macro to define reusable query constraints on your models. The scope function receives a `Select<Entity>` as its first parameter (removed from the public API) and returns a modified query:
+
+```rust
+use larastvel_core::scope;
+
+impl User {
+    /// Find users with at least N followers.
+    #[scope]
+    fn popular(query: Select<Entity>, min_followers: i64) -> Select<Entity> {
+        query.filter(Column::Followers.gte(min_followers))
+    }
+}
+```
+
+The generated method chains onto `Self::query()` automatically:
+
+```rust
+let users = User::popular(100).all().await?;
+```
+
+Laravel's `scope_` prefix convention is supported — `scope_popular` becomes `popular()`:
+
+```rust
+impl User {
+    #[scope]
+    fn scope_recent(query: Select<Entity>, days: i64) -> Select<Entity> {
+        query.filter(Column::CreatedAt.gte(chrono::Utc::now().naive_utc() - chrono::Duration::days(days)))
+    }
+}
+
+// Call without the scope_ prefix:
+let users = User::recent(7).all().await?;
+```
+
+Generate a scaffolded scope with:
+
+```bash
+larastvel make:scope popular
+```
+
 ## Migrations
 
 Generate and run migrations via CLI:

@@ -143,6 +143,9 @@ async fn main() {
             Some(MakeTarget::Mail { name }) => {
                 make_mail(&name);
             }
+            Some(MakeTarget::Scope { name }) => {
+                make_scope(&name);
+            }
             Some(MakeTarget::Factory { name }) => {
                 make_factory(&name);
             }
@@ -157,6 +160,7 @@ async fn main() {
                 println!("  make:job         Create a new job");
                 println!("  make:event       Create a new event");
                 println!("  make:listener    Create a new event listener");
+                println!("  make:scope       Create a new query scope");
                 println!("  make:notification Create a new notification");
                 println!("  make:rule        Create a new validation rule");
                 println!("  make:command     Create a new console command");
@@ -185,6 +189,7 @@ async fn main() {
             println!("  make:job         Create a new job");
             println!("  make:event       Create a new event");
             println!("  make:listener    Create a new event listener");
+            println!("  make:scope       Create a new query scope");
             println!("  make:notification Create a new notification");
             println!("  make:rule        Create a new validation rule");
             println!("  make:command     Create a new console command");

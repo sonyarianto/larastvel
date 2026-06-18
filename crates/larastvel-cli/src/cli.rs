@@ -134,4 +134,6 @@ pub enum MakeTarget {
     Factory { name: String },
     /// Create a new mail class
     Mail { name: String },
+    /// Create a new query scope
+    Scope { name: String },
 }

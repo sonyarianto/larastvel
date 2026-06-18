@@ -762,4 +762,51 @@ mod tests {
             _ => panic!("expected Id"),
         }
     }
+
+    // --- #[scope] macro tests ---
+
+    mod scope_test {
+        use super::*;
+        use crate::scope;
+
+        #[table("articles")]
+        pub struct Article {
+            #[sea_orm(primary_key)]
+            pub id: i32,
+            pub title: String,
+            pub likes: i64,
+        }
+
+        impl Article {
+            #[scope]
+            fn popular(query: Select<Entity>, min_likes: i64) -> Select<Entity> {
+                query.filter(Column::Likes.gte(min_likes))
+            }
+
+            #[scope]
+            fn trending(query: Select<Entity>, min_likes: i64) -> Select<Entity> {
+                query.filter(Column::Likes.gte(min_likes))
+            }
+
+            #[scope]
+            fn scope_top_rated(query: Select<Entity>, min_likes: i64) -> Select<Entity> {
+                query.filter(Column::Likes.gte(min_likes))
+            }
+        }
+
+        #[test]
+        fn test_scope_macro_generates_method() {
+            let _query = Article::popular(100);
+        }
+
+        #[test]
+        fn test_scope_macro_without_scope_prefix() {
+            let _query = Article::trending(500);
+        }
+
+        #[test]
+        fn test_scope_macro_strips_scope_prefix() {
+            let _query = Article::top_rated(1000);
+        }
+    }
 }
