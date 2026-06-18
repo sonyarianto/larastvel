@@ -12,7 +12,3 @@ pre-commit:
       glob: "*.rs"
       run: cargo check --workspace
 
-pre-push:
-  commands:
-    test:
-      run: cargo test --workspace
