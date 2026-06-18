@@ -14,17 +14,20 @@ Larastvel's notification system supports multiple delivery channels.
 
 ## Defining Notifications
 
-```rust
-use larastvel_core::notifications::{
-    Notification, NotificationChannel, NotificationSender,
-};
+Use the `#[notification]` attribute macro on your struct's `impl` block:
 
-#[derive(Debug, Clone)]
+```rust
+use larastvel_core::notifications::{NotificationChannel, NotificationSender};
+use larastvel_core::mail::Mailable;
+use larastvel_core::notification;
+
+#[derive(Debug)]
 struct OrderShipped {
     order_id: String,
 }
 
-impl Notification for OrderShipped {
+#[notification]
+impl OrderShipped {
     fn via(&self) -> Vec<NotificationChannel> {
         vec![NotificationChannel::Mail, NotificationChannel::Broadcast]
     }
@@ -45,6 +48,10 @@ impl Notification for OrderShipped {
     }
 }
 ```
+
+The macro scans for `via`, `to_mail`, `to_broadcast`, `to_database`, `to_webhook`, and `to_sms` methods, then generates `impl Notification for OrderShipped` containing those methods. Only `via` is required — every `to_*` method has a default that returns `None`.
+
+You can define other helper methods alongside notification methods; they remain on the original `impl` block.
 
 ## Notifiable Trait
 

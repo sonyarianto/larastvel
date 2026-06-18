@@ -1116,6 +1116,76 @@ pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 // ---------------------------------------------------------------------------
+// Attribute: #[notification]
+//
+// Generates a Notification trait implementation from an impl block by
+// scanning for notification-specific methods (via, to_mail, to_broadcast,
+// to_database, to_webhook, to_sms).  Non-notification methods remain on
+// the original impl block.
+//
+// Usage:
+// ```rust,ignore
+// #[derive(Debug)]
+// struct InvoicePaid {
+//     invoice_id: i32,
+// }
+//
+// #[notification]
+// impl InvoicePaid {
+//     fn via(&self) -> Vec<NotificationChannel> {
+//         vec![NotificationChannel::Mail]
+//     }
+//
+//     fn to_mail(&self) -> Option<Mailable> {
+//         Some(Mailable::html(vec![], "Invoice Paid", "<p>...</p>"))
+//     }
+// }
+// ```
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn notification(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input: syn::ItemImpl = parse_macro_input!(item as syn::ItemImpl);
+    let struct_ty = &input.self_ty;
+    let generics = &input.generics;
+    let where_clause = &input.generics.where_clause;
+
+    let known_methods: [&str; 6] = [
+        "via",
+        "to_mail",
+        "to_broadcast",
+        "to_database",
+        "to_webhook",
+        "to_sms",
+    ];
+
+    let mut notification_impls = Vec::new();
+    let mut kept_items = Vec::new();
+
+    for item in input.items {
+        if let syn::ImplItem::Fn(method) = &item {
+            if known_methods.contains(&method.sig.ident.to_string().as_str()) {
+                notification_impls.push(item);
+                continue;
+            }
+        }
+        kept_items.push(item);
+    }
+
+    let expanded = quote! {
+        impl #generics #struct_ty #where_clause {
+            #(#kept_items)*
+        }
+
+        impl #generics larastvel_core::notifications::Notification for #struct_ty #where_clause {
+            #(#notification_impls)*
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
 // Attribute: #[observer(Model)]
 //
 // Generates Listener implementations for model lifecycle events based on

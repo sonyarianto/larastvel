@@ -65,8 +65,8 @@ pub use foundation::{
 pub use hash::{check as hash_check, is_hashed, make as hash_make, needs_rehash, HashError};
 pub use http::{Error as HttpError, JsonResponse, LarastvelResult, Request};
 pub use larastvel_macros::{
-    can, controller, delete, get, job, listener, middleware, observer, patch, post, put,
-    queued_listener, route, scope, table, validate, validated_query, ws, Resource,
+    can, controller, delete, get, job, listener, middleware, notification, observer, patch, post,
+    put, queued_listener, route, scope, table, validate, validated_query, ws, Resource,
 };
 pub use logging::init as logging_init;
 pub use middleware::presets::{

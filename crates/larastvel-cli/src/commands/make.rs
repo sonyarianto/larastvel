@@ -294,7 +294,8 @@ pub fn make_notification(name: &str) {
     };
 
     let notification_content = format!(
-        r#"use larastvel_core::mail::{{Mailable, Mailer}};
+        r#"use larastvel_core::notifications::NotificationChannel;
+use larastvel_core::mail::Mailable;
 
 /// Notification: {name}
 #[derive(Debug)]
@@ -302,17 +303,18 @@ pub struct {struct_name} {{
     // TODO: Add notification data fields
 }}
 
+#[notification]
 impl {struct_name} {{
-    pub async fn send(&self, mailer: &dyn Mailer, to: &str) -> Result<(), Box<dyn std::error::Error>> {{
-        let mailable = Mailable::html(
-            vec![to.to_string()],
-            "Notification: {name}",
-            "<h1>{name}</h1><p>Your notification content here.</p>",
-        )
-        .from("noreply@example.com");
+    fn via(&self) -> Vec<NotificationChannel> {{
+        vec![NotificationChannel::Mail]
+    }}
 
-        mailer.send(mailable).await?;
-        Ok(())
+    fn to_mail(&self) -> Option<Mailable> {{
+        Some(Mailable::html(
+            vec![],
+            "Notification: {name}",
+            "<p>Your notification content here.</p>",
+        ))
     }}
 }}
 "#,

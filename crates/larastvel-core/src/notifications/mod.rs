@@ -1180,4 +1180,122 @@ mod tests {
         // Default sender has no services configured, so results are errors.
         // The function exists for ergonomics when a default sender is appropriate.
     }
+
+    // -------------------------------------------------------------------------
+    // #[notification] macro tests
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_notification_macro_via_only() {
+        use crate::notification;
+        use crate::NotificationChannel;
+
+        #[derive(Debug)]
+        struct OrderShipped;
+
+        #[notification]
+        impl OrderShipped {
+            fn via(&self) -> Vec<NotificationChannel> {
+                vec![NotificationChannel::Mail]
+            }
+        }
+
+        let n = OrderShipped;
+        assert_eq!(n.via(), vec![NotificationChannel::Mail]);
+    }
+
+    #[test]
+    fn test_notification_macro_with_to_mail() {
+        use crate::mail::Mailable;
+        use crate::notification;
+        use crate::NotificationChannel;
+
+        #[derive(Debug)]
+        #[allow(dead_code)]
+        struct InvoicePaid {
+            invoice_id: i32,
+        }
+
+        #[notification]
+        impl InvoicePaid {
+            fn via(&self) -> Vec<NotificationChannel> {
+                vec![NotificationChannel::Mail]
+            }
+
+            fn to_mail(&self) -> Option<Mailable> {
+                Some(Mailable::html(vec![], "Invoice Paid", "<p>Thank you!</p>"))
+            }
+        }
+
+        let n = InvoicePaid { invoice_id: 42 };
+        assert_eq!(n.via(), vec![NotificationChannel::Mail]);
+        assert!(n.to_mail().is_some());
+    }
+
+    #[test]
+    fn test_notification_macro_preserves_own_methods() {
+        use crate::notification;
+        use crate::NotificationChannel;
+
+        #[derive(Debug)]
+        struct WelcomeEmail {
+            user_name: String,
+        }
+
+        #[notification]
+        impl WelcomeEmail {
+            fn via(&self) -> Vec<NotificationChannel> {
+                vec![NotificationChannel::Mail]
+            }
+
+            // Own method — not a notification method — stays on the impl
+            fn greeting(&self) -> String {
+                format!("Hello, {}!", self.user_name)
+            }
+        }
+
+        let n = WelcomeEmail {
+            user_name: "Alice".to_string(),
+        };
+        assert_eq!(n.greeting(), "Hello, Alice!");
+        assert_eq!(n.via(), vec![NotificationChannel::Mail]);
+    }
+
+    #[test]
+    fn test_notification_macro_multiple_channels() {
+        use crate::mail::Mailable;
+        use crate::notification;
+        use crate::sms::SmsMessage;
+        use crate::NotificationChannel;
+
+        #[derive(Debug)]
+        struct MultiChannel {
+            phone: String,
+        }
+
+        #[notification]
+        impl MultiChannel {
+            fn via(&self) -> Vec<NotificationChannel> {
+                vec![NotificationChannel::Mail, NotificationChannel::Sms]
+            }
+
+            fn to_mail(&self) -> Option<Mailable> {
+                Some(Mailable::html(vec![], "Alert", "<p>Urgent!</p>"))
+            }
+
+            fn to_sms(&self) -> Option<SmsMessage> {
+                Some(SmsMessage::new(&self.phone, "Urgent!"))
+            }
+        }
+
+        let n = MultiChannel {
+            phone: "+15551234567".to_string(),
+        };
+        assert_eq!(
+            n.via(),
+            vec![NotificationChannel::Mail, NotificationChannel::Sms]
+        );
+        assert!(n.to_mail().is_some());
+        assert!(n.to_sms().is_some());
+    }
 }
