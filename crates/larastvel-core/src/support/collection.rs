@@ -1,3 +1,22 @@
+//! # Collections
+//!
+//! A fluent, expressive wrapper around `Vec<T>` inspired by Laravel's
+//! `Illuminate\Support\Collection`. Provides methods for mapping, filtering,
+//! sorting, chunking, and transforming data without manual loops.
+//!
+//! ## Example
+//!
+//! ```rust
+//! use larastvel_core::Collection;
+//!
+//! let result = Collection::new(vec![1, 2, 3, 4, 5, 6])
+//!     .filter(|x| x % 2 == 0)
+//!     .cloned()
+//!     .map(|x| x * 10);
+//!
+//! assert_eq!(result.into_items(), vec![20, 40, 60]);
+//! ```
+
 use std::cmp::Ordering;
 use std::hash::Hash;
 

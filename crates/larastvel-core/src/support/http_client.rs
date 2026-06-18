@@ -1,3 +1,29 @@
+//! # HTTP Client
+//!
+//! A fluent wrapper around `reqwest` for making HTTP requests, inspired by
+//! Laravel's `Illuminate\Support\Facades\Http`. Supports bearer tokens, basic
+//! auth, custom headers, JSON/form/raw bodies, query parameters, timeouts,
+//! retries, and base URLs.
+//!
+//! ## Example
+//!
+//! ```rust,no_run
+//! use larastvel_core::Http;
+//! use std::time::Duration;
+//!
+//! async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!     let response = Http::with_token("your-token")
+//!         .timeout(Duration::from_secs(10))
+//!         .get("https://api.github.com/user")
+//!         .await?;
+//!
+//!     let status = response.status_code();
+//!     let data: serde_json::Value = response.json().await?;
+//!     println!("Status: {}", status);
+//!     Ok(())
+//! }
+//! ```
+
 use std::collections::HashMap;
 use std::time::Duration;
 
