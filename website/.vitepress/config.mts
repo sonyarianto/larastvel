@@ -72,6 +72,8 @@ export default defineConfig({
             { text: 'Localization', link: '/guide/localization' },
             { text: 'Mail', link: '/guide/mail' },
             { text: 'Notifications', link: '/guide/notifications' },
+            { text: 'Number', link: '/guide/number' },
+            { text: 'Prompt', link: '/guide/prompt' },
             { text: 'Queues', link: '/guide/queues' },
             { text: 'Rate Limiting', link: '/guide/rate-limiting' },
             { text: 'Task Scheduling', link: '/guide/scheduling' },
