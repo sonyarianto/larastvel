@@ -50,3 +50,8 @@ dialoguer.workspace = true
 [dev-dependencies]
 tower.workspace = true
 serial_test = "3"
+criterion.workspace = true
+
+[[bench]]
+name = "support"
+harness = false
