@@ -13,9 +13,39 @@ struct OrderShipped {
 }
 ```
 
-## Defining Listeners
+## Defining Listeners with `#[listener]`
 
-Implement the `Listener` trait:
+Use the `#[listener]` attribute macro to turn an async function into a synchronous listener:
+
+```rust
+use larastvel_core::listener;
+
+#[listener(OrderShipped)]
+async fn send_shipment_notification(event: OrderShipped) {
+    tracing::info!("Order {} shipped!", event.order_id);
+}
+```
+
+This generates a zero-sized struct `SendShipmentNotificationListener` that implements the `Listener<OrderShipped>` trait. The generated struct provides a `listen()` method for registration.
+
+## Queued Listeners with `#[queued_listener]`
+
+For listeners that should run in the background, use `#[queued_listener]`:
+
+```rust
+use larastvel_core::queued_listener;
+
+#[queued_listener(OrderShipped)]
+async fn send_shipment_notification(event: OrderShipped) {
+    tracing::info!("Order {} shipped!", event.order_id);
+}
+```
+
+This generates both a job struct and a listener struct. When the event is dispatched, the listener pushes a background job instead of running the handler inline.
+
+## Defining Listeners Manually
+
+Alternatively, implement the `Listener` trait directly:
 
 ```rust
 use larastvel_core::events::{EventService, Listener, Event};
@@ -26,7 +56,7 @@ struct SendShipmentNotification;
 #[async_trait]
 impl Listener<OrderShipped> for SendShipmentNotification {
     async fn handle(&self, event: OrderShipped) {
-        info!("Order {} shipped!", event.order_id);
+        tracing::info!("Order {} shipped!", event.order_id);
     }
 }
 ```
@@ -35,13 +65,19 @@ Or use a closure:
 
 ```rust
 EventService::listen_fn::<OrderShipped, _, _>(move |event| async move {
-    info!("Order {} shipped!", event.order_id);
+    tracing::info!("Order {} shipped!", event.order_id);
 });
 ```
 
 ## Registration
 
-Register listeners during application bootstrap:
+For macro-generated listeners, call the generated `listen()` method:
+
+```rust
+SendShipmentNotificationListener::listen();
+```
+
+For manually-defined listeners:
 
 ```rust
 EventService::listen::<OrderShipped, SendShipmentNotification>(SendShipmentNotification);
@@ -53,6 +89,16 @@ EventService::listen::<OrderShipped, SendShipmentNotification>(SendShipmentNotif
 EventService::dispatch(OrderShipped {
     order_id: "ORD-123".into(),
 }).await;
+```
+
+## CLI Generators
+
+```bash
+# Generate an event + listener pair
+larastvel make:event OrderShipped
+
+# Generate a standalone listener
+larastvel make:listener SendNotification
 ```
 
 ## Testing
@@ -68,6 +114,8 @@ assert_eq!(EventService::assert_dispatched_times::<OrderShipped>(1), true);
 
 EventService::reset();
 ```
+
+## API Reference
 
 | Method | Description |
 |--------|-------------|

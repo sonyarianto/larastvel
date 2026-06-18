@@ -96,23 +96,15 @@ pub fn make_job(name: &str) {
     };
 
     let job_content = format!(
-        r#"use larastvel_core::queue::{{JobError, ShouldQueue}};
-use async_trait::async_trait;
+        r#"use larastvel_core::job;
+use larastvel_core::queue::JobError;
 
-#[derive(Debug)]
-pub struct {name};
-
-#[async_trait]
-impl ShouldQueue for {name} {{
-    fn name(&self) -> &str {{
-        "{snake}"
-    }}
-
-    async fn handle(&self) -> Result<(), JobError> {{
-        // TODO: Implement job logic
-        tracing::info!("Job executed: {name}");
-        Ok(())
-    }}
+/// Job: {name}
+#[job]
+async fn {snake}(/* TODO: Add job parameters */) -> Result<(), JobError> {{
+    // TODO: Implement job logic
+    tracing::info!("Job executed: {name}");
+    Ok(())
 }}
 "#,
         name = job_name,
@@ -153,7 +145,7 @@ impl ShouldQueue for {name} {{
     );
     println!(
         "{}",
-        "  Dispatch with: larastvel_core::queue::dispatch(MyJob).await;".dimmed()
+        format!("  Dispatch with: {}::new(...).dispatch().await;", job_name).dimmed()
     );
 }
 
@@ -164,28 +156,21 @@ pub fn make_event(name: &str) {
     let snake_name = to_snake_case(name);
 
     let event_content = format!(
-        r#"use larastvel_core::events::Listener;
-use async_trait::async_trait;
-
-/// Event payload for {name}
+        r#"/// Event payload for {name}
 #[derive(Debug, Clone)]
 pub struct {name}Event {{
     // TODO: Add event data fields
 }}
 
-/// Listener for {name}
-#[derive(Debug)]
-pub struct {name}Listener;
-
-#[async_trait]
-impl Listener<{name}Event> for {name}Listener {{
-    async fn handle(&self, _event: &{name}Event) {{
-        // TODO: Handle the event
-        tracing::info!("Event handled: {name}");
-    }}
+#[listener({name}Event)]
+async fn handle_{snake}(event: {name}Event) {{
+    // TODO: Handle the event
+    let _ = event;
+    tracing::info!("Event handled: {name}");
 }}
 "#,
         name = name,
+        snake = snake_name,
     );
 
     let file_path = events_dir.join(format!("{}.rs", snake_name));
@@ -220,13 +205,80 @@ impl Listener<{name}Event> for {name}Listener {{
             .green()
             .bold()
     );
+    let listener_name = format!("{}EventListener", name);
     println!(
         "{}",
-        "  Register with: EventService::listen::<MyEvent, MyListener>();".dimmed()
+        format!("  Register with: {}::listen();", listener_name).dimmed()
     );
     println!(
         "{}",
-        "  Dispatch with: larastvel_core::events::dispatch(MyEvent).await;".dimmed()
+        "  Dispatch with: larastvel_core::events::EventService::dispatch(MyEvent).await;".dimmed()
+    );
+}
+
+pub fn make_listener(name: &str) {
+    let listeners_dir = std::path::Path::new("src/listeners");
+    std::fs::create_dir_all(listeners_dir).unwrap();
+
+    let snake_name = to_snake_case(name);
+    let struct_name = if name.ends_with("Listener") {
+        name.to_string()
+    } else {
+        format!("{}Listener", name)
+    };
+
+    let listener_content = format!(
+        r#"/// Listener: {name}
+#[listener({name}Event)]
+async fn handle_{snake}(event: {name}Event) {{
+    // TODO: Handle the event
+    let _ = event;
+    tracing::info!("Listener handled: {name}");
+}}
+"#,
+        name = struct_name,
+        snake = snake_name,
+    );
+
+    let file_path = listeners_dir.join(format!("{}.rs", snake_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!(
+                "Error: Listener '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, listener_content).unwrap();
+
+    // Update mod.rs
+    let mod_path = listeners_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", snake_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!(
+            "✓ Listener [{}] created at '{}'.",
+            name,
+            file_path.display()
+        )
+        .green()
+        .bold()
+    );
+    println!(
+        "{}",
+        format!("  Register with: {}::listen();", struct_name).dimmed()
     );
 }
 
@@ -580,28 +632,15 @@ pub fn make_model(name: &str) {
     let snake_name = to_snake_case(name);
 
     let model_content = format!(
-        r#"use larastvel_core::sea_orm;
-use sea_orm::entity::prelude::*;
+        r#"use larastvel_core::table;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "{table}")]
-pub struct Model {{
+#[table("{table}")]
+pub struct {name} {{
     #[sea_orm(primary_key)]
     pub id: i32,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }}
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {{}}
-
-impl ActiveModelBehavior for ActiveModel {{}}
-
-pub struct {name};
-
-impl larastvel_core::models::DbModel for {name} {{
-        type Entity = Entity;
-    }}
 "#,
         name = name,
         table = snake_name
@@ -648,15 +687,38 @@ pub fn make_controller(name: &str) {
     let snake_name = to_snake_case(name);
 
     let controller_content = format!(
-        r#"use larastvel_core::axum::response::{{IntoResponse, Json, Response}};
-use larastvel_core::Resource;
+        r#"use larastvel_core::{{route, get, post, put, patch, delete}};
+use larastvel_core::axum::response::{{IntoResponse, Json, Response}};
 use serde_json::json;
 
-#[derive(Resource)]
 pub struct {name};
 
-impl larastvel_core::routing::ResourceController for {name} {{
-    const RESOURCE_NAME: &'static str = "{resource_name}";
+#[route]
+impl {name} {{
+    #[get("/{resource_name}")]
+    pub async fn index() -> Response {{
+        Json(json!([])).into_response()
+    }}
+
+    #[post("/{resource_name}")]
+    pub async fn store() -> Response {{
+        Json(json!({{"created": true}})).into_response()
+    }}
+
+    #[get("/{resource_name}/{{id}}")]
+    pub async fn show() -> Response {{
+        Json(json!({{"data": null}})).into_response()
+    }}
+
+    #[put("/{resource_name}/{{id}}")]
+    pub async fn update() -> Response {{
+        Json(json!({{"updated": true}})).into_response()
+    }}
+
+    #[delete("/{resource_name}/{{id}}")]
+    pub async fn destroy() -> Response {{
+        Json(json!({{"deleted": true}})).into_response()
+    }}
 }}
 "#,
         name = name,
@@ -701,12 +763,11 @@ impl larastvel_core::routing::ResourceController for {name} {{
     );
     println!(
         "{}",
-        "  Override resource methods in the `impl ResourceController` block to add custom logic."
-            .dimmed()
+        "  Add custom handler logic, validation, and authorization inside each method.".dimmed()
     );
     println!(
         "{}",
-        "  Register routes: MyController::register_routes(&registrar);".dimmed()
+        "  Register routes: {name}::register_routes(&registrar);".dimmed()
     );
 }
 
@@ -718,24 +779,20 @@ pub fn make_seeder(name: &str) {
 
     let seeder_content = format!(
         r#"use larastvel_core::database::DatabaseSeeder;
+use larastvel_core::models::factory::{{factory_create, factory_create_count}};
 use larastvel_core::sea_orm::DbConn;
 
 pub struct {name};
 
 impl {name} {{
     pub async fn run(conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {{
-        // TODO: Insert seed data here
+        // TODO: Insert seed data using factories:
         // Example:
-        // use sea_orm::{{ActiveModelTrait, Set}};
-        // use crate::models::user::ActiveModel as UserActiveModel;
-        //
-        // let user = UserActiveModel {{
-        //     name: Set("Admin".to_string()),
-        //     email: Set("admin@example.com".to_string()),
-        //     password: Set(larastvel_core::hash::make("password")?),
-        //     ..Default::default()
-        // }};
-        // user.insert(conn).await?;
+        // use crate::database::factories::user::UserFactory;
+        // factory_create::<UserFactory>().await?;
+
+        // Example — batch create:
+        // factory_create_count::<UserFactory>(10).await?;
 
         tracing::info!("Seeded: {name}");
         Ok(())
@@ -941,5 +998,83 @@ impl {struct_name} {{
     println!(
         "{}",
         "  Send with: my_mail.send(&mailer, \"user@example.com\").await?;".dimmed()
+    );
+}
+
+pub fn make_factory(name: &str) {
+    let factories_dir = std::path::Path::new("src/database/factories");
+    std::fs::create_dir_all(factories_dir).unwrap();
+
+    let snake_name = to_snake_case(name);
+    let struct_name = if name.ends_with("Factory") {
+        name.to_string()
+    } else {
+        format!("{}Factory", name)
+    };
+    let model_name = name.strip_suffix("Factory").unwrap_or(name);
+
+    let factory_content = format!(
+        r#"use larastvel_core::models::factory::{{Faker, ModelFactory}};
+use larastvel_core::sea_orm::Set;
+use sea_orm::entity::prelude::*;
+
+/// Factory for creating {model_name} model instances.
+#[derive(Debug, Default)]
+pub struct {struct_name};
+
+impl ModelFactory for {struct_name} {{
+    type ActiveModel = crate::models::{snake}::ActiveModel;
+
+    fn definition() -> Self::ActiveModel {{
+        crate::models::{snake}::ActiveModel {{
+            // TODO: Set default attribute values
+            // Example:
+            // name: Set(Faker::name()),
+            // email: Set(Faker::email()),
+            ..Default::default()
+        }}
+    }}
+}}
+"#,
+        struct_name = struct_name,
+        model_name = model_name,
+        snake = snake_name,
+    );
+
+    let file_path = factories_dir.join(format!("{}.rs", snake_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!(
+                "Error: Factory '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, factory_content).unwrap();
+
+    // Update mod.rs
+    let mod_path = factories_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", snake_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!("✓ Factory [{}] created at '{}'.", name, file_path.display())
+            .green()
+            .bold()
+    );
+    println!(
+        "{}",
+        "  Usage: let user = factory_create::<UserFactory>().await;".dimmed()
     );
 }

@@ -54,6 +54,83 @@ match result {
 | `max_value(n)` | Numeric maximum |
 | `regex(pattern)` | Must match regex pattern |
 
+## Attribute Macro Validation
+
+Use the `#[validate]` attribute to validate JSON request bodies directly in handler functions:
+
+```rust
+use larastvel_core::validate;
+use larastvel_core::validation::rules::{required, email, min};
+use axum::{Json, extract::Json as JsonExtractor};
+use serde_json::{json, Value};
+
+#[validate(vec![
+    ("email", vec![required(), email()]),
+    ("name", vec![required(), min(2)]),
+])]
+async fn store(Json(body): JsonExtractor<Value>) -> impl IntoResponse {
+    Json(json!({"ok": true}))
+}
+```
+
+The macro:
+- Finds the `Json<Value>` parameter in the handler signature
+- Converts the body to a `HashMap<String, Value>`
+- Runs the validator; returns `422 Unprocessable Entity` with error details on failure
+- Passes through to the original handler body on success
+
+Can be combined with `#[route]`:
+
+```rust
+#[route]
+impl UserController {
+    #[post("/users")]
+    #[validate(vec![
+        ("email", vec![required(), email()]),
+    ])]
+    async fn create(Json(body): JsonExtractor<Value>) -> impl IntoResponse {
+        Json(json!({"created": true}))
+    }
+}
+```
+
+## Query String Validation
+
+Use the `#[validated_query]` attribute to validate query-string parameters:
+
+```rust
+use larastvel_core::validated_query;
+use larastvel_core::validation::rules::{required, min};
+use axum::extract::Query;
+use std::collections::HashMap;
+
+#[validated_query(vec![
+    ("page", vec![required()]),
+    ("per_page", vec![min(1)]),
+])]
+async fn list(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
+    Json(json!({"page": params.get("page")}))
+}
+```
+
+Works inside `#[route]` blocks and composes with `#[can]` and `#[validate]`:
+
+```rust
+#[route]
+impl SearchController {
+    #[get("/search")]
+    #[can("admin")]
+    #[validated_query(vec![("q", vec![required()])])]
+    #[validate(vec![("email", vec![required(), email()])])]
+    async fn search(
+        Query(params): Query<HashMap<String, String>>,
+        Json(body): Json<Value>,
+    ) -> impl IntoResponse {
+        Json(json!({ "query": params.get("q") }))
+    }
+}
+```
+
 ## Extractor-Based Validation
 
 Use `ValidatedJson` and `ValidatedQuery` to auto-validate incoming data:

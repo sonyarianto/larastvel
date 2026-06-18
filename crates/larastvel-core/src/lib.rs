@@ -37,6 +37,7 @@ pub use serde;
 pub use serde_json;
 pub use tokio;
 
+pub use async_trait::async_trait;
 pub use auth::{
     authorize, check_ability, require_ability, require_verified_email, Auth, AuthError,
     AuthenticatedUser, Claims, EmailVerificationBroker, EmailVerificationError, Gate, GateCheck,
@@ -62,10 +63,17 @@ pub use foundation::{
 };
 pub use hash::{check as hash_check, is_hashed, make as hash_make, needs_rehash, HashError};
 pub use http::{Error as HttpError, JsonResponse, LarastvelResult, Request};
-pub use larastvel_macros::{can, controller, delete, get, patch, post, put, route, ws, Resource};
+pub use larastvel_macros::{
+    can, controller, delete, get, job, listener, middleware, patch, post, put, queued_listener,
+    route, table, validate, validated_query, ws, Resource,
+};
 pub use logging::init as logging_init;
+pub use middleware::presets::{
+    auth as auth_preset, cors as cors_preset, guest as guest_preset, logger as logger_preset,
+    throttle as throttle_preset, verified as verified_preset,
+};
 pub use middleware::{cors_middleware, request_logger};
-pub use models::factory::{Faker, ModelFactory};
+pub use models::factory::{factory_create, factory_create_count, Faker, ModelFactory};
 pub use models::serialization::{ApiResource, JsonResource, ResourceCollection, SerializesToArray};
 pub use notifications::{
     BroadcastPayload, DatabaseNotification, Notifiable, Notification, NotificationChannel,
@@ -73,8 +81,8 @@ pub use notifications::{
 };
 pub use pagination::{paginate, PaginationParams, Paginator};
 pub use queue::{
-    dispatch, DatabaseQueue, InMemoryQueue, JobResolver, Queue, QueueManager, QueueWorker,
-    ShouldQueue, SyncQueue,
+    dispatch, DatabaseQueue, InMemoryQueue, JobError, JobResolver, Queue, QueueManager,
+    QueueWorker, ShouldQueue, SyncQueue,
 };
 pub use rate_limiter::{
     rate_limit_middleware, rate_limiter, RateLimitConfig, RateLimitExceeded, RateLimiter,

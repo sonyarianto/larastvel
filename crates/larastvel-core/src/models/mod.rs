@@ -717,4 +717,49 @@ mod tests {
         _assert_ts::<Article>();
         _assert_sd::<Post>();
     }
+
+    // --- #[table] macro test ---
+
+    use crate::table;
+
+    mod table_test {
+        use super::*;
+
+        #[table("widgets")]
+        pub struct Widget {
+            #[sea_orm(primary_key)]
+            pub id: i32,
+            pub name: String,
+            pub price: f64,
+        }
+    }
+
+    #[test]
+    fn test_table_macro_generates_entity() {
+        use table_test::{Entity, Model, Widget};
+
+        // Model should have fields
+        let _ = Model {
+            id: 1,
+            name: "foo".into(),
+            price: 9.99,
+        };
+        // Widget should implement DbModel
+        fn _assert_db<T: DbModel>() {}
+        _assert_db::<Widget>();
+        // Entity should be the SeaORM entity type
+        let _: Widget = Widget;
+        let _: Entity = Entity;
+    }
+
+    #[test]
+    fn test_table_macro_column_attrs_forwarded() {
+        use table_test::Column;
+
+        // Verify we can reference Column variants
+        match Column::Id {
+            Column::Id => {}
+            _ => panic!("expected Id"),
+        }
+    }
 }

@@ -17,8 +17,9 @@ pub use down::{maintenance_down, maintenance_up};
 pub use env::env_display;
 #[allow(unused_imports)]
 pub use make::{
-    make_command, make_controller, make_event, make_job, make_mail, make_migration, make_model,
-    make_notification, make_policy, make_rule, make_seeder, make_test, to_snake_case,
+    make_command, make_controller, make_event, make_factory, make_job, make_listener, make_mail,
+    make_migration, make_model, make_notification, make_policy, make_rule, make_seeder, make_test,
+    to_snake_case,
 };
 pub use migrate::run_migrate_command;
 pub use new::create_project;

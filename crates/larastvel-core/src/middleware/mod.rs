@@ -1,5 +1,9 @@
 use axum::{extract::Request, middleware::Next, response::Response};
 
+pub mod presets;
+
+pub use presets::{auth, cors, guest, logger, throttle, verified};
+
 pub async fn cors_middleware(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     response

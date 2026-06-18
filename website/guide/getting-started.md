@@ -67,11 +67,10 @@ pub fn web(router: &Registrar) {
 
 ```rust
 // src/models/user.rs
-use sea_orm::entity::prelude::*;
+use larastvel_core::table;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "users")]
-pub struct Model {
+#[table("users")]
+pub struct User {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub name: String,

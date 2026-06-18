@@ -511,4 +511,75 @@ mod tests {
             .await;
         assert!(result.is_ok());
     }
+
+    // --- #[job] attribute macro tests ---
+
+    use crate::job;
+
+    #[tokio::test]
+    async fn test_job_macro_no_params() {
+        #[job]
+        async fn simple_job() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        let result = SimpleJob::new().dispatch().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_job_macro_with_params() {
+        static JOB_DATA: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+        #[job]
+        async fn process_data(key: String, value: i32) -> Result<(), JobError> {
+            let mut data = JOB_DATA.lock().unwrap();
+            *data = Some(format!("{}_{}", key, value));
+            Ok(())
+        }
+
+        ProcessDataJob::new("hello".to_string(), 42)
+            .dispatch()
+            .await
+            .unwrap();
+
+        let data = JOB_DATA.lock().unwrap();
+        assert_eq!(data.as_deref(), Some("hello_42"));
+    }
+
+    #[tokio::test]
+    async fn test_job_macro_name() {
+        #[job]
+        async fn my_named_job() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        let job = MyNamedJob::new();
+        assert_eq!(<MyNamedJob as ShouldQueue>::name(&job), "my_named_job");
+    }
+
+    #[tokio::test]
+    async fn test_job_macro_struct_is_debug() {
+        #[job]
+        async fn debug_job(count: u64) -> Result<(), JobError> {
+            let _ = count;
+            Ok(())
+        }
+
+        let job = DebugJob::new(7);
+        let debug_str = format!("{:?}", job);
+        assert!(debug_str.contains("count: 7"));
+    }
+
+    #[tokio::test]
+    async fn test_job_macro_failing_job() {
+        #[job]
+        async fn failing_job() -> Result<(), JobError> {
+            Err(JobError::Failed("oops".to_string()))
+        }
+
+        let result = FailingJob::new().dispatch().await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), JobError::Failed(_)));
+    }
 }

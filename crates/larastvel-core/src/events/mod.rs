@@ -411,4 +411,149 @@ mod tests {
         assert_eq!(recv.as_deref(), Some("data-check"));
         EventService::clear_all_listeners();
     }
+
+    // --- #[listener] attribute macro tests ---
+
+    use crate::listener;
+
+    #[derive(Debug, Clone, PartialEq)]
+    struct InvoicePaid {
+        invoice_id: String,
+        amount: f64,
+    }
+
+    static LISTENER_HANDLED: AtomicBool = AtomicBool::new(false);
+    static LISTENER_INVOICE_ID: Mutex<String> = Mutex::new(String::new());
+
+    #[listener(InvoicePaid)]
+    async fn send_invoice_receipt(event: InvoicePaid) {
+        let _ = event;
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_listener_macro_generates_struct_and_registers() {
+        EventService::clear_all_listeners();
+        LISTENER_HANDLED.store(false, Ordering::SeqCst);
+
+        #[listener(InvoicePaid)]
+        async fn record_payment(_event: InvoicePaid) {
+            LISTENER_HANDLED.store(true, Ordering::SeqCst);
+        }
+
+        RecordPaymentListener::listen();
+
+        assert!(EventService::has_listeners::<InvoicePaid>());
+
+        EventService::dispatch(InvoicePaid {
+            invoice_id: "INV-001".into(),
+            amount: 99.99,
+        })
+        .await;
+
+        assert!(LISTENER_HANDLED.load(Ordering::SeqCst));
+        EventService::clear_listeners::<InvoicePaid>();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_listener_macro_receives_event_data() {
+        EventService::clear_all_listeners();
+        *LISTENER_INVOICE_ID.lock().unwrap() = String::new();
+
+        #[listener(InvoicePaid)]
+        async fn log_invoice(event: InvoicePaid) {
+            let mut recv = LISTENER_INVOICE_ID.lock().unwrap();
+            *recv = event.invoice_id;
+        }
+
+        LogInvoiceListener::listen();
+
+        EventService::dispatch(InvoicePaid {
+            invoice_id: "INV-002".into(),
+            amount: 49.50,
+        })
+        .await;
+
+        {
+            let recv = LISTENER_INVOICE_ID.lock().unwrap();
+            assert_eq!(*recv, "INV-002");
+        }
+        EventService::clear_listeners::<InvoicePaid>();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_listener_macro_top_level() {
+        EventService::clear_all_listeners();
+
+        SendInvoiceReceiptListener::listen();
+        assert!(EventService::has_listeners::<InvoicePaid>());
+
+        EventService::dispatch(InvoicePaid {
+            invoice_id: "INV-003".into(),
+            amount: 10.00,
+        })
+        .await;
+
+        EventService::clear_listeners::<InvoicePaid>();
+    }
+
+    // --- #[queued_listener] attribute macro tests ---
+
+    use crate::queued_listener;
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_queued_listener_dispatches_job() {
+        EventService::clear_all_listeners();
+        static QUEUED_FLAG: AtomicBool = AtomicBool::new(false);
+
+        #[derive(Debug, Clone, PartialEq)]
+        struct UserRegistered {
+            user_id: u64,
+        }
+
+        #[queued_listener(UserRegistered)]
+        async fn send_welcome_email(event: UserRegistered) -> Result<(), crate::queue::JobError> {
+            let _ = event;
+            QUEUED_FLAG.store(true, Ordering::SeqCst);
+            Ok(())
+        }
+
+        SendWelcomeEmailListener::listen();
+        assert!(EventService::has_listeners::<UserRegistered>());
+
+        EventService::dispatch(UserRegistered { user_id: 42 }).await;
+
+        // The queued listener dispatches a job synchronously (SyncQueue),
+        // so the flag should be set after dispatch.
+        assert!(QUEUED_FLAG.load(Ordering::SeqCst));
+        EventService::clear_listeners::<UserRegistered>();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_queued_listener_job_name() {
+        EventService::clear_all_listeners();
+
+        #[derive(Debug, Clone, PartialEq)]
+        struct OrderPlaced {
+            id: u64,
+        }
+
+        #[queued_listener(OrderPlaced)]
+        async fn on_order_placed(event: OrderPlaced) -> Result<(), crate::queue::JobError> {
+            let _ = event;
+            Ok(())
+        }
+
+        let job = OnOrderPlacedJob {
+            event: OrderPlaced { id: 1 },
+        };
+        assert_eq!(
+            <OnOrderPlacedJob as crate::queue::ShouldQueue>::name(&job),
+            "on_order_placed"
+        );
+    }
 }

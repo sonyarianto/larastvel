@@ -355,5 +355,5 @@ mod tests {
     }
 
     // ModelFactory trait is verified by compilation — no concrete impl
-    // without a SeaORM entity (which needs `#[derive(DeriveEntityModel)]`).
+    // without a SeaORM entity (use `#[table]` to generate one).
 }

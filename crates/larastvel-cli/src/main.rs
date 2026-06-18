@@ -128,6 +128,9 @@ async fn main() {
             Some(MakeTarget::Event { name }) => {
                 make_event(&name);
             }
+            Some(MakeTarget::Listener { name }) => {
+                make_listener(&name);
+            }
             Some(MakeTarget::Notification { name }) => {
                 make_notification(&name);
             }
@@ -140,6 +143,9 @@ async fn main() {
             Some(MakeTarget::Mail { name }) => {
                 make_mail(&name);
             }
+            Some(MakeTarget::Factory { name }) => {
+                make_factory(&name);
+            }
             None => {
                 println!("{}", "Available make targets:".cyan());
                 println!("  make:model       Create a new model");
@@ -150,10 +156,12 @@ async fn main() {
                 println!("  make:test        Create a new test");
                 println!("  make:job         Create a new job");
                 println!("  make:event       Create a new event");
+                println!("  make:listener    Create a new event listener");
                 println!("  make:notification Create a new notification");
                 println!("  make:rule        Create a new validation rule");
                 println!("  make:command     Create a new console command");
                 println!("  make:mail        Create a new mail class");
+                println!("  make:factory     Create a new model factory");
             }
         },
         None => {
@@ -176,9 +184,11 @@ async fn main() {
             println!("  make:test        Create a new test");
             println!("  make:job         Create a new job");
             println!("  make:event       Create a new event");
+            println!("  make:listener    Create a new event listener");
             println!("  make:notification Create a new notification");
             println!("  make:rule        Create a new validation rule");
             println!("  make:command     Create a new console command");
+            println!("  make:factory     Create a new model factory");
             println!("  schedule:run     Run scheduled tasks");
             println!("  db:seed          Run database seeders");
             println!("  storage:link     Create a symbolic link from public/storage to storage/app/public");

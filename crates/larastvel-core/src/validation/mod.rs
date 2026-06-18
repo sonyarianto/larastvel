@@ -10,7 +10,8 @@ use axum::{
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use self::rules::{check_rule, Rule};
+use self::rules::check_rule;
+pub use self::rules::Rule;
 
 #[derive(Debug, Clone)]
 pub struct ValidationErrors {

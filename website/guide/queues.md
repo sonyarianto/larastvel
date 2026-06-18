@@ -12,25 +12,25 @@ Larastvel provides queue drivers for deferring time-consuming tasks.
 
 ## Defining Jobs
 
+Use the `#[job]` attribute macro to turn an async function into a queued job:
+
 ```rust
-use larastvel_core::queue::{ShouldQueue, JobError, dispatch};
+use larastvel_core::job;
+use larastvel_core::queue::JobError;
 
-#[derive(Debug)]
-struct SendWelcomeEmail {
-    user_id: i32,
+#[job]
+async fn send_welcome_email(user_id: i32) -> Result<(), JobError> {
+    // send email logic
+    Ok(())
 }
+```
 
-#[async_trait]
-impl ShouldQueue for SendWelcomeEmail {
-    async fn handle(&self) -> Result<(), JobError> {
-        // send email logic
-        Ok(())
-    }
+This generates a `SendWelcomeEmailJob` struct with `new()`, `dispatch()`, and `name()` methods.
 
-    fn name(&self) -> &str {
-        "send-welcome-email"
-    }
-}
+The job can be dispatched manually:
+
+```rust
+SendWelcomeEmailJob::new(42).dispatch().await?;
 ```
 
 ## Dispatching

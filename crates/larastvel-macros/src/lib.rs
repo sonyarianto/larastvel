@@ -6,6 +6,18 @@ use syn::{
     parse_macro_input, ImplItem, ItemImpl, ItemStruct, Lit,
 };
 
+fn snake_to_pascal(s: &str) -> String {
+    s.split('_')
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().to_string() + c.as_str(),
+            }
+        })
+        .collect()
+}
+
 fn resource_name_from_ident(name: &syn::Ident) -> String {
     let s = name.to_string();
     s.strip_suffix("Controller").unwrap_or(&s).to_lowercase()
@@ -195,6 +207,359 @@ pub fn ws(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+/// Marks a handler function with middleware. Must be used inside a `#[route]` impl block.
+///
+/// Accepts one or more middleware names:
+/// ```ignore
+/// #[middleware("auth")]
+/// #[middleware("auth", "admin")]
+/// ```
+#[proc_macro_attribute]
+pub fn middleware(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+// ---------------------------------------------------------------------------
+// Parser for middleware arguments: one or more comma-separated string literals.
+// ---------------------------------------------------------------------------
+
+struct MiddlewareArgs {
+    names: Vec<String>,
+}
+
+impl Parse for MiddlewareArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut names = Vec::new();
+        while !input.is_empty() {
+            let lit: Lit = input.parse()?;
+            match lit {
+                Lit::Str(s) => names.push(s.value()),
+                _ => return Err(syn::Error::new(lit.span(), "expected string literal")),
+            }
+            if !input.is_empty() {
+                input.parse::<syn::Token![,]>()?;
+            }
+        }
+        Ok(MiddlewareArgs { names })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: #[listener(EventType)]
+//
+// Converts an async function into a zero-sized Listener struct that
+// implements the `Listener<EventType>` trait and provides a `listen()`
+// helper to register it with `EventService`.
+//
+// Usage:
+//   #[listener(OrderShipped)]
+//   async fn send_notification(event: OrderShipped) {
+//       tracing::info!("Order {} shipped", event.order_id);
+//   }
+//
+// Expands to:
+//   struct SendNotificationListener;
+//
+//   #[async_trait]
+//   impl listener<OrderShipped> for SendNotificationListener {
+//       async fn handle(&self, event: OrderShipped) { ... }
+//   }
+//
+//   impl SendNotificationListener {
+//       fn listen() {
+//           EventService::listen::<OrderShipped, Self>(Self);
+//       }
+//   }
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn listener(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let event_ty: syn::Type = parse_macro_input!(attr as syn::Type);
+    let func = parse_macro_input!(item as syn::ItemFn);
+
+    if func.sig.asyncness.is_none() {
+        return syn::Error::new(func.sig.span(), "#[listener] requires async fn")
+            .to_compile_error()
+            .into();
+    }
+
+    let fn_name = &func.sig.ident;
+    let struct_name_str = snake_to_pascal(&fn_name.to_string()) + "Listener";
+    let struct_name = syn::Ident::new(&struct_name_str, fn_name.span());
+    let vis = &func.vis;
+    let body = &func.block;
+    let params = &func.sig.inputs;
+
+    let expanded = quote! {
+        #vis struct #struct_name;
+
+        #[larastvel_core::async_trait]
+        impl larastvel_core::events::Listener<#event_ty> for #struct_name {
+            async fn handle(&self, #params) {
+                #body
+            }
+        }
+
+        impl #struct_name {
+            pub fn listen() {
+                larastvel_core::events::EventService::listen::<#event_ty, Self>(Self);
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: #[job]
+//
+// Converts an async function into a queue job struct that implements
+// `ShouldQueue`.  The function parameters become struct fields, and the
+// generated struct provides `new()`, `dispatch()`, and `name()` methods.
+//
+// Usage:
+//   #[job]
+//   async fn process_podcast(podcast_id: i32) -> Result<(), JobError> {
+//       tracing::info!("Processing podcast {}", podcast_id);
+//       Ok(())
+//   }
+//
+// Expands to:
+//   #[derive(Debug)]
+//   pub struct ProcessPodcastJob {
+//       pub podcast_id: i32,
+//   }
+//
+//   impl ProcessPodcastJob {
+//       pub fn new(podcast_id: i32) -> Self { ... }
+//       pub async fn dispatch(self) -> Result<(), JobError> { ... }
+//   }
+//
+//   #[async_trait]
+//   impl ShouldQueue for ProcessPodcastJob {
+//       fn name(&self) -> &str { "process_podcast" }
+//       async fn handle(&self) -> Result<(), JobError> {
+//           __process_podcast_inner(self.podcast_id).await
+//       }
+//   }
+//
+//   async fn __process_podcast_inner(podcast_id: i32) -> Result<(), JobError> { ... }
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn job(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let func = parse_macro_input!(item as syn::ItemFn);
+
+    if func.sig.asyncness.is_none() {
+        return syn::Error::new(func.sig.span(), "#[job] requires async fn")
+            .to_compile_error()
+            .into();
+    }
+
+    let fn_name = &func.sig.ident;
+    let fn_name_str = fn_name.to_string();
+    // Strip trailing "_job" suffix so `fn simple_job` yields struct `SimpleJob`, not `SimpleJobJob`.
+    let stem = if fn_name_str.ends_with("_job") && fn_name_str.len() > 4 {
+        &fn_name_str[..fn_name_str.len() - 4]
+    } else {
+        &fn_name_str
+    };
+    let struct_name_str = snake_to_pascal(stem) + "Job";
+    let struct_name = syn::Ident::new(&struct_name_str, fn_name.span());
+    let inner_fn_name = syn::Ident::new(&format!("__{}_inner", fn_name_str), fn_name.span());
+    let vis = &func.vis;
+    let output_ty = &func.sig.output;
+    let body = &func.block;
+
+    // Parse function params into struct fields.
+    let mut field_tokens = Vec::new();
+    let mut new_param_tokens = Vec::new();
+    let mut field_assignments = Vec::new();
+    let mut dispatch_args = Vec::new();
+    let mut handle_args = Vec::new();
+
+    for arg in &func.sig.inputs {
+        match arg {
+            syn::FnArg::Typed(pat_type) => {
+                let pat = &pat_type.pat;
+                let ty = &pat_type.ty;
+                field_tokens.push(quote! { pub #pat: #ty });
+                new_param_tokens.push(quote! { #pat: #ty });
+                field_assignments.push(quote! { #pat });
+                // In dispatch(self), self is owned so we can move fields out.
+                dispatch_args.push(quote! { self.#pat });
+                // In handle(&self), we must clone since we only have &self.
+                handle_args.push(quote! { self.#pat.clone() });
+            }
+            syn::FnArg::Receiver(_) => {
+                return syn::Error::new(arg.span(), "#[job] cannot be used on methods with self")
+                    .to_compile_error()
+                    .into();
+            }
+        }
+    }
+
+    let expanded = quote! {
+        #[derive(Debug)]
+        #vis struct #struct_name {
+            #(#field_tokens,)*
+        }
+
+        impl #struct_name {
+            pub fn new(#(#new_param_tokens),*) -> Self {
+                Self {
+                    #(#field_assignments,)*
+                }
+            }
+
+            pub async fn dispatch(self) -> Result<(), larastvel_core::queue::JobError> {
+                #inner_fn_name(#(#dispatch_args),*).await
+            }
+        }
+
+        #[larastvel_core::async_trait]
+        impl larastvel_core::queue::ShouldQueue for #struct_name {
+            fn name(&self) -> &str {
+                #fn_name_str
+            }
+
+            async fn handle(&self) -> Result<(), larastvel_core::queue::JobError> {
+                #inner_fn_name(#(#handle_args),*).await
+            }
+        }
+
+        #[allow(dead_code)]
+        async fn #inner_fn_name(#(#new_param_tokens),*) #output_ty {
+            #body
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: #[queued_listener(EventType)]
+//
+// Like `#[listener]` but dispatches the handler as a background job instead
+// of running synchronously.  Generates both a `*Listener` struct (registered
+// with EventService) and a `*Job` struct (implements ShouldQueue).
+//
+// Usage:
+//   #[queued_listener(OrderShipped)]
+//   async fn handle_order_shipped(event: OrderShipped) -> Result<(), JobError> {
+//       tracing::info!("Processing order {}", event.order_id);
+//       Ok(())
+//   }
+//
+// This registers a listener that, on each event, dispatches a
+// `HandleOrderShippedJob` to the default queue.
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn queued_listener(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let event_ty: syn::Type = parse_macro_input!(attr as syn::Type);
+    let func = parse_macro_input!(item as syn::ItemFn);
+
+    if func.sig.asyncness.is_none() {
+        return syn::Error::new(func.sig.span(), "#[queued_listener] requires async fn")
+            .to_compile_error()
+            .into();
+    }
+
+    let fn_name = &func.sig.ident;
+    let fn_name_str = fn_name.to_string();
+
+    // Strip trailing "_listener" for a cleaner struct name.
+    let stem = if fn_name_str.ends_with("_listener") && fn_name_str.len() > 10 {
+        &fn_name_str[..fn_name_str.len() - 9]
+    } else {
+        &fn_name_str
+    };
+    // Strip trailing "_handler" too.
+    let stem = if stem.ends_with("_handler") && stem.len() > 8 {
+        &stem[..stem.len() - 8]
+    } else {
+        stem
+    };
+
+    let struct_stem = snake_to_pascal(stem);
+    let job_struct_name = syn::Ident::new(&(struct_stem.clone() + "Job"), fn_name.span());
+    let listener_struct_name = syn::Ident::new(&(struct_stem + "Listener"), fn_name.span());
+    let inner_fn_name = syn::Ident::new(&format!("__{}_inner", fn_name_str), fn_name.span());
+    let vis = &func.vis;
+    let output = &func.sig.output;
+    let body = &func.block;
+
+    // Extract the event parameter.
+    let event_param = func.sig.inputs.first().and_then(|arg| match arg {
+        syn::FnArg::Typed(pat_type) => Some((pat_type.pat.clone(), pat_type.ty.clone())),
+        _ => None,
+    });
+
+    let Some((event_pat, event_ty_inner)) = event_param else {
+        return syn::Error::new(
+            func.sig.span(),
+            "#[queued_listener] requires exactly one parameter: the event",
+        )
+        .to_compile_error()
+        .into();
+    };
+
+    let expanded = quote! {
+        // --- Job struct ---
+        #[derive(Debug)]
+        #vis struct #job_struct_name {
+            pub #event_pat: #event_ty_inner,
+        }
+
+        impl #job_struct_name {
+            pub fn new(#event_pat: #event_ty_inner) -> Self {
+                Self { #event_pat }
+            }
+
+            pub async fn dispatch(self) -> Result<(), larastvel_core::queue::JobError> {
+                #inner_fn_name(self.#event_pat).await
+            }
+        }
+
+        #[larastvel_core::async_trait]
+        impl larastvel_core::queue::ShouldQueue for #job_struct_name {
+            fn name(&self) -> &str {
+                #fn_name_str
+            }
+
+            async fn handle(&self) -> Result<(), larastvel_core::queue::JobError> {
+                #inner_fn_name(self.#event_pat.clone()).await
+            }
+        }
+
+        #[allow(dead_code)]
+        async fn #inner_fn_name(#event_pat: #event_ty_inner) #output {
+            #body
+        }
+
+        // --- Listener struct ---
+        #vis struct #listener_struct_name;
+
+        #[larastvel_core::async_trait]
+        impl larastvel_core::events::Listener<#event_ty> for #listener_struct_name {
+            async fn handle(&self, #event_pat: #event_ty_inner) {
+                if let Err(e) = #job_struct_name::new(#event_pat).dispatch().await {
+                    tracing::error!("Queued listener failed: {e}");
+                }
+            }
+        }
+
+        impl #listener_struct_name {
+            pub fn listen() {
+                larastvel_core::events::EventService::listen::<#event_ty, Self>(Self);
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 // ---------------------------------------------------------------------------
 // Attribute: #[can("ability")]
 //
@@ -253,6 +618,291 @@ pub fn can(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 // ---------------------------------------------------------------------------
+// Attribute: #[validate(rules_expr)]
+//
+// Validates a JSON request body before the handler runs.
+//
+// The attribute argument must be an expression that evaluates to
+// `Vec<(&str, Vec<Rule>)>`.  The handler must have a `Json<Value>`
+// parameter (typically `Json(body): Json<Value>`).
+//
+// The return type is changed to `axum::response::Response`.
+//
+// Usage:
+//   #[validate(vec![("email", vec![Rule::required(), Rule::email()])])]
+//   async fn store(Json(body): Json<Value>) -> impl IntoResponse {
+//       Json(json!({"ok": true}))
+//   }
+// ---------------------------------------------------------------------------
+
+/// Extracts the binding name from a pattern like `Json(body)` or `body`.
+fn extract_json_binding(pat: &syn::Pat) -> Option<proc_macro2::TokenStream> {
+    match pat {
+        // `Json(body)` — body IS the inner Value
+        syn::Pat::TupleStruct(ps) if ps.elems.len() == 1 => {
+            if let syn::Pat::Ident(inner) = &ps.elems[0] {
+                let id = &inner.ident;
+                return Some(quote! { #id });
+            }
+            None
+        }
+        // `Json { body }` — body IS the inner Value
+        syn::Pat::Struct(ps) => ps.fields.first().and_then(|f| match &*f.pat {
+            syn::Pat::Ident(ident) => {
+                let id = &ident.ident;
+                Some(quote! { #id })
+            }
+            _ => None,
+        }),
+        // `body: Json<Value>` — body IS the Json<Value> struct, need .0
+        syn::Pat::Ident(pi) => {
+            let id = &pi.ident;
+            Some(quote! { #id . 0 })
+        }
+        _ => None,
+    }
+}
+
+#[proc_macro_attribute]
+pub fn validate(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let rules_expr = proc_macro2::TokenStream::from(attr);
+    let func = parse_macro_input!(item as syn::ItemFn);
+
+    if func.sig.asyncness.is_none() {
+        return syn::Error::new(func.sig.span(), "#[validate] requires async fn")
+            .to_compile_error()
+            .into();
+    }
+
+    let vis = &func.vis;
+    let name = &func.sig.ident;
+    let inputs = &func.sig.inputs;
+    let body = &func.block;
+
+    for input in inputs {
+        if let syn::FnArg::Receiver(_) = input {
+            return syn::Error::new(
+                input.span(),
+                "#[validate] cannot be used on methods with self",
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
+
+    // Find the Json<Value> binding in the handler parameters.
+    let body_access = inputs
+        .iter()
+        .find_map(|arg| {
+            if let syn::FnArg::Typed(pat_type) = arg {
+                let ty_str = quote! { #pat_type.ty }.to_string();
+                if ty_str.contains("Json") && ty_str.contains("Value") {
+                    return extract_json_binding(pat_type.pat.as_ref());
+                }
+            }
+            None
+        })
+        .unwrap_or_else(|| {
+            // Fallback: create a synthetic accessor for "__body.0"
+            quote! { __body . 0 }
+        });
+
+    let expanded = quote! {
+        #vis async fn #name(
+            #inputs
+        ) -> larastvel_core::axum::response::Response {
+            use std::collections::HashMap;
+
+            let __larastvel_body: &serde_json::Value = &(#body_access);
+            let __data: HashMap<String, serde_json::Value> = match __larastvel_body.as_object() {
+                Some(map) => map.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                None => {
+                    let mut __errors = larastvel_core::validation::ValidationErrors::new();
+                    __errors.add("_", "Request body must be a JSON object.");
+                    return __errors.into_response();
+                }
+            };
+
+            let __rules = #rules_expr;
+
+            if let Err(__errors) = larastvel_core::validation::validate(&__data, __rules) {
+                return __errors.into_response();
+            }
+
+            larastvel_core::axum::response::IntoResponse::into_response(#body)
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: #[validated_query(rules_expr)]
+//
+// Validates query-string parameters before the handler runs.
+//
+// The attribute argument must be an expression that evaluates to
+// `Vec<(&str, Vec<Rule>)>`.  The handler must have a `Query<HashMap<String,
+// String>>` parameter (typically `Query(params): Query<HashMap<String, String>>`).
+//
+// The return type is changed to `axum::response::Response`.
+//
+// Usage:
+//   #[validated_query(vec![("page", vec![required(), numeric()])])]
+//   async fn list(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
+//       Json(json!({"page": params.get("page")}))
+//   }
+// ---------------------------------------------------------------------------
+
+/// Extracts the binding name from a pattern like `Query(params)` or `params`.
+fn extract_query_binding(pat: &syn::Pat) -> Option<proc_macro2::TokenStream> {
+    // Same logic as extract_json_binding — patterns are identical.
+    extract_json_binding(pat)
+}
+
+#[proc_macro_attribute]
+pub fn validated_query(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let rules_expr = proc_macro2::TokenStream::from(attr);
+    let func = parse_macro_input!(item as syn::ItemFn);
+
+    if func.sig.asyncness.is_none() {
+        return syn::Error::new(func.sig.span(), "#[validated_query] requires async fn")
+            .to_compile_error()
+            .into();
+    }
+
+    let vis = &func.vis;
+    let name = &func.sig.ident;
+    let inputs = &func.sig.inputs;
+    let body = &func.block;
+
+    for input in inputs {
+        if let syn::FnArg::Receiver(_) = input {
+            return syn::Error::new(
+                input.span(),
+                "#[validated_query] cannot be used on methods with self",
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
+
+    // Find the Query<…> binding in the handler parameters.
+    let body_access = inputs
+        .iter()
+        .find_map(|arg| {
+            if let syn::FnArg::Typed(pat_type) = arg {
+                let ty_str = quote! { #pat_type.ty }.to_string();
+                if ty_str.contains("Query") {
+                    return extract_query_binding(pat_type.pat.as_ref());
+                }
+            }
+            None
+        })
+        .unwrap_or_else(|| {
+            quote! { __params }
+        });
+
+    let expanded = quote! {
+        #vis async fn #name(
+            #inputs
+        ) -> larastvel_core::axum::response::Response {
+            use std::collections::HashMap;
+
+            let __raw: &HashMap<String, String> = &(#body_access);
+            let __data: HashMap<String, serde_json::Value> = __raw
+                .iter()
+                .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                .collect();
+
+            let __rules = #rules_expr;
+
+            if let Err(__errors) = larastvel_core::validation::validate(&__data, __rules) {
+                return __errors.into_response();
+            }
+
+            larastvel_core::axum::response::IntoResponse::into_response(#body)
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: #[table("name")]
+//
+// Converts a plain struct into a full SeaORM entity, eliminating the
+// boilerplate of `DeriveEntityModel`, `Relation`, `ActiveModelBehavior`,
+// and the `DbModel` wrapper.
+//
+// Usage:
+//   #[table("users")]
+//   pub struct User {
+//       #[sea_orm(primary_key)]
+//       pub id: i32,
+//       pub name: String,
+//       pub email: String,
+//       pub password: String,
+//       pub email_verified_at: Option<DateTime>,
+//       pub created_at: DateTime,
+//       pub updated_at: DateTime,
+//   }
+//
+// Expands to a `__table_User` inner module containing a Model struct
+// with `DeriveEntityModel`, a `Relation` enum, `ActiveModelBehavior`,
+// and re-exports `Model`, `Entity`, `ActiveModel`, `Column`.
+// The original struct name is kept as a `DbModel` wrapper.
+//
+// Field-level `#[sea_orm(…)]` attributes are passed through directly
+// to `DeriveEntityModel` – all SeaORM options (primary_key,
+// auto_increment, unique, default_value, indexed, column_type, …)
+// are supported.
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn table(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let table_name: syn::LitStr = syn::parse_macro_input!(attr as syn::LitStr);
+    let input: syn::ItemStruct = syn::parse_macro_input!(item as syn::ItemStruct);
+
+    let name = &input.ident;
+    let vis = &input.vis;
+    let fields = &input.fields;
+    let table = table_name.value();
+    let mod_name = syn::Ident::new(&format!("__table_{}", name), name.span());
+
+    let expanded = quote! {
+        #[doc(hidden)]
+        #[allow(non_snake_case)]
+        mod #mod_name {
+            use larastvel_core::sea_orm;
+            use sea_orm::entity::prelude::*;
+
+            #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+            #[sea_orm(table_name = #table)]
+            pub struct Model #fields
+
+            #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+            pub enum Relation {}
+
+            impl ActiveModelBehavior for ActiveModel {}
+        }
+
+        pub use #mod_name::Model;
+        pub use #mod_name::Entity;
+        pub use #mod_name::ActiveModel;
+        pub use #mod_name::Column;
+
+        #vis struct #name;
+
+        impl larastvel_core::models::DbModel for #name {
+            type Entity = Entity;
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
 // Attribute: #[route]  (on impl blocks)
 //
 // Scans method-level #[get("…")], #[post("…")] etc. markers and generates
@@ -288,6 +938,7 @@ pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
         if let ImplItem::Fn(m) = method_item {
             let mut method_name: Option<String> = None;
             let mut uri: Option<String> = None;
+            let mut middleware_names: Vec<String> = Vec::new();
 
             for attr in &m.attrs {
                 if let Some(ident) = attr.path().get_ident() {
@@ -299,6 +950,9 @@ pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         let parsed: UriArg = attr.parse_args().unwrap();
                         method_name = Some(name.to_uppercase());
                         uri = Some(parsed.uri);
+                    } else if name == "middleware" {
+                        let parsed: MiddlewareArgs = attr.parse_args().unwrap();
+                        middleware_names = parsed.names;
                     }
                 }
             }
@@ -306,14 +960,14 @@ pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let fn_name = &m.sig.ident;
             let (attrs, vis, sig, block) = (&m.attrs, &m.vis, &m.sig, &m.block);
 
-            // Keep attributes that are NOT route markers.
+            // Keep attributes that are NOT route markers or middleware.
             let kept_attrs: Vec<_> = attrs
                 .iter()
                 .filter(|a| {
                     a.path().get_ident().map(|i| i.to_string()).is_none_or(|n| {
                         !matches!(
                             n.as_str(),
-                            "get" | "post" | "put" | "patch" | "delete" | "ws"
+                            "get" | "post" | "put" | "patch" | "delete" | "ws" | "middleware"
                         )
                     })
                 })
@@ -327,10 +981,28 @@ pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
             if let (Some(method), Some(uri)) = (method_name, uri) {
                 let method_ident =
                     syn::Ident::new(&method.to_lowercase(), proc_macro2::Span::call_site());
-                let registrar_call = if method == "WS" {
-                    quote! { registrar.ws(#uri, Self::#fn_name); }
+
+                // Set per-route middleware.
+                let mw_strings: Vec<_> = middleware_names
+                    .iter()
+                    .map(|n| proc_macro2::Literal::string(n))
+                    .collect();
+                let mw_set = if mw_strings.is_empty() {
+                    quote! { registrar.with_middleware(Vec::<&str>::new()); }
                 } else {
-                    quote! { registrar.#method_ident(#uri, Self::#fn_name); }
+                    quote! { registrar.with_middleware(vec![#(#mw_strings),*]); }
+                };
+
+                let registrar_call = if method == "WS" {
+                    quote! {
+                        #mw_set
+                        registrar.ws(#uri, Self::#fn_name);
+                    }
+                } else {
+                    quote! {
+                        #mw_set
+                        registrar.#method_ident(#uri, Self::#fn_name);
+                    }
                 };
                 registrations.push(registrar_call);
             }

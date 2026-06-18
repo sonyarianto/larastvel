@@ -1121,4 +1121,434 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].uri, "/admin");
     }
+
+    // --- #[validate] attribute macro tests ---
+
+    use crate::validate;
+    use crate::validation::rules;
+    use serde_json::{json, Value};
+
+    /// A handler with #[validate] that requires email + name.
+    #[validate(vec![
+        ("email", vec![rules::required(), rules::email()]),
+        ("name", vec![rules::required()]),
+    ])]
+    async fn validate_store_handler(Json(body): Json<Value>) -> impl IntoResponse {
+        Json(json!({"ok": true}))
+    }
+
+    /// #[validate] compiles and the function has the expected name.
+    #[test]
+    fn test_validate_attribute_compiles() {
+        let _name = stringify!(validate_store_handler);
+    }
+
+    /// Valid payload passes validation → 200.
+    #[tokio::test]
+    async fn test_validate_passes() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.post("/validate", validate_store_handler);
+
+        let app = registrar.build();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/validate")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"email": "user@example.com", "name": "John"}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    /// Invalid payload fails validation → 422.
+    #[tokio::test]
+    async fn test_validate_fails() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.post("/validate", validate_store_handler);
+
+        let app = registrar.build();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/validate")
+                    .header("content-type", "application/json")
+                    .body(Body::from(json!({"email": "bad", "name": ""}).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 422);
+
+        let body: Value = serde_json::from_slice(
+            &axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(body["errors"]["email"].is_array());
+        assert!(body["errors"]["name"].is_array());
+    }
+
+    /// Non-object body returns 422.
+    #[tokio::test]
+    async fn test_validate_non_object_body() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.post("/validate", validate_store_handler);
+
+        let app = registrar.build();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/validate")
+                    .header("content-type", "application/json")
+                    .body(Body::from(json!("just a string").to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 422);
+    }
+
+    // --- #[validated_query] attribute macro tests ---
+
+    use crate::validated_query;
+    use axum::extract::Query;
+    use std::collections::HashMap;
+
+    /// A handler with #[validated_query] that requires page.
+    #[validated_query(vec![
+        ("page", vec![rules::required()]),
+    ])]
+    async fn list_handler(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
+        Json(json!({"page": params.get("page")}))
+    }
+
+    /// #[validated_query] compiles.
+    #[test]
+    fn test_validated_query_attribute_compiles() {
+        let _name = stringify!(list_handler);
+    }
+
+    /// Valid query params pass validation → 200.
+    #[tokio::test]
+    async fn test_validated_query_passes() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get("/list", list_handler);
+
+        let app = registrar.build();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/list?page=1&per_page=20")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    /// Missing required query param fails → 422.
+    #[tokio::test]
+    async fn test_validated_query_fails_missing() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get("/list", list_handler);
+
+        let app = registrar.build();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/list")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 422);
+    }
+
+    /// Valid but with extra param passes → 200 (extra params ignored).
+    #[tokio::test]
+    async fn test_validated_query_extra_params_pass() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get("/list", list_handler);
+
+        let app = registrar.build();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/list?page=1&unknown=whatever")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+    }
+
+    /// #[validated_query] used inside a #[route] impl block.
+    struct QueryController;
+
+    #[route]
+    impl QueryController {
+        #[get("/search")]
+        #[validated_query(vec![
+            ("q", vec![rules::required()]),
+        ])]
+        async fn search(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
+            Json(json!({"query": params.get("q")}))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validated_query_within_route_macro() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        QueryController::register_routes(&registrar);
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].uri, "/search");
+    }
+
+    /// #[validated_query] used inside a #[route] impl block composes with #[can].
+    struct AuthSearchController;
+
+    #[route]
+    impl AuthSearchController {
+        #[get("/admin-search")]
+        #[can("admin")]
+        #[validated_query(vec![
+            ("q", vec![rules::required()]),
+        ])]
+        async fn admin_search(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
+            Json(json!({"query": params.get("q")}))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validated_query_with_can_and_route() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        AuthSearchController::register_routes(&registrar);
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].uri, "/admin-search");
+    }
+
+    /// #[validated_query] used inside a #[route] impl block composes with #[validate].
+    struct FullValidationController;
+
+    #[route]
+    impl FullValidationController {
+        #[post("/complex")]
+        #[validated_query(vec![
+            ("locale", vec![rules::required()]),
+        ])]
+        #[validate(vec![
+            ("email", vec![rules::required(), rules::email()]),
+        ])]
+        async fn complex(
+            Query(params): Query<HashMap<String, String>>,
+            Json(_body): Json<Value>,
+        ) -> impl IntoResponse {
+            Json(json!({
+                "locale": params.get("locale"),
+                "email": "set",
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validated_query_and_validate_together() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        FullValidationController::register_routes(&registrar);
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].uri, "/complex");
+    }
+
+    /// #[validated_query] used inside a #[route] impl block.
+    struct ValidateController;
+
+    #[route]
+    impl ValidateController {
+        #[post("/validated")]
+        #[validate(vec![
+            ("email", vec![rules::required(), rules::email()]),
+        ])]
+        async fn create(Json(body): Json<Value>) -> impl IntoResponse {
+            Json(json!({"created": true}))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_within_route_macro() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        ValidateController::register_routes(&registrar);
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].uri, "/validated");
+    }
+
+    // --- #[middleware] attribute macro tests ---
+
+    /// A handler with #[middleware] inside a #[route] impl block.
+    struct MiddlewareTestController;
+
+    #[route]
+    impl MiddlewareTestController {
+        #[get("/public")]
+        async fn public_endpoint() -> &'static str {
+            "public"
+        }
+
+        #[get("/guarded")]
+        #[middleware("test-mw")]
+        async fn guarded_endpoint() -> &'static str {
+            "secret"
+        }
+
+        #[get("/multi")]
+        #[middleware("mw-a", "mw-b")]
+        async fn multi_mw_endpoint() -> &'static str {
+            "multi"
+        }
+    }
+
+    #[test]
+    fn test_middleware_attribute_on_handler() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.middleware("test-mw", |r| r);
+        registrar.middleware("mw-a", |r| r);
+        registrar.middleware("mw-b", |r| r);
+        MiddlewareTestController::register_routes(&registrar);
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 3);
+
+        // Find the guarded route and check its middleware
+        let guarded = listed.iter().find(|r| r.uri == "/guarded").unwrap();
+        assert_eq!(guarded.middleware, vec!["test-mw"]);
+
+        // Find the multi-mw route
+        let multi = listed.iter().find(|r| r.uri == "/multi").unwrap();
+        assert_eq!(multi.middleware, vec!["mw-a", "mw-b"]);
+
+        // Public route has no middleware
+        let public = listed.iter().find(|r| r.uri == "/public").unwrap();
+        assert!(public.middleware.is_empty());
+    }
+
+    /// #[middleware] actually applies the middleware to the route.
+    #[tokio::test]
+    async fn test_middleware_attribute_applies_middleware() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.middleware("add-header", |r| {
+            r.layer(axum::middleware::from_fn(
+                |req: axum::http::Request<axum::body::Body>,
+                 next: axum::middleware::Next| async move {
+                    let mut resp = next.run(req).await;
+                    resp.headers_mut()
+                        .insert("X-Guarded", "yes".parse().unwrap());
+                    resp
+                },
+            ))
+        });
+
+        // Re-register test-mw to use add-header for the integration test
+        registrar.middleware("test-mw", |r| {
+            r.layer(axum::middleware::from_fn(
+                |req: axum::http::Request<axum::body::Body>,
+                 next: axum::middleware::Next| async move {
+                    let mut resp = next.run(req).await;
+                    resp.headers_mut()
+                        .insert("X-Guarded", "yes".parse().unwrap());
+                    resp
+                },
+            ))
+        });
+        MiddlewareTestController::register_routes(&registrar);
+
+        let app = registrar.build();
+
+        // Guarded endpoint gets the header
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/guarded")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        assert_eq!(
+            resp.headers().get("X-Guarded").map(|v| v.to_str().unwrap()),
+            Some("yes")
+        );
+
+        // Public endpoint does NOT get the header
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/public")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        assert_eq!(
+            resp.headers().get("X-Guarded").map(|v| v.to_str().unwrap()),
+            None
+        );
+    }
 }

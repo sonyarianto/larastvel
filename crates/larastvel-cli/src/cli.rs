@@ -122,12 +122,16 @@ pub enum MakeTarget {
     Job { name: String },
     /// Create a new event
     Event { name: String },
+    /// Create a new listener
+    Listener { name: String },
     /// Create a new notification
     Notification { name: String },
     /// Create a new validation rule
     Rule { name: String },
     /// Create a new console command
     Command { name: String },
+    /// Create a new factory
+    Factory { name: String },
     /// Create a new mail class
     Mail { name: String },
 }
