@@ -20,17 +20,61 @@ export default defineConfig({
           items: [
             { text: 'Quick Start', link: '/guide/getting-started' },
             { text: 'Configuration', link: '/guide/configuration' },
+            { text: 'Directory Structure', link: '/guide/structure' },
             { text: 'Architecture', link: '/guide/architecture' },
+            { text: 'Deployment', link: '/guide/deployment' },
           ],
         },
         {
           text: 'Core Concepts',
           items: [
             { text: 'Routing', link: '/guide/routing' },
-            { text: 'Database & ORM', link: '/guide/database' },
+            { text: 'Middleware', link: '/guide/middleware' },
+            { text: 'Controllers', link: '/guide/controllers' },
+            { text: 'Views & Templating', link: '/guide/views' },
+            { text: 'Validation', link: '/guide/validation' },
+            { text: 'Error Handling', link: '/guide/errors' },
+            { text: 'Logging', link: '/guide/logging' },
+          ],
+        },
+        {
+          text: 'Security',
+          items: [
             { text: 'Authentication', link: '/guide/auth' },
+            { text: 'Authorization', link: '/guide/authorization' },
             { text: 'Session & CSRF', link: '/guide/session' },
+            { text: 'Encryption & Hashing', link: '/guide/encryption' },
+            { text: 'Password Reset', link: '/guide/passwords' },
+          ],
+        },
+        {
+          text: 'Database',
+          items: [
+            { text: 'Database & ORM', link: '/guide/database' },
+            { text: 'Migrations', link: '/guide/migrations' },
+            { text: 'Pagination', link: '/guide/pagination' },
+          ],
+        },
+        {
+          text: 'Digging Deeper',
+          items: [
             { text: 'Caching', link: '/guide/caching' },
+            { text: 'Events', link: '/guide/events' },
+            { text: 'Broadcasting', link: '/guide/broadcasting' },
+            { text: 'File Storage', link: '/guide/filesystem' },
+            { text: 'Localization', link: '/guide/localization' },
+            { text: 'Mail', link: '/guide/mail' },
+            { text: 'Notifications', link: '/guide/notifications' },
+            { text: 'Queues', link: '/guide/queues' },
+            { text: 'Rate Limiting', link: '/guide/rate-limiting' },
+            { text: 'Task Scheduling', link: '/guide/scheduling' },
+            { text: 'SMS', link: '/guide/sms' },
+          ],
+        },
+        {
+          text: 'Testing',
+          items: [
+            { text: 'Testing', link: '/guide/testing' },
           ],
         },
       ],
