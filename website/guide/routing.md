@@ -51,6 +51,51 @@ router.group("/admin", |r| {
 });
 ```
 
+## Route Attribute Macro
+
+The `#[route]` macro lets you define routes directly on controller methods using `#[get]`, `#[post]`, `#[put]`, `#[patch]`, `#[delete]`, and `#[ws]` attributes:
+
+```rust
+#[route]
+impl UserController {
+    #[get("/users")]
+    async fn index() -> impl IntoResponse {
+        Json(json!({"users": []}))
+    }
+
+    #[post("/users")]
+    async fn store() -> impl IntoResponse {
+        StatusCode::CREATED
+    }
+
+    #[get("/users/{id}")]
+    async fn show(Path(id): Path<String>) -> impl IntoResponse {
+        Json(json!({"user": {"id": id}}))
+    }
+
+    #[put("/users/{id}")]
+    async fn update(Path(id): Path<String>) -> impl IntoResponse {
+        Json(json!({"updated": true}))
+    }
+
+    #[delete("/users/{id}")]
+    async fn destroy(Path(id): Path<String>) -> impl IntoResponse {
+        StatusCode::NO_CONTENT
+    }
+}
+```
+
+The macro generates a `register_routes(&Registrar)` method on the struct. Call it in your route files:
+
+```rust
+// routes/api.rs
+pub fn api(router: &Registrar) {
+    UserController::register_routes(router);
+}
+```
+
+Methods without a route attribute are left as-is (not registered). Each method is an Axum handler and can use any Axum extractor.
+
 ## Controllers
 
 Use the `#[controller]` macro:
