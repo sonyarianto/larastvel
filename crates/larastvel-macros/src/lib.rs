@@ -1623,3 +1623,118 @@ pub fn api_resource(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
+
+// ---------------------------------------------------------------------------
+// Attribute: broadcast_event
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn broadcast_event(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let event_name = parse_macro_input!(attr as syn::LitStr);
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+    let name_str = event_name.value();
+
+    let expanded = quote! {
+        #input
+
+        impl larastvel_core::broadcasting::BroadcastEvent for #name {
+            fn broadcast_event_name(&self) -> &str {
+                #name_str
+            }
+
+            fn broadcast_channels(&self) -> Vec<larastvel_core::broadcasting::Channel> {
+                self.channels()
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: mail
+// ---------------------------------------------------------------------------
+
+struct MailArgs {
+    subject: String,
+    from: Option<String>,
+    reply_to: Option<String>,
+}
+
+impl Parse for MailArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut subject = None;
+        let mut from = None;
+        let mut reply_to = None;
+
+        while !input.is_empty() {
+            let ident: syn::Ident = input.parse()?;
+            input.parse::<syn::Token![=]>()?;
+            let value: syn::LitStr = input.parse()?;
+            match ident.to_string().as_str() {
+                "subject" => subject = Some(value.value()),
+                "from" => from = Some(value.value()),
+                "reply_to" => reply_to = Some(value.value()),
+                other => {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        format!("unknown mail argument: {}", other),
+                    ));
+                }
+            }
+            if !input.is_empty() {
+                input.parse::<syn::Token![,]>()?;
+            }
+        }
+
+        let subject = subject.ok_or_else(|| {
+            syn::Error::new(proc_macro2::Span::call_site(), "#[mail] requires `subject`")
+        })?;
+
+        Ok(MailArgs {
+            subject,
+            from,
+            reply_to,
+        })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn mail(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as MailArgs);
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+    let subject = &args.subject;
+
+    let from_chain = args.from.as_ref().map(|f| {
+        quote! { .from(#f) }
+    });
+
+    let reply_to_chain = args.reply_to.as_ref().map(|r| {
+        quote! { .reply_to(#r) }
+    });
+
+    let expanded = quote! {
+        #input
+
+        impl #name {
+            /// Send this mail using the given mailer.
+            pub async fn send(
+                &self,
+                mailer: &dyn larastvel_core::mail::Mailer,
+            ) -> Result<(), larastvel_core::mail::MailError> {
+                let mailable = larastvel_core::mail::Mailable::html(
+                    self.to.clone(),
+                    #subject,
+                    &self.html(),
+                )
+                #from_chain
+                #reply_to_chain;
+                mailer.send(mailable).await
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}

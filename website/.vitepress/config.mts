@@ -105,6 +105,8 @@ export default defineConfig({
             { text: 'Model Factories', link: '/reference/factories' },
             { text: 'API Resources', link: '/reference/api-resources' },
             { text: 'Service Providers', link: '/reference/providers' },
+            { text: 'Broadcast Events', link: '/reference/broadcast-events' },
+            { text: 'Mail', link: '/reference/mail' },
           ],
         },
       ],

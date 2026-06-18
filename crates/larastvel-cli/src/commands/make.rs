@@ -957,31 +957,21 @@ pub fn make_mail(name: &str) {
     };
 
     let mail_content = format!(
-        r#"use larastvel_core::mail::{{Mailable, Mailer}};
+        r#"use larastvel_core::mail::Mailer;
 
 /// Mailable: {name}
 #[derive(Debug)]
+#[mail(subject = "{name}", from = "noreply@example.com")]
 pub struct {struct_name} {{
-    // TODO: Add email data fields
+    /// Recipient email addresses.
+    pub to: Vec<String>,
+    // TODO: Add additional email data fields
 }}
 
 impl {struct_name} {{
-    pub fn new() -> Self {{
-        Self {{
-            // TODO: Initialize with data
-        }}
-    }}
-
-    pub async fn send(&self, mailer: &dyn Mailer, to: &str) -> Result<(), Box<dyn std::error::Error>> {{
-        let mailable = Mailable::html(
-            vec![to.to_string()],
-            "{name}",
-            "<h1>{name}</h1><p>Your message here.</p>",
-        )
-        .from("noreply@example.com");
-
-        mailer.send(mailable).await?;
-        Ok(())
+    /// Build the HTML body for this mail.
+    pub fn html(&self) -> String {{
+        format!("<h1>{name}</h1><p>Your message here.</p>")
     }}
 }}
 "#,
@@ -1346,6 +1336,74 @@ impl {struct_name} {{
         format!(
             "✓ Provider [{}] created at '{}'.",
             struct_name,
+            file_path.display()
+        )
+        .green()
+        .bold()
+    );
+}
+
+pub fn make_broadcast(name: &str) {
+    let events_dir = std::path::Path::new("src/events");
+    std::fs::create_dir_all(events_dir).unwrap();
+
+    let snake_name = to_snake_case(name);
+    let event_name = snake_name.clone();
+
+    let event_content = format!(
+        r#"use larastvel_core::broadcasting::Channel;
+use serde::Serialize;
+
+/// Broadcast event for {description}
+#[derive(Debug, Serialize)]
+#[broadcast_event("{event_name}")]
+pub struct {name} {{
+    // TODO: Add event data fields
+}}
+
+impl {name} {{
+    /// Define the channels this event should be broadcast on.
+    pub fn channels(&self) -> Vec<Channel> {{
+        vec![Channel::public("{{channel}}")]
+    }}
+}}
+"#,
+        name = name,
+        event_name = event_name,
+        description = name,
+    );
+
+    let file_path = events_dir.join(format!("{}.rs", snake_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!(
+                "Error: Broadcast event '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, event_content).unwrap();
+
+    // Update mod.rs
+    let mod_path = events_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", snake_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!(
+            "✓ Broadcast event [{}] created at '{}'.",
+            name,
             file_path.display()
         )
         .green()

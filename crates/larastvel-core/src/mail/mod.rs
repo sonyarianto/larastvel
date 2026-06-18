@@ -433,4 +433,70 @@ mod tests {
         let result = mailer.send(mailable).await;
         assert!(result.is_ok());
     }
+
+    // -----------------------------------------------------------------------
+    // #[mail] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::mail;
+
+    #[mail(subject = "Welcome!", from = "noreply@example.com")]
+    #[derive(Debug)]
+    struct WelcomeMail {
+        to: Vec<String>,
+        name: String,
+    }
+
+    impl WelcomeMail {
+        fn html(&self) -> String {
+            format!("<h1>Welcome, {}</h1>", self.name)
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mail_macro_send() {
+        let mail = WelcomeMail {
+            to: vec!["user@test.com".to_string()],
+            name: "Alice".to_string(),
+        };
+        let mailer = LogMailer::new("log");
+        let result = mail.send(&mailer).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_mail_macro_struct_fields() {
+        let mail = WelcomeMail {
+            to: vec!["a@b.com".to_string()],
+            name: "Bob".to_string(),
+        };
+        assert_eq!(mail.to, vec!["a@b.com"]);
+        assert_eq!(mail.name, "Bob");
+    }
+
+    #[mail(
+        subject = "Test",
+        from = "admin@test.com",
+        reply_to = "support@test.com"
+    )]
+    #[derive(Debug)]
+    struct MultiRecipientMail {
+        to: Vec<String>,
+    }
+
+    impl MultiRecipientMail {
+        fn html(&self) -> String {
+            "<p>test</p>".to_string()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mail_macro_with_reply_to() {
+        let mail = MultiRecipientMail {
+            to: vec!["a@b.com".to_string(), "c@d.com".to_string()],
+        };
+        let mailer = LogMailer::new("log");
+        let result = mail.send(&mailer).await;
+        assert!(result.is_ok());
+    }
 }

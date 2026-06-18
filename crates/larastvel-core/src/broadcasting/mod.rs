@@ -537,4 +537,55 @@ mod tests {
         // Use to_channel_name() for the prefixed name
         assert_eq!(ch.to_channel_name(), "private-chat");
     }
+
+    // -----------------------------------------------------------------------
+    // #[broadcast_event] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::broadcast_event;
+
+    #[broadcast_event("new-message")]
+    #[derive(Debug, serde::Serialize)]
+    struct MacroEvent {
+        text: String,
+    }
+
+    impl MacroEvent {
+        fn channels(&self) -> Vec<Channel> {
+            vec![Channel::public("chat")]
+        }
+    }
+
+    #[test]
+    fn test_broadcast_event_macro_implements_trait() {
+        fn assert_trait<E: BroadcastEvent>() {}
+        assert_trait::<MacroEvent>();
+    }
+
+    #[test]
+    fn test_broadcast_event_macro_name() {
+        let event = MacroEvent {
+            text: "hello".to_string(),
+        };
+        assert_eq!(event.broadcast_event_name(), "new-message");
+    }
+
+    #[test]
+    fn test_broadcast_event_macro_channels() {
+        let event = MacroEvent {
+            text: "hello".to_string(),
+        };
+        let channels = event.broadcast_channels();
+        assert_eq!(channels.len(), 1);
+        assert_eq!(channels[0].name(), "chat");
+    }
+
+    #[test]
+    fn test_broadcast_event_macro_data_default() {
+        let event = MacroEvent {
+            text: "hello".to_string(),
+        };
+        let data = event.broadcast_data();
+        assert_eq!(data["text"], "hello");
+    }
 }

@@ -39,6 +39,27 @@ manager.register("log", LogBroadcaster::new("log"));
 
 ## Broadcasting Events
 
+Define broadcast events with the `#[broadcast_event]` macro. See the [full reference](/reference/broadcast-events) for details.
+
+```rust
+use larastvel_core::broadcasting::{BroadcastEvent, Channel};
+use serde::Serialize;
+
+#[broadcast_event("order.shipped")]
+#[derive(Debug, Serialize)]
+struct OrderShipped {
+    order_id: String,
+}
+
+impl OrderShipped {
+    fn channels(&self) -> Vec<Channel> {
+        vec![Channel::public("orders")]
+    }
+}
+```
+
+Or broadcast raw messages without a struct:
+
 ```rust
 use larastvel_core::broadcasting::{BroadcastMessage, Channel};
 

@@ -1,6 +1,6 @@
 # Mail
 
-Larastvel provides SMTP and log mailers with a builder API for creating emails.
+Larastvel provides SMTP and log mailers with a builder API for creating emails. The `#[mail]` macro generates clean mailable structs — see the [full reference](/reference/mail).
 
 ## Mailers
 

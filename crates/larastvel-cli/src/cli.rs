@@ -142,4 +142,7 @@ pub enum MakeTarget {
     Resource { name: String },
     /// Create a new service provider
     Provider { name: String },
+    /// Create a new broadcast event
+    #[command(name = "broadcast-event")]
+    Broadcast { name: String },
 }

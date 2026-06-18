@@ -28,7 +28,7 @@ features:
     details: CSRF middleware auto-wired, AES-256-GCM session encryption, bcrypt hashing, constant-time comparisons.
   - icon: 🧪
     title: Testable
-    details: TestClient, TestResponse, RefreshDatabase trait. 984+ tests across the framework.
+    details: TestClient, TestResponse, RefreshDatabase trait. 991+ tests across the framework.
   - icon: 📦
     title: Modular
     details: 7 crates in a Cargo workspace. Use only what you need. CLI, macros, and testing utilities separate.

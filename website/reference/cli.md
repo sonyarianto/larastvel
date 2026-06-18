@@ -28,6 +28,8 @@ Larastvel ships with an Artisan-like CLI.
 | `make:command` | Create a new CLI command |
 | `make:resource` | Create a new API resource |
 | `make:provider` | Create a new service provider |
+| `make:broadcast-event` | Create a new broadcast event |
+| `make:mail` | Create a new mail class |
 | `db:seed` | Seed the database |
 | `notifications:table` | Create notifications migration |
 | `storage:link` | Create a symbolic link from public/storage to storage/app/public |

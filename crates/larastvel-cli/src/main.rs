@@ -158,6 +158,9 @@ async fn main() {
             Some(MakeTarget::Provider { name }) => {
                 make_provider(&name);
             }
+            Some(MakeTarget::Broadcast { name }) => {
+                make_broadcast(&name);
+            }
             None => {
                 println!("{}", "Available make targets:".cyan());
                 println!("  make:model       Create a new model");
@@ -178,6 +181,7 @@ async fn main() {
                 println!("  make:factory     Create a new model factory");
                 println!("  make:resource    Create a new API resource");
                 println!("  make:provider    Create a new service provider");
+                println!("  make:broadcast-event Create a new broadcast event");
             }
         },
         None => {
@@ -209,6 +213,7 @@ async fn main() {
             println!("  make:factory     Create a new model factory");
             println!("  make:resource    Create a new API resource");
             println!("  make:provider    Create a new service provider");
+            println!("  make:broadcast-event Create a new broadcast event");
             println!("  schedule:run     Run scheduled tasks");
             println!("  db:seed          Run database seeders");
             println!("  storage:link     Create a symbolic link from public/storage to storage/app/public");
