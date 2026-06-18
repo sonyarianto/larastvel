@@ -18,6 +18,7 @@ pub mod middleware;
 pub mod models;
 pub mod notifications;
 pub mod pagination;
+pub mod pipeline;
 pub mod queue;
 pub mod rate_limiter;
 pub mod routing;
@@ -80,6 +81,7 @@ pub use notifications::{
     NotificationError, NotificationSender,
 };
 pub use pagination::{paginate, PaginationParams, Paginator};
+pub use pipeline::{pipe_fn, Next, Pipe, Pipeline};
 pub use queue::{
     dispatch, DatabaseQueue, InMemoryQueue, JobError, JobResolver, Queue, QueueManager,
     QueueWorker, ShouldQueue, SyncQueue,
