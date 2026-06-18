@@ -1186,6 +1186,110 @@ pub fn notification(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 // ---------------------------------------------------------------------------
+// Attribute: #[rule]
+//
+// Generates a ValidationRule trait implementation from an impl block by
+// scanning for a `validate` method.  The `name()` method is auto-derived
+// from the struct name (snake_case).  Non-rule methods remain on the
+// original impl block.
+//
+// Usage:
+// ```rust,ignore
+// #[derive(Debug, Clone)]
+// struct UpperCaseRule;
+//
+// #[rule]
+// impl UpperCaseRule {
+//     fn validate(&self, field: &str, value: &str) -> Result<(), ValidationError> {
+//         if value.chars().any(|c| c.is_lowercase()) {
+//             return Err(ValidationError::new(
+//                 format!("The {} must be uppercase.", field),
+//             ));
+//         }
+//         Ok(())
+//     }
+// }
+// ```
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn rule(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input: syn::ItemImpl = parse_macro_input!(item as syn::ItemImpl);
+    let struct_ty = &input.self_ty;
+    let generics = &input.generics;
+    let where_clause = &input.generics.where_clause;
+
+    // Derive name() from the struct name: PascalCase -> snake_case
+    let struct_name = struct_ty_to_string(struct_ty);
+    let rule_name = pascal_to_snake(&struct_name);
+
+    let mut validate_method: Option<syn::ImplItemFn> = None;
+    let mut kept_items = Vec::new();
+
+    for item in input.items {
+        if let syn::ImplItem::Fn(method) = &item {
+            if method.sig.ident == "validate" {
+                validate_method = Some(method.clone());
+                continue;
+            }
+        }
+        kept_items.push(item);
+    }
+
+    let validate = match validate_method {
+        Some(m) => quote! { #m },
+        None => {
+            return syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "#[rule] requires a `validate` method on the impl block",
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
+
+    let expanded = quote! {
+        impl #generics #struct_ty #where_clause {
+            #(#kept_items)*
+        }
+
+        impl #generics larastvel_core::validation::ValidationRule for #struct_ty #where_clause {
+            fn name(&self) -> &str {
+                #rule_name
+            }
+
+            #validate
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+fn struct_ty_to_string(ty: &syn::Type) -> String {
+    // Extract the simple type name: e.g. MyRule<T> -> "MyRule"
+    match ty {
+        syn::Type::Path(p) => p
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
+fn pascal_to_snake(s: &str) -> String {
+    let mut result = String::new();
+    for (i, c) in s.char_indices() {
+        if i > 0 && c.is_uppercase() {
+            result.push('_');
+        }
+        result.push(c.to_ascii_lowercase());
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
 // Attribute: #[observer(Model)]
 //
 // Generates Listener implementations for model lifecycle events based on

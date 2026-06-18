@@ -66,7 +66,7 @@ pub use hash::{check as hash_check, is_hashed, make as hash_make, needs_rehash, 
 pub use http::{Error as HttpError, JsonResponse, LarastvelResult, Request};
 pub use larastvel_macros::{
     can, controller, delete, get, job, listener, middleware, notification, observer, patch, post,
-    put, queued_listener, route, scope, table, validate, validated_query, ws, Resource,
+    put, queued_listener, route, rule, scope, table, validate, validated_query, ws, Resource,
 };
 pub use logging::init as logging_init;
 pub use middleware::presets::{
@@ -104,5 +104,8 @@ pub use translation::{
     load_translation_json, locale, set_fallback_locale, set_locale, trans_choice,
     trans_choice_with, Translator, __,
 };
-pub use validation::{validate, ValidatedJson, ValidatedQuery, ValidationErrors, Validator};
+pub use validation::{
+    custom, rules, validate, ValidatedJson, ValidatedQuery, ValidationError, ValidationErrors,
+    ValidationRule, Validator,
+};
 pub use view::{ViewError, ViewFactory};

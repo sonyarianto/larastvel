@@ -1,4 +1,31 @@
 use regex::Regex;
+use std::sync::Arc;
+
+/// An error returned by a custom validation rule.
+#[derive(Debug, Clone)]
+pub struct ValidationError(pub String);
+
+impl ValidationError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self(message.into())
+    }
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ValidationError {}
+
+/// Trait for custom validation rules.
+pub trait ValidationRule: Send + Sync + std::fmt::Debug {
+    /// The rule name (used in error messages).
+    fn name(&self) -> &str;
+    /// Validate a value. Return `Ok(())` if valid, `Err(ValidationError)` if not.
+    fn validate(&self, field: &str, value: &str) -> Result<(), ValidationError>;
+}
 
 #[derive(Clone)]
 pub enum Rule {
@@ -23,6 +50,36 @@ pub enum Rule {
     Size(usize),
     Present,
     Prohibited,
+    Custom(Arc<dyn ValidationRule>),
+}
+
+impl std::fmt::Debug for Rule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Required => write!(f, "Required"),
+            Self::Email => write!(f, "Email"),
+            Self::Min(n) => write!(f, "Min({})", n),
+            Self::Max(n) => write!(f, "Max({})", n),
+            Self::MinValue(n) => write!(f, "MinValue({})", n),
+            Self::MaxValue(n) => write!(f, "MaxValue({})", n),
+            Self::String => write!(f, "String"),
+            Self::Numeric => write!(f, "Numeric"),
+            Self::Boolean => write!(f, "Boolean"),
+            Self::Confirmed => write!(f, "Confirmed"),
+            Self::Same(s) => write!(f, "Same({})", s),
+            Self::Different(s) => write!(f, "Different({})", s),
+            Self::Alpha => write!(f, "Alpha"),
+            Self::AlphaNumeric => write!(f, "AlphaNumeric"),
+            Self::Url => write!(f, "Url"),
+            Self::Ip => write!(f, "Ip"),
+            Self::Regex(_) => write!(f, "Regex"),
+            Self::Between(a, b) => write!(f, "Between({}, {})", a, b),
+            Self::Size(n) => write!(f, "Size({})", n),
+            Self::Present => write!(f, "Present"),
+            Self::Prohibited => write!(f, "Prohibited"),
+            Self::Custom(rule) => write!(f, "Custom({})", rule.name()),
+        }
+    }
 }
 
 pub fn required() -> Rule {
@@ -87,6 +144,9 @@ pub fn present() -> Rule {
 }
 pub fn prohibited() -> Rule {
     Rule::Prohibited
+}
+pub fn custom(rule: Arc<dyn ValidationRule>) -> Rule {
+    Rule::Custom(rule)
 }
 
 pub(crate) fn check_rule(
@@ -274,6 +334,10 @@ pub(crate) fn check_rule(
                 return Some(format!("The {} field is prohibited.", field));
             }
             None
+        }
+        Rule::Custom(rule) => {
+            let val = value.and_then(|v| v.as_str()).unwrap_or("");
+            rule.validate(field, val).err().map(|e| e.0)
         }
     }
 }

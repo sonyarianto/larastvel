@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use self::rules::check_rule;
-pub use self::rules::Rule;
+pub use self::rules::{custom, Rule, ValidationError, ValidationRule};
 
 #[derive(Debug, Clone)]
 pub struct ValidationErrors {
@@ -620,6 +620,83 @@ mod tests {
             let d = data(vec![("username", json!("john@123"))]);
             let err = validate(&d, vec![("username", vec![rules::alpha_numeric()])]).unwrap_err();
             assert!(err.has("username"));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Custom rule tests
+    // -------------------------------------------------------------------------
+
+    mod custom_rule {
+        use super::*;
+        use crate::rule;
+        use std::sync::Arc;
+
+        #[derive(Debug, Clone)]
+        struct UpperCaseRule;
+
+        #[rule]
+        impl UpperCaseRule {
+            fn validate(&self, field: &str, value: &str) -> Result<(), ValidationError> {
+                if value.chars().any(|c| c.is_lowercase()) {
+                    return Err(ValidationError::new(format!(
+                        "The {} must be uppercase.",
+                        field
+                    )));
+                }
+                Ok(())
+            }
+        }
+
+        #[test]
+        fn rule_name_derived_from_struct() {
+            let rule = UpperCaseRule;
+            assert_eq!(
+                <UpperCaseRule as ValidationRule>::name(&rule),
+                "upper_case_rule"
+            );
+        }
+
+        #[test]
+        fn custom_rule_validates_correctly() {
+            let rule = UpperCaseRule;
+            assert!(rule.validate("code", "ABC").is_ok());
+            assert!(rule.validate("code", "abc").is_err());
+        }
+
+        #[test]
+        fn custom_rule_works_with_validate_function() {
+            let d = data(vec![("code", json!("ABC"))]);
+            assert!(validate(&d, vec![("code", vec![custom(Arc::new(UpperCaseRule))])]).is_ok());
+
+            let d = data(vec![("code", json!("abc"))]);
+            let err =
+                validate(&d, vec![("code", vec![custom(Arc::new(UpperCaseRule))])]).unwrap_err();
+            assert!(err.has("code"));
+        }
+
+        #[test]
+        fn custom_rule_mixed_with_builtin() {
+            let d = data(vec![("code", json!("ABC"))]);
+            assert!(validate(
+                &d,
+                vec![(
+                    "code",
+                    vec![rules::required(), custom(Arc::new(UpperCaseRule))]
+                )]
+            )
+            .is_ok());
+
+            let d = data(vec![("code", json!("abc"))]);
+            let err = validate(
+                &d,
+                vec![(
+                    "code",
+                    vec![rules::required(), custom(Arc::new(UpperCaseRule))],
+                )],
+            )
+            .unwrap_err();
+            assert!(err.has("code"));
         }
     }
 }

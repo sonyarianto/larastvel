@@ -161,6 +161,52 @@ if validator.fails() {
 }
 ```
 
+## Custom Rules
+
+Define custom validation rules with the `#[rule]` attribute macro. The macro scans the impl block for a `validate` method and auto-generates the `ValidationRule` trait implementation; the `name()` method is derived automatically from the struct name.
+
+```rust
+use larastvel_core::rule;
+use larastvel_core::validation::ValidationError;
+
+#[derive(Debug, Clone)]
+struct UpperCaseRule;
+
+#[rule]
+impl UpperCaseRule {
+    fn validate(&self, field: &str, value: &str) -> Result<(), ValidationError> {
+        if value.chars().any(|c| c.is_lowercase()) {
+            return Err(ValidationError::new(format!(
+                "The {} must be uppercase.",
+                field
+            )));
+        }
+        Ok(())
+    }
+}
+```
+
+Use custom rules alongside built-in rules via `custom()`:
+
+```rust
+use larastvel_core::validation::{validate, rules, custom};
+use std::sync::Arc;
+
+let data = /* ... */;
+let result = validate(&data, vec![
+    ("code", vec![
+        rules::required(),
+        custom(Arc::new(UpperCaseRule)),
+    ]),
+]);
+```
+
+Generate a new custom rule with `make:rule`:
+
+```bash
+cargo run make:rule UpperCase
+```
+
 ## ValidationErrors API
 
 | Method | Description |

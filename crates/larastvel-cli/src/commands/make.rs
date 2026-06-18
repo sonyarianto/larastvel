@@ -376,7 +376,8 @@ pub fn make_rule(name: &str) {
     };
 
     let rule_content = format!(
-        r#"use larastvel_core::validation::{{ValidationRule, ValidationError}};
+        r#"use larastvel_core::validation::ValidationError;
+use larastvel_core::rule;
 
 /// Validation rule: {name}
 #[derive(Debug, Clone)]
@@ -392,12 +393,9 @@ impl {struct_name} {{
     }}
 }}
 
-impl ValidationRule for {struct_name} {{
-    fn name(&self) -> &str {{
-        "{snake}"
-    }}
-
-    fn validate(&self, _field: &str, _value: &str) -> Result<(), ValidationError> {{
+#[rule]
+impl {struct_name} {{
+    fn validate(&self, field: &str, value: &str) -> Result<(), ValidationError> {{
         // TODO: Implement validation logic
         // Return Ok(()) for valid, Err(ValidationError::new("message")) for invalid
         Ok(())
@@ -406,7 +404,6 @@ impl ValidationRule for {struct_name} {{
 "#,
         struct_name = struct_name,
         name = name,
-        snake = snake_name,
     );
 
     let file_path = rules_dir.join(format!("{}.rs", snake_name));
