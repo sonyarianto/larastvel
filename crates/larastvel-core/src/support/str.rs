@@ -281,6 +281,10 @@ impl Str {
         s.starts_with("http://") || s.starts_with("https://")
     }
 
+    pub fn of(s: &str) -> crate::support::Stringable {
+        crate::support::Stringable::new(s)
+    }
+
     pub fn is_uuid(s: &str) -> bool {
         let s = s.trim();
         if s.len() != 36 {
@@ -301,7 +305,7 @@ impl Str {
     }
 }
 
-fn words(s: &str) -> Vec<String> {
+pub(crate) fn words(s: &str) -> Vec<String> {
     let s = s.trim();
     if s.is_empty() {
         return vec![];
@@ -351,7 +355,7 @@ fn split_camel(s: &str) -> Vec<String> {
     result
 }
 
-fn capitalize(s: &str) -> String {
+pub(crate) fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
         None => String::new(),

@@ -87,7 +87,7 @@ pub use sms::{LogSmsSender, SmsError, SmsMessage, SmsSender, VonageSmsSender};
 pub use storage::{Filesystem, LocalDisk, StorageError, StorageManager};
 pub use support::{
     app_path, base_path, collect_items, config_path, now, public_path, resource_path, storage_path,
-    today, Arr, Collection, Dt, Http, PendingRequest, Str, Vite,
+    today, Arr, Collection, Dt, Http, PendingRequest, Str, Stringable, Vite,
 };
 pub use translation::{
     __with, has_translation, load_translation_directory, load_translation_file,

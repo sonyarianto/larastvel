@@ -72,6 +72,7 @@ export default defineConfig({
             { text: 'Queues', link: '/guide/queues' },
             { text: 'Rate Limiting', link: '/guide/rate-limiting' },
             { text: 'Str', link: '/guide/str' },
+            { text: 'Stringable', link: '/guide/stringable' },
             { text: 'Task Scheduling', link: '/guide/scheduling' },
             { text: 'SMS', link: '/guide/sms' },
           ],
