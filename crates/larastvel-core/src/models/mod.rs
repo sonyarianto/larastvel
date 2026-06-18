@@ -8,6 +8,10 @@ use sea_orm::{
     LoaderTrait, ModelTrait, PrimaryKeyTrait, QueryFilter, Related,
 };
 
+use crate::events::{
+    EventService, ModelCreated, ModelDeleted, ModelRetrieved, ModelSaved, ModelUpdated,
+};
+
 static GLOBAL_DB: OnceLock<DatabaseConnection> = OnceLock::new();
 
 pub fn set_global_database(db: DatabaseConnection) -> Result<(), sea_orm::DbErr> {
@@ -77,11 +81,18 @@ pub trait DbModel: Send + Sync + Sized + 'static {
     /// This automatically applies any global scopes defined via `scope_filter()`.
     async fn find(
         id: impl Into<<<Self::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType> + Send,
-    ) -> Result<Option<<Self::Entity as EntityTrait>::Model>, sea_orm::DbErr> {
-        Self::Entity::find_by_id(id)
+    ) -> Result<Option<<Self::Entity as EntityTrait>::Model>, sea_orm::DbErr>
+    where
+        <Self::Entity as EntityTrait>::Model: Clone + Send + Sync,
+    {
+        let result = Self::Entity::find_by_id(id)
             .filter(Self::scope_filter())
             .one(Self::db())
-            .await
+            .await?;
+        if let Some(ref model) = result {
+            EventService::dispatch(ModelRetrieved::<Self::Entity>(model.clone())).await;
+        }
+        Ok(result)
     }
 
     /// Retrieve all models of this type.
@@ -101,9 +112,12 @@ pub trait DbModel: Send + Sync + Sized + 'static {
     where
         <Self::Entity as EntityTrait>::ActiveModel: Send,
         <Self::Entity as EntityTrait>::Model:
-            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel>,
+            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel> + Clone + Send + Sync,
     {
-        active_model.insert(Self::db()).await
+        let model = active_model.insert(Self::db()).await?;
+        EventService::dispatch(ModelCreated::<Self::Entity>(model.clone())).await;
+        EventService::dispatch(ModelSaved::<Self::Entity>(model.clone())).await;
+        Ok(model)
     }
 
     /// Update an existing record.
@@ -113,19 +127,26 @@ pub trait DbModel: Send + Sync + Sized + 'static {
     where
         <Self::Entity as EntityTrait>::ActiveModel: Send,
         <Self::Entity as EntityTrait>::Model:
-            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel>,
+            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel> + Clone + Send + Sync,
     {
-        active_model.update(Self::db()).await
+        let model = active_model.update(Self::db()).await?;
+        EventService::dispatch(ModelUpdated::<Self::Entity>(model.clone())).await;
+        EventService::dispatch(ModelSaved::<Self::Entity>(model.clone())).await;
+        Ok(model)
     }
 
     /// Delete a record.
     async fn delete(
-        active_model: <Self::Entity as EntityTrait>::ActiveModel,
+        model: <Self::Entity as EntityTrait>::Model,
     ) -> Result<DeleteResult, sea_orm::DbErr>
     where
         <Self::Entity as EntityTrait>::ActiveModel: Send,
+        <Self::Entity as EntityTrait>::Model:
+            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel> + Clone + Send + Sync,
     {
-        active_model.delete(Self::db()).await
+        let result = model.clone().into_active_model().delete(Self::db()).await?;
+        EventService::dispatch(ModelDeleted::<Self::Entity>(model)).await;
+        Ok(result)
     }
 
     // -------------------------------------------------------------------------
@@ -296,9 +317,9 @@ pub trait SoftDeletes: DbModel {
     where
         <Self::Entity as EntityTrait>::ActiveModel: Send,
         <Self::Entity as EntityTrait>::Model:
-            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel>,
+            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel> + Clone + Send + Sync,
     {
-        active_model.update(Self::db()).await
+        <Self as DbModel>::update(active_model).await
     }
 
     /// Permanently delete a soft-deletable record (hard delete).
@@ -395,9 +416,9 @@ pub trait Timestamps: DbModel {
     where
         <Self::Entity as EntityTrait>::ActiveModel: Send,
         <Self::Entity as EntityTrait>::Model:
-            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel>,
+            IntoActiveModel<<Self::Entity as EntityTrait>::ActiveModel> + Clone + Send + Sync,
     {
-        active_model.update(Self::db()).await
+        <Self as DbModel>::update(active_model).await
     }
 }
 

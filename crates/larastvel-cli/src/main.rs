@@ -149,6 +149,9 @@ async fn main() {
             Some(MakeTarget::Factory { name }) => {
                 make_factory(&name);
             }
+            Some(MakeTarget::Observer { name }) => {
+                make_observer(&name);
+            }
             None => {
                 println!("{}", "Available make targets:".cyan());
                 println!("  make:model       Create a new model");
@@ -160,6 +163,7 @@ async fn main() {
                 println!("  make:job         Create a new job");
                 println!("  make:event       Create a new event");
                 println!("  make:listener    Create a new event listener");
+                println!("  make:observer    Create a new model observer");
                 println!("  make:scope       Create a new query scope");
                 println!("  make:notification Create a new notification");
                 println!("  make:rule        Create a new validation rule");
@@ -189,6 +193,7 @@ async fn main() {
             println!("  make:job         Create a new job");
             println!("  make:event       Create a new event");
             println!("  make:listener    Create a new event listener");
+            println!("  make:observer    Create a new model observer");
             println!("  make:scope       Create a new query scope");
             println!("  make:notification Create a new notification");
             println!("  make:rule        Create a new validation rule");

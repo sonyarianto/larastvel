@@ -1126,3 +1126,87 @@ impl ModelFactory for {struct_name} {{
         "  Usage: let user = factory_create::<UserFactory>().await;".dimmed()
     );
 }
+
+pub fn make_observer(name: &str) {
+    let observers_dir = std::path::Path::new("src/observers");
+    std::fs::create_dir_all(observers_dir).unwrap();
+
+    let snake_name = to_snake_case(name);
+    let struct_name = if name.ends_with("Observer") {
+        name.to_string()
+    } else {
+        format!("{}Observer", name)
+    };
+
+    let observer_content = format!(
+        r#"use larastvel_core::observer;
+
+/// Observer for {model}
+pub struct {struct_name};
+
+// Define hook methods inside the observer impl block:
+
+// #[observer({model})]
+// impl {struct_name} {{
+//     async fn created(&self, model: {model}Model) {{
+//         // TODO: handle created event
+//     }}
+//
+//     async fn updated(&self, model: {model}Model) {{
+//         // TODO: handle updated event
+//     }}
+//
+//     async fn deleted(&self, model: {model}Model) {{
+//         // TODO: handle deleted event
+//     }}
+// }}
+"#,
+        model = name,
+        struct_name = struct_name,
+    );
+
+    let file_path = observers_dir.join(format!("{}.rs", snake_name));
+    if file_path.exists() {
+        eprintln!(
+            "{}",
+            format!(
+                "Error: Observer '{}' already exists at '{}'.",
+                name,
+                file_path.display()
+            )
+            .red()
+        );
+        return;
+    }
+
+    std::fs::write(&file_path, observer_content).unwrap();
+
+    // Update mod.rs
+    let mod_path = observers_dir.join("mod.rs");
+    let mut mod_content = if mod_path.exists() {
+        std::fs::read_to_string(&mod_path).unwrap()
+    } else {
+        String::new()
+    };
+    mod_content.push_str(&format!("pub mod {};\n", snake_name));
+    std::fs::write(&mod_path, mod_content).unwrap();
+
+    println!(
+        "{}",
+        format!(
+            "✓ Observer [{}] created at '{}'.",
+            struct_name,
+            file_path.display()
+        )
+        .green()
+        .bold()
+    );
+    println!(
+        "{}",
+        format!(
+            "  Add hook methods, then register with: {}::observe();",
+            struct_name
+        )
+        .dimmed()
+    );
+}

@@ -136,4 +136,6 @@ pub enum MakeTarget {
     Mail { name: String },
     /// Create a new query scope
     Scope { name: String },
+    /// Create a new model observer
+    Observer { name: String },
 }

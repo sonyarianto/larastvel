@@ -85,6 +85,44 @@ Generate a scaffolded scope with:
 larastvel make:scope popular
 ```
 
+## Model Observers
+
+Observers allow you to hook into model lifecycle events — `created`, `updated`, `deleted`, `saved`, and `retrieved` — by defining handler methods on a dedicated struct.
+
+```rust
+use larastvel_core::observer;
+
+struct UserObserver;
+
+#[observer(User)]
+impl UserObserver {
+    async fn created(&self, user: Model) {
+        // React to new user creation
+    }
+
+    async fn deleted(&self, user: Model) {
+        // React to user deletion
+    }
+}
+
+// Register the observer at app boot:
+UserObserver::observe();
+```
+
+Only the hook methods you define are wired up — if you omit `updated`, no `ModelUpdated` listener is registered.
+
+The `DbModel` trait automatically dispatches these events:
+- `find()` → `ModelRetrieved`
+- `insert()` → `ModelCreated` + `ModelSaved`
+- `update()` → `ModelUpdated` + `ModelSaved`
+- `delete()` → `ModelDeleted`
+
+Generate a scaffolded observer with:
+
+```bash
+larastvel make:observer UserObserver
+```
+
 ## Migrations
 
 Generate and run migrations via CLI:

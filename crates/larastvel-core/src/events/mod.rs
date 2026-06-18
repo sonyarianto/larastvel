@@ -6,6 +6,31 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use once_cell::sync::Lazy;
+use sea_orm::EntityTrait;
+
+// ---------------------------------------------------------------------------
+// Model lifecycle events
+// ---------------------------------------------------------------------------
+
+/// Emitted after a model is retrieved from the database via `find()`.
+#[derive(Debug, Clone)]
+pub struct ModelRetrieved<M: EntityTrait>(pub M::Model);
+
+/// Emitted after a model is inserted for the first time.
+#[derive(Debug, Clone)]
+pub struct ModelCreated<M: EntityTrait>(pub M::Model);
+
+/// Emitted after a model is updated.
+#[derive(Debug, Clone)]
+pub struct ModelUpdated<M: EntityTrait>(pub M::Model);
+
+/// Emitted after a model is deleted.
+#[derive(Debug, Clone)]
+pub struct ModelDeleted<M: EntityTrait>(pub M::Model);
+
+/// Emitted after a model is saved (both created and updated).
+#[derive(Debug, Clone)]
+pub struct ModelSaved<M: EntityTrait>(pub M::Model);
 
 type EventPayload = Box<dyn Any + Send + Sync>;
 type ListenerFnInner =
@@ -555,5 +580,182 @@ mod tests {
             <OnOrderPlacedJob as crate::queue::ShouldQueue>::name(&job),
             "on_order_placed"
         );
+    }
+
+    // --- #[observer] attribute macro tests ---
+
+    use crate::models::DbModel;
+    use crate::observer;
+
+    // A minimal SeaORM entity for use in observer tests
+    mod obs_user {
+        use sea_orm::entity::prelude::*;
+
+        #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+        #[sea_orm(table_name = "obs_users")]
+        pub struct Model {
+            #[sea_orm(primary_key)]
+            pub id: i32,
+            pub name: String,
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+        pub enum Relation {}
+
+        impl ActiveModelBehavior for ActiveModel {}
+    }
+
+    struct ObsUser;
+
+    impl DbModel for ObsUser {
+        type Entity = obs_user::Entity;
+    }
+
+    #[test]
+    fn test_observer_macro_compiles() {
+        use super::*;
+
+        struct TestObserver;
+
+        #[observer(ObsUser)]
+        impl TestObserver {
+            async fn created(&self, _model: obs_user::Model) {}
+
+            async fn deleted(&self, _model: obs_user::Model) {}
+        }
+
+        // Verify the listener impls exist by requiring the trait bounds
+        fn _assert_listener<E, L>()
+        where
+            E: Event,
+            L: Listener<E>,
+        {
+        }
+        _assert_listener::<ModelCreated<obs_user::Entity>, TestObserver>();
+        _assert_listener::<ModelDeleted<obs_user::Entity>, TestObserver>();
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_observer_observe_method_registers_listeners() {
+        EventService::clear_all_listeners();
+
+        struct TestObserver2;
+
+        #[observer(ObsUser)]
+        impl TestObserver2 {
+            async fn created(&self, _model: obs_user::Model) {}
+
+            async fn updated(&self, _model: obs_user::Model) {}
+        }
+
+        TestObserver2::observe();
+
+        assert!(EventService::has_listeners::<ModelCreated<obs_user::Entity>>());
+        assert!(EventService::has_listeners::<ModelUpdated<obs_user::Entity>>());
+
+        // Should NOT have listener for deleted (no deleted method defined)
+        assert!(!EventService::has_listeners::<ModelDeleted<obs_user::Entity>>());
+
+        EventService::clear_all_listeners();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_observer_receives_created_event() {
+        EventService::clear_all_listeners();
+        static CALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+        struct CreatedObserver;
+
+        #[observer(ObsUser)]
+        impl CreatedObserver {
+            async fn created(&self, _model: obs_user::Model) {
+                CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+
+        CreatedObserver::observe();
+        assert!(EventService::has_listeners::<ModelCreated<obs_user::Entity>>());
+
+        EventService::dispatch(ModelCreated::<obs_user::Entity>(obs_user::Model {
+            id: 1,
+            name: "test".into(),
+        }))
+        .await;
+
+        assert!(CALLED.load(std::sync::atomic::Ordering::SeqCst));
+        EventService::clear_listeners::<ModelCreated<obs_user::Entity>>();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_observer_receives_deleted_event() {
+        EventService::clear_all_listeners();
+        static HANDLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+        struct DeletedObserver;
+
+        #[observer(ObsUser)]
+        impl DeletedObserver {
+            async fn deleted(&self, _model: obs_user::Model) {
+                HANDLED.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+
+        DeletedObserver::observe();
+        assert!(EventService::has_listeners::<ModelDeleted<obs_user::Entity>>());
+
+        EventService::dispatch(ModelDeleted::<obs_user::Entity>(obs_user::Model {
+            id: 42,
+            name: "deleted-user".into(),
+        }))
+        .await;
+
+        assert!(HANDLED.load(std::sync::atomic::Ordering::SeqCst));
+        EventService::clear_listeners::<ModelDeleted<obs_user::Entity>>();
+    }
+
+    #[test]
+    fn test_observer_macro_handles_all_hook_methods() {
+        #[allow(dead_code)]
+        struct FullObserver;
+
+        // All five hooks — should compile and generate all five listener impls
+        #[observer(ObsUser)]
+        #[allow(dead_code)]
+        impl FullObserver {
+            async fn created(&self, _model: obs_user::Model) {}
+            async fn updated(&self, _model: obs_user::Model) {}
+            async fn deleted(&self, _model: obs_user::Model) {}
+            async fn saved(&self, _model: obs_user::Model) {}
+            async fn retrieved(&self, _model: obs_user::Model) {}
+        }
+
+        fn _assert_created()
+        where
+            FullObserver: Listener<ModelCreated<obs_user::Entity>>,
+        {
+        }
+        fn _assert_updated()
+        where
+            FullObserver: Listener<ModelUpdated<obs_user::Entity>>,
+        {
+        }
+        fn _assert_deleted()
+        where
+            FullObserver: Listener<ModelDeleted<obs_user::Entity>>,
+        {
+        }
+        fn _assert_saved()
+        where
+            FullObserver: Listener<ModelSaved<obs_user::Entity>>,
+        {
+        }
+        fn _assert_retrieved()
+        where
+            FullObserver: Listener<ModelRetrieved<obs_user::Entity>>,
+        {
+        }
     }
 }

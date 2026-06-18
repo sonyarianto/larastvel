@@ -1114,3 +1114,102 @@ pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(gen)
 }
+
+// ---------------------------------------------------------------------------
+// Attribute: #[observer(Model)]
+//
+// Generates Listener implementations for model lifecycle events based on
+// hook methods defined on an impl block.
+//
+// The attribute goes on an impl block for an observer struct. Hook methods
+// are scanned by name (`created`, `updated`, `deleted`, `saved`,
+// `retrieved`) and each generates a `Listener<ModelEvent<M::Entity>>`
+// implementation.  An `observe()` method is also generated to register
+// all listeners with `EventService`.
+//
+// Usage:
+// ```rust,ignore
+// struct UserObserver;
+//
+// #[observer(User)]
+// impl UserObserver {
+//     async fn created(&self, model: Model) {
+//         tracing::info!("User created: {}", model.email);
+//     }
+//
+//     async fn deleted(&self, model: Model) {
+//         tracing::info!("User deleted: {}", model.email);
+//     }
+// }
+//
+// // Register the observer at app boot:
+// UserObserver::observe();
+// ```
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn observer(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let model_ty: syn::Type = parse_macro_input!(attr as syn::Type);
+    let input: syn::ItemImpl = parse_macro_input!(item as syn::ItemImpl);
+
+    let struct_ty = &input.self_ty;
+
+    let entity_ty = quote! {
+        <#model_ty as larastvel_core::models::DbModel>::Entity
+    };
+    let event_mod = quote! { larastvel_core::events };
+    let listener_trait = quote! { larastvel_core::events::Listener };
+
+    // Known hook method names and their corresponding event type stems
+    let hooks: [(&str, &str); 5] = [
+        ("created", "ModelCreated"),
+        ("updated", "ModelUpdated"),
+        ("deleted", "ModelDeleted"),
+        ("saved", "ModelSaved"),
+        ("retrieved", "ModelRetrieved"),
+    ];
+
+    // Scan the impl block for hook methods
+    let mut listener_impls = Vec::new();
+    let mut observe_calls = Vec::new();
+
+    for item in &input.items {
+        if let syn::ImplItem::Fn(method) = item {
+            let method_name = method.sig.ident.to_string();
+            if let Some(&(_, event_stem)) = hooks.iter().find(|(name, _)| *name == method_name) {
+                let event_ident = syn::Ident::new(event_stem, method.sig.ident.span());
+                let hook_method = &method.sig.ident;
+
+                // Generate Listener<ModelEvent<M::Entity>> implementation
+                listener_impls.push(quote! {
+                    #[larastvel_core::async_trait]
+                    impl #listener_trait<#event_mod::#event_ident<#entity_ty>> for #struct_ty {
+                        async fn handle(&self, event: #event_mod::#event_ident<#entity_ty>) {
+                            self.#hook_method(event.0).await;
+                        }
+                    }
+                });
+
+                // Generate the observe() registration call
+                observe_calls.push(quote! {
+                    larastvel_core::events::EventService::listen::<#event_mod::#event_ident<#entity_ty>, Self>(Self);
+                });
+            }
+        }
+    }
+
+    let expanded = quote! {
+        #input
+
+        #(#listener_impls)*
+
+        impl #struct_ty {
+            /// Register this observer's hook methods as event listeners.
+            pub fn observe() {
+                #(#observe_calls)*
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
