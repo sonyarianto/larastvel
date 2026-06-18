@@ -79,8 +79,8 @@ use larastvel_core::sms::{LogSmsSender, SmsMessage, SmsSender};
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub db: sea_orm::DatabaseConnection,
-    pub sms_store: SharedSmsStore,
-    pub broadcast_log: SharedBroadcastLog,
+    pub(crate) sms_store: SharedSmsStore,
+    pub(crate) broadcast_log: SharedBroadcastLog,
 }
 
 // =============================================================================

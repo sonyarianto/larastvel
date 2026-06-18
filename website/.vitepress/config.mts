@@ -60,6 +60,7 @@ export default defineConfig({
           items: [
             { text: 'Caching', link: '/guide/caching' },
             { text: 'Collections', link: '/guide/collections' },
+            { text: 'Date & Time', link: '/guide/datetime' },
             { text: 'Events', link: '/guide/events' },
             { text: 'Broadcasting', link: '/guide/broadcasting' },
             { text: 'File Storage', link: '/guide/filesystem' },

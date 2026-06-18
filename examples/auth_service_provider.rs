@@ -416,7 +416,7 @@ pub async fn register_all(
 ///     }))
 /// }
 /// ```
-
+///
 /// Example handler using `AuthenticatedUser` and the Gate from extensions.
 ///
 /// ```ignore
@@ -436,7 +436,7 @@ pub async fn register_all(
 ///     }
 /// }
 /// ```
-
+///
 /// Entry point (required for `cargo run --example`).
 /// See the module-level documentation for how to wire up the services.
 fn main() {
