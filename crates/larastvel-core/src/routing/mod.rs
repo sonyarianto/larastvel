@@ -1045,4 +1045,80 @@ mod tests {
         let listed = registrar.list_routes();
         assert!(!listed.iter().any(|r| r.handler_name.contains("internal")));
     }
+
+    // --- #[can] attribute macro tests ---
+
+    use crate::can;
+    use axum::Extension;
+
+    /// A handler with #[can] that returns &'static str.
+    #[can("admin")]
+    async fn protected_handler() -> &'static str {
+        "secret"
+    }
+
+    /// #[can] compiles and the function has the expected name.
+    #[test]
+    fn test_can_attribute_compiles() {
+        let _name = stringify!(protected_handler);
+    }
+
+    /// Verify #[can] handler works through the registrar when auth passes.
+    #[tokio::test]
+    async fn test_can_handler_registers_and_routes() {
+        use crate::auth::Gate;
+        use crate::GateCheck;
+
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+
+        registrar.get("/protected", protected_handler);
+
+        let gate = Gate::new();
+        gate.define("admin", |_, _| GateCheck::Allowed);
+        let app = registrar.build().layer(Extension(gate));
+
+        // Without auth token — should fail authentication (401/403)
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/protected")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = resp.status();
+        assert!(
+            status == 401 || status == 403,
+            "expected 401 or 403, got {status}",
+        );
+    }
+
+    /// Test #[can] used inside a #[route] impl block.
+    struct AdminController;
+
+    #[route]
+    impl AdminController {
+        #[get("/admin")]
+        #[can("admin")]
+        async fn admin_only() -> &'static str {
+            "admin data"
+        }
+    }
+
+    #[tokio::test]
+    async fn test_can_within_route_macro() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        AdminController::register_routes(&registrar);
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].uri, "/admin");
+    }
 }

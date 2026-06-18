@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, ImplItem, ItemImpl, ItemStruct, Lit,
@@ -192,6 +193,63 @@ pub fn delete(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn ws(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: #[can("ability")]
+//
+// Adds authorization checking to an async handler function.
+//
+// Prepends `AuthenticatedUser` and `Extension<Gate>` extractor parameters
+// and wraps the body with an ability check.  The function return type is
+// changed to `axum::response::Response`.
+//
+// Usage:
+//   #[can("admin")]
+//   async fn dashboard(Extension(state): Extension<AppState>) -> impl IntoResponse {
+//       Html("<h1>Admin</h1>")
+//   }
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn can(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let parsed = parse_macro_input!(attr as UriArg);
+    let ability = parsed.uri;
+    let func = parse_macro_input!(item as syn::ItemFn);
+
+    if func.sig.asyncness.is_none() {
+        return syn::Error::new(func.sig.span(), "#[can] requires async fn")
+            .to_compile_error()
+            .into();
+    }
+
+    let vis = &func.vis;
+    let name = &func.sig.ident;
+    let inputs = &func.sig.inputs;
+    let body = &func.block;
+
+    for input in inputs {
+        if let syn::FnArg::Receiver(_) = input {
+            return syn::Error::new(input.span(), "#[can] cannot be used on methods with self")
+                .to_compile_error()
+                .into();
+        }
+    }
+
+    let expanded = quote! {
+        #vis async fn #name(
+            __larastvel_auth: larastvel_core::auth::AuthenticatedUser,
+            __larastvel_gate: larastvel_core::axum::Extension<larastvel_core::auth::Gate>,
+            #inputs
+        ) -> larastvel_core::axum::response::Response {
+            if let Err(__larastvel_e) = larastvel_core::auth::check_ability(#ability, &__larastvel_auth, &__larastvel_gate.0).await {
+                return __larastvel_e.into_response();
+            }
+            larastvel_core::axum::response::IntoResponse::into_response(#body)
+        }
+    };
+
+    TokenStream::from(expanded)
 }
 
 // ---------------------------------------------------------------------------

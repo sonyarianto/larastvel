@@ -51,6 +51,37 @@ router.group("/admin", |r| {
 });
 ```
 
+## Authorization
+
+Use `#[can("ability")]` to protect handler functions:
+
+```rust
+#[can("admin")]
+async fn admin_dashboard(Extension(state): Extension<AppState>) -> impl IntoResponse {
+    Html("<h1>Admin Dashboard</h1>")
+}
+
+// Usage in routes:
+router.get("/admin", admin_dashboard);
+```
+
+The macro injects `AuthenticatedUser` and `Extension<Gate>` as the first extractor parameters and checks the ability before the handler body runs. Returns `403 Forbidden` if denied.
+
+> **Note:** The `Gate` must be available in the Axum request extensions via `.layer(Extension(gate))`.
+
+### With Route Macros
+
+```rust
+#[route]
+impl AdminController {
+    #[get("/admin")]
+    #[can("admin")]
+    async fn dashboard() -> impl IntoResponse {
+        Html("<h1>Admin</h1>")
+    }
+}
+```
+
 ## Route Attribute Macro
 
 The `#[route]` macro lets you define routes directly on controller methods using `#[get]`, `#[post]`, `#[put]`, `#[patch]`, `#[delete]`, and `#[ws]` attributes:

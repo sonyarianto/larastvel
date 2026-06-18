@@ -62,7 +62,7 @@ pub use foundation::{
 };
 pub use hash::{check as hash_check, is_hashed, make as hash_make, needs_rehash, HashError};
 pub use http::{Error as HttpError, JsonResponse, LarastvelResult, Request};
-pub use larastvel_macros::{controller, delete, get, patch, post, put, route, ws, Resource};
+pub use larastvel_macros::{can, controller, delete, get, patch, post, put, route, ws, Resource};
 pub use logging::init as logging_init;
 pub use middleware::{cors_middleware, request_logger};
 pub use models::factory::{Faker, ModelFactory};
