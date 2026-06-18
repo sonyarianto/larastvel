@@ -152,6 +152,12 @@ async fn main() {
             Some(MakeTarget::Observer { name }) => {
                 make_observer(&name);
             }
+            Some(MakeTarget::Resource { name }) => {
+                make_resource(&name);
+            }
+            Some(MakeTarget::Provider { name }) => {
+                make_provider(&name);
+            }
             None => {
                 println!("{}", "Available make targets:".cyan());
                 println!("  make:model       Create a new model");
@@ -170,6 +176,8 @@ async fn main() {
                 println!("  make:command     Create a new console command");
                 println!("  make:mail        Create a new mail class");
                 println!("  make:factory     Create a new model factory");
+                println!("  make:resource    Create a new API resource");
+                println!("  make:provider    Create a new service provider");
             }
         },
         None => {
@@ -199,6 +207,8 @@ async fn main() {
             println!("  make:rule        Create a new validation rule");
             println!("  make:command     Create a new console command");
             println!("  make:factory     Create a new model factory");
+            println!("  make:resource    Create a new API resource");
+            println!("  make:provider    Create a new service provider");
             println!("  schedule:run     Run scheduled tasks");
             println!("  db:seed          Run database seeders");
             println!("  storage:link     Create a symbolic link from public/storage to storage/app/public");

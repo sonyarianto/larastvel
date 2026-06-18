@@ -134,16 +134,23 @@ cargo run -p larastvel-cli -- migrate
 
 ## Seeders
 
+The `#[seeder]` macro generates a `Seeder` trait implementation. See the [full reference](/reference/seeders) for details, arguments, and generated code.
+
 ```rust
-#[derive(Seeder)]
+use larastvel_core::sea_orm::DbConn;
+
+#[seeder]
 struct UserSeeder;
 
-impl Seeder for UserSeeder {
-    async fn run(&self, db: &DatabaseConnection) -> Result<()> {
-        // Seed data
+impl UserSeeder {
+    async fn seed(conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
+        // Insert seed data
+        Ok(())
     }
 }
 ```
+
+Run seeders:
 
 ```bash
 cargo run -p larastvel-cli -- db:seed
@@ -151,8 +158,65 @@ cargo run -p larastvel-cli -- db:seed
 
 ## Model Factories
 
+The `#[factory]` macro generates a `ModelFactory` trait implementation. See the [full reference](/reference/factories) for details.
+
 ```rust
-factory_create::<User>(UserFactory, 10).await?;
+use larastvel_core::models::factory::Faker;
+use larastvel_core::sea_orm::Set;
+use sea_orm::entity::prelude::*;
+
+#[derive(Debug, Default)]
+#[factory("user")]
+pub struct UserFactory;
+
+impl UserFactory {
+    fn define() -> crate::models::user::ActiveModel {
+        user::ActiveModel {
+            name: Set(Faker::name()),
+            email: Set(Faker::email()),
+            ..Default::default()
+        }
+    }
+}
 ```
 
-Uses Faker for realistic test data.
+```rust
+factory_create::<UserFactory>().await?;
+factory_create_count::<UserFactory>(10).await?;
+```
+
+## API Resources
+
+The `#[api_resource]` macro generates an `ApiResource` trait implementation. See the [full reference](/reference/api-resources) for details, including how to use single-model and collection transforms.
+
+```rust
+use larastvel_core::api_resource;
+
+#[api_resource(crate::models::user::Model)]
+#[derive(Debug)]
+struct UserResource;
+
+impl UserResource {
+    fn to_array(model: &crate::models::user::Model) -> serde_json::Value {
+        serde_json::json!({
+            "id": model.id,
+            "name": model.name,
+            "email": model.email,
+        })
+    }
+}
+```
+
+```rust
+let resource = UserResource::make(user);
+let json = resource.value();
+
+let collection = UserResource::collect(users);
+let json = collection.value();
+```
+
+Generate a scaffolded resource with:
+
+```bash
+larastvel make:resource UserResource
+```

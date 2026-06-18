@@ -606,4 +606,66 @@ mod tests {
         app.boot();
         assert!(!BOOTED.load(std::sync::atomic::Ordering::SeqCst));
     }
+
+    // -----------------------------------------------------------------------
+    // #[provider] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::provider;
+
+    #[provider]
+    struct TestAppProvider;
+
+    impl TestAppProvider {
+        fn register_services(&self, _app: &Application) {
+            // no-op for testing
+        }
+    }
+
+    #[test]
+    fn test_provider_macro_implements_trait() {
+        fn assert_provider<P: ServiceProvider>() {}
+        assert_provider::<TestAppProvider>();
+    }
+
+    #[test]
+    fn test_provider_macro_register_delegates() {
+        let provider = TestAppProvider;
+        let app = Application::new(None);
+        // Should not panic — verifies register_services is called
+        provider.register(&app);
+    }
+
+    #[test]
+    fn test_provider_macro_boot_default() {
+        let provider = TestAppProvider;
+        let app = Application::new(None);
+        // Should use trait default (no-op)
+        provider.boot(&app);
+    }
+
+    #[test]
+    fn test_provider_macro_provides_default() {
+        let provider = TestAppProvider;
+        assert!(provider.provides().is_empty());
+    }
+
+    /// Provider that actually registers a service
+    #[provider]
+    struct RegistrationProvider;
+
+    impl RegistrationProvider {
+        fn register_services(&self, app: &Application) {
+            app.bind(42u32);
+        }
+    }
+
+    #[test]
+    fn test_provider_macro_actual_registration() {
+        let app = Application::new(None);
+        let provider = RegistrationProvider;
+        provider.register(&app);
+        let val: u32 = app.make::<u32>().unwrap();
+        assert_eq!(val, 42);
+    }
 }

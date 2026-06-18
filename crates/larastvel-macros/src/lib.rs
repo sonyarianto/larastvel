@@ -1387,3 +1387,239 @@ pub fn observer(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
+
+// ---------------------------------------------------------------------------
+// Attribute: command
+// ---------------------------------------------------------------------------
+
+struct CommandArgs {
+    name: String,
+    description: String,
+}
+
+impl Parse for CommandArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let name: syn::LitStr = input.parse()?;
+        let mut description = String::new();
+        if input.peek(syn::Token![,]) {
+            input.parse::<syn::Token![,]>()?;
+            let ident: syn::Ident = input.parse()?;
+            if ident == "description" {
+                input.parse::<syn::Token![=]>()?;
+                description = input.parse::<syn::LitStr>()?.value();
+            }
+        }
+        Ok(CommandArgs {
+            name: name.value(),
+            description,
+        })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as CommandArgs);
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+
+    let command_name = &args.name;
+    let description = &args.description;
+
+    let expanded = quote! {
+        #input
+
+        impl larastvel_core::console::Command for #name {
+            fn name(&self) -> &'static str {
+                #command_name
+            }
+
+            fn description(&self) -> &'static str {
+                #description
+            }
+
+            fn handle(
+                &self,
+                app: &larastvel_core::foundation::Application,
+                args: &[String],
+            ) -> Result<(), larastvel_core::console::ConsoleError> {
+                self.run(app, args)
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: policy
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn policy(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let resource_name = parse_macro_input!(attr as syn::LitStr);
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+    let resource = resource_name.value();
+
+    let expanded = quote! {
+        #input
+
+        impl #name {
+            /// Register this policy with the given gate.
+            pub fn register(gate: &larastvel_core::auth::Gate) {
+                gate.register_policy(#resource, std::sync::Arc::new(#name));
+            }
+        }
+
+        impl larastvel_core::auth::Policy for #name {
+            fn resource(&self) -> &str {
+                #resource
+            }
+
+            fn check(
+                &self,
+                user: &larastvel_core::auth::AuthenticatedUser,
+                ability: &str,
+                args: &[String],
+            ) -> Option<larastvel_core::auth::GateCheck> {
+                self.check_ability(user, ability, args)
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: factory
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn factory(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let model_name = parse_macro_input!(attr as syn::LitStr);
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+    let model = model_name.value();
+    let model_ident = syn::Ident::new(&model, model_name.span());
+
+    let expanded = quote! {
+        #input
+
+        impl larastvel_core::models::factory::ModelFactory for #name {
+            type ActiveModel = crate::models::#model_ident::ActiveModel;
+
+            fn definition() -> Self::ActiveModel {
+                Self::define()
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: seeder
+// ---------------------------------------------------------------------------
+
+struct SeederArgs {
+    name: Option<String>,
+}
+
+impl Parse for SeederArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.is_empty() {
+            Ok(SeederArgs { name: None })
+        } else {
+            let name: syn::LitStr = input.parse()?;
+            Ok(SeederArgs {
+                name: Some(name.value()),
+            })
+        }
+    }
+}
+
+#[proc_macro_attribute]
+pub fn seeder(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as SeederArgs);
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+    let seeder_name = args
+        .name
+        .unwrap_or_else(|| pascal_to_snake(&name.to_string()));
+
+    let expanded = quote! {
+        #input
+
+        #[larastvel_core::async_trait]
+        impl larastvel_core::database::Seeder for #name {
+            fn name() -> &'static str {
+                #seeder_name
+            }
+
+            async fn run(
+                conn: &larastvel_core::sea_orm::DbConn,
+            ) -> Result<(), Box<dyn std::error::Error>> {
+                Self::seed(conn).await
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: provider
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn provider(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+
+    let expanded = quote! {
+        #input
+
+        impl larastvel_core::foundation::ServiceProvider for #name {
+            fn register(&self, app: &larastvel_core::foundation::Application) {
+                self.register_services(app)
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: api_resource
+// ---------------------------------------------------------------------------
+
+struct ApiResourceArgs {
+    model_type: syn::Type,
+}
+
+impl Parse for ApiResourceArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let model_type: syn::Type = input.parse()?;
+        Ok(ApiResourceArgs { model_type })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn api_resource(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as ApiResourceArgs);
+    let input = parse_macro_input!(item as ItemStruct);
+    let name = &input.ident;
+    let model_ty = &args.model_type;
+
+    let expanded = quote! {
+        #input
+
+        impl larastvel_core::models::serialization::ApiResource<#model_ty> for #name {
+            fn transform(model: &#model_ty) -> serde_json::Value {
+                Self::to_array(model)
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}

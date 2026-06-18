@@ -22,24 +22,34 @@ if authorize("update-post", &post).await {
 
 ## Policies
 
-Policies organize authorization logic around a resource:
+Policies organize authorization logic around a resource.
+
+### Defining Policies
+
+Use the `#[policy]` macro to generate the `Policy` trait implementation. See the [full reference](/reference/policies) for details.
 
 ```rust
-use larastvel_core::auth::Policy;
+use larastvel_core::auth::{AuthenticatedUser, GateCheck};
 
+#[policy("post")]
+#[derive(Debug)]
 struct PostPolicy;
 
-impl Policy for PostPolicy {
-    fn before(user: &User, ability: &str) -> Option<bool> {
-        if user.is_admin() {
-            return Some(true);
+impl PostPolicy {
+    fn check_ability(&self, user: &AuthenticatedUser, ability: &str, args: &[String]) -> Option<GateCheck> {
+        match ability {
+            "view" | "create" | "update" => Some(GateCheck::Allowed),
+            "delete" => Some(GateCheck::Denied("Admins only".to_string())),
+            _ => None,
         }
-        None
     }
 }
+```
 
-// Register checks
-Gate::register_policy::<Post, _>("post", PostPolicy);
+### Registering Policies
+
+```rust
+PostPolicy::register(&gate);
 ```
 
 ## Middleware

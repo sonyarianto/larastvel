@@ -413,4 +413,85 @@ mod tests {
         assert_eq!(inner.len(), 1);
         assert_eq!(inner[0].sku, "C1");
     }
+
+    // -----------------------------------------------------------------------
+    // #[api_resource] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::api_resource;
+
+    #[api_resource(Product)]
+    struct ProductApiResource;
+
+    impl ProductApiResource {
+        fn to_array(model: &Product) -> Value {
+            json!({ "sku": model.sku, "price": model.price })
+        }
+    }
+
+    #[test]
+    fn test_api_resource_macro_transform() {
+        let product = Product {
+            sku: "TEST-1".into(),
+            price: 15.0,
+            internal_note: "hidden".into(),
+        };
+        let arr = <ProductApiResource as ApiResource<Product>>::transform(&product);
+        assert_eq!(arr.get("sku").and_then(|v| v.as_str()), Some("TEST-1"));
+        assert_eq!(arr.get("price").and_then(|v| v.as_f64()), Some(15.0));
+        assert!(arr.get("internal_note").is_none());
+    }
+
+    #[test]
+    fn test_api_resource_macro_make() {
+        let product = Product {
+            sku: "MAKE-1".into(),
+            price: 25.0,
+            internal_note: "x".into(),
+        };
+        let resource = ProductApiResource::make(product);
+        let arr = resource.to_array();
+        assert_eq!(arr.get("sku").and_then(|v| v.as_str()), Some("MAKE-1"));
+    }
+
+    #[test]
+    fn test_api_resource_macro_collection() {
+        let products = vec![
+            Product {
+                sku: "A".into(),
+                price: 1.0,
+                internal_note: "x".into(),
+            },
+            Product {
+                sku: "B".into(),
+                price: 2.0,
+                internal_note: "y".into(),
+            },
+        ];
+        let collection = ProductApiResource::collection(products);
+        let arr = collection.to_array();
+        assert!(arr.get("data").is_some());
+        assert_eq!(arr["data"].as_array().unwrap().len(), 2);
+    }
+
+    /// Resource with a module path argument
+    #[api_resource(self::Product)]
+    struct SubResource;
+
+    impl SubResource {
+        fn to_array(model: &Product) -> Value {
+            json!({ "sku": model.sku })
+        }
+    }
+
+    #[test]
+    fn test_api_resource_macro_module_path() {
+        let product = Product {
+            sku: "MOD-1".into(),
+            price: 0.0,
+            internal_note: "".into(),
+        };
+        let arr = <SubResource as ApiResource<Product>>::transform(&product);
+        assert_eq!(arr.get("sku").and_then(|v| v.as_str()), Some("MOD-1"));
+    }
 }

@@ -735,4 +735,104 @@ mod tests {
         let gate = Gate::default();
         assert!(gate.abilities().is_empty());
     }
+
+    // -----------------------------------------------------------------------
+    // #[policy] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::policy;
+    use std::sync::Arc;
+
+    #[policy("article")]
+    #[derive(Debug)]
+    struct ArticlePolicy;
+
+    impl ArticlePolicy {
+        fn check_ability(
+            &self,
+            _user: &AuthenticatedUser,
+            ability: &str,
+            _args: &[String],
+        ) -> Option<GateCheck> {
+            match ability {
+                "view" | "create" => Some(GateCheck::Allowed),
+                "delete" => Some(GateCheck::Denied("Admins only".to_string())),
+                _ => None,
+            }
+        }
+    }
+
+    #[policy("admin")]
+    #[derive(Debug)]
+    struct AdminPolicy;
+
+    impl AdminPolicy {
+        fn check_ability(
+            &self,
+            _user: &AuthenticatedUser,
+            _ability: &str,
+            _args: &[String],
+        ) -> Option<GateCheck> {
+            Some(GateCheck::Allowed)
+        }
+    }
+
+    #[test]
+    fn test_policy_macro_resource() {
+        let policy = ArticlePolicy;
+        assert_eq!(policy.resource(), "article");
+    }
+
+    #[test]
+    fn test_policy_macro_check_delegates() {
+        let policy = ArticlePolicy;
+        let user = AuthenticatedUser {
+            user_id: "1".to_string(),
+            claims: Claims {
+                sub: "1".to_string(),
+                exp: 0,
+                iat: 0,
+            },
+        };
+        assert_eq!(policy.check(&user, "view", &[]), Some(GateCheck::Allowed));
+        assert_eq!(policy.check(&user, "create", &[]), Some(GateCheck::Allowed));
+        assert_eq!(
+            policy.check(&user, "delete", &[]),
+            Some(GateCheck::Denied("Admins only".to_string()))
+        );
+        assert_eq!(policy.check(&user, "update", &[]), None);
+    }
+
+    #[test]
+    fn test_policy_macro_register() {
+        let gate = Gate::new();
+        ArticlePolicy::register(&gate);
+        assert!(gate.policy_resources().contains(&"article".to_string()));
+    }
+
+    #[test]
+    fn test_policy_macro_integration_with_gate() {
+        let gate = Gate::new();
+        AdminPolicy::register(&gate);
+        let user = AuthenticatedUser {
+            user_id: "1".to_string(),
+            claims: Claims {
+                sub: "1".to_string(),
+                exp: 0,
+                iat: 0,
+            },
+        };
+        let result = gate.inspect(&user, "do-admin", &[]);
+        assert_eq!(result, GateCheck::Allowed);
+    }
+
+    #[test]
+    fn test_policy_macro_multiple_policies() {
+        let gate = Gate::new();
+        ArticlePolicy::register(&gate);
+        AdminPolicy::register(&gate);
+        let mut resources = gate.policy_resources();
+        resources.sort();
+        assert_eq!(resources, vec!["admin", "article"]);
+    }
 }

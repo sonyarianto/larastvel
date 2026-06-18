@@ -28,7 +28,7 @@ The project is a Cargo workspace with 7 crates:
 |---|---|
 | `larastvel-core` | Framework core — router, DB, config, views, middleware |
 | `larastvel-cli` | Artisan-like CLI binary |
-| `larastvel-macros` | Procedural macros (`Resource`, `controller`, `route`) |
+| `larastvel-macros` | Procedural macros (`Resource`, `api_resource`, `controller`, `route`, `command`, `table`, `job`, `scope`, `observer`, `notification`, `rule`, `policy`, `provider`, `seeder`, `factory`) |
 | `larastvel-tinker` | Interactive REPL binary |
 | `larastvel-new` | Project scaffolding binary |
 | `larastvel-testing` | Test utilities (`TestClient`, `TestResponse`, `RefreshDatabase`) |
@@ -60,3 +60,53 @@ App::new()
 ```
 
 Session and CSRF layers are auto-wired when `app.key` is present in config.
+
+## Custom Commands
+
+The `#[command]` attribute macro generates a `Command` trait implementation for Artisan-style CLI commands. See the [full reference](/reference/commands) for details, arguments, and generated code.
+
+```rust
+use larastvel_core::console::{Command, ConsoleError};
+use larastvel_core::foundation::Application;
+
+#[command("inspire", description = "Display an inspiring quote")]
+#[derive(Debug)]
+struct InspireCommand;
+
+impl InspireCommand {
+    fn run(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
+        println!("Simplicity is the ultimate sophistication.");
+        Ok(())
+    }
+}
+```
+
+Generate a scaffolded command with:
+
+```bash
+larastvel make:command InspireCommand
+```
+
+## Service Providers
+
+The `#[provider]` attribute macro generates a `ServiceProvider` implementation. See the [full reference](/reference/providers) for details.
+
+```rust
+use larastvel_core::foundation::Application;
+use larastvel_core::provider;
+
+#[provider]
+struct AppServiceProvider;
+
+impl AppServiceProvider {
+    fn register_services(&self, app: &Application) {
+        app.bind(MyService::new());
+    }
+}
+```
+
+Generate a scaffolded provider with:
+
+```bash
+larastvel make:provider AppServiceProvider
+```

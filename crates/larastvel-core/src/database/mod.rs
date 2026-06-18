@@ -158,4 +158,46 @@ mod tests {
         let _ = DatabaseSeeder::run_all;
         let _ = DatabaseSeeder::run_seeder::<TestSeeder>;
     }
+
+    // -----------------------------------------------------------------------
+    // #[seeder] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::seeder;
+
+    #[seeder("custom_name")]
+    struct CustomSeeder;
+
+    impl CustomSeeder {
+        async fn seed(_conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
+            Ok(())
+        }
+    }
+
+    #[seeder]
+    struct AutoNameSeeder;
+
+    impl AutoNameSeeder {
+        async fn seed(_conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_seeder_macro_custom_name() {
+        assert_eq!(CustomSeeder::name(), "custom_name");
+    }
+
+    #[test]
+    fn test_seeder_macro_auto_name() {
+        assert_eq!(AutoNameSeeder::name(), "auto_name_seeder");
+    }
+
+    #[test]
+    fn test_seeder_macro_implements_trait() {
+        // Verify the type satisfies Seeder bounds at compile time
+        fn assert_seeder<S: Seeder>() {}
+        assert_seeder::<CustomSeeder>();
+        assert_seeder::<AutoNameSeeder>();
+    }
 }

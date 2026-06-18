@@ -96,6 +96,17 @@ export default defineConfig({
           text: 'Parity Tracking',
           link: '/reference/parity',
         },
+        {
+          text: 'Macros',
+          items: [
+            { text: 'Commands', link: '/reference/commands' },
+            { text: 'Policies', link: '/reference/policies' },
+            { text: 'Seeders', link: '/reference/seeders' },
+            { text: 'Model Factories', link: '/reference/factories' },
+            { text: 'API Resources', link: '/reference/api-resources' },
+            { text: 'Service Providers', link: '/reference/providers' },
+          ],
+        },
       ],
     },
     socialLinks: [

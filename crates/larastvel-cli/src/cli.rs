@@ -138,4 +138,8 @@ pub enum MakeTarget {
     Scope { name: String },
     /// Create a new model observer
     Observer { name: String },
+    /// Create a new API resource
+    Resource { name: String },
+    /// Create a new service provider
+    Provider { name: String },
 }

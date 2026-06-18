@@ -446,4 +446,79 @@ mod tests {
             assert!(result.is_ok(), "stub {} failed: {:?}", stub.name(), result);
         }
     }
+
+    // -----------------------------------------------------------------------
+    // #[command] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::command;
+
+    #[command("test:hello", description = "A hello command")]
+    struct TestHelloCommand;
+
+    impl TestHelloCommand {
+        fn run(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
+            println!("Hello from test command!");
+            Ok(())
+        }
+    }
+
+    #[command("test:fail")]
+    struct TestFailCommand;
+
+    impl TestFailCommand {
+        fn run(&self, _app: &Application, _args: &[String]) -> Result<(), ConsoleError> {
+            Err(ConsoleError("fail".to_string()))
+        }
+    }
+
+    #[test]
+    fn test_command_macro_name_and_description() {
+        let cmd = TestHelloCommand;
+        assert_eq!(cmd.name(), "test:hello");
+        assert_eq!(cmd.description(), "A hello command");
+    }
+
+    #[test]
+    fn test_command_macro_handle_delegates_to_run() {
+        let app = Application::new(None);
+        let cmd = TestHelloCommand;
+        let result = cmd.handle(&app, &[]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_command_macro_error() {
+        let app = Application::new(None);
+        let cmd = TestFailCommand;
+        let result = cmd.handle(&app, &[]);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().0, "fail");
+    }
+
+    #[test]
+    fn test_command_macro_empty_description() {
+        let cmd = TestFailCommand;
+        assert_eq!(cmd.name(), "test:fail");
+        assert_eq!(cmd.description(), "");
+    }
+
+    #[test]
+    fn test_command_macro_can_be_registered_with_kernel() {
+        let app = Application::new(None);
+        let kernel = ConsoleKernel::new(app);
+        kernel.add_command(Arc::new(TestHelloCommand));
+        assert!(kernel.has_command("test:hello"));
+        assert_eq!(kernel.command_count(), 1);
+        let result = kernel.call("test:hello", &[]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_command_macro_string_arg() {
+        let app = Application::new(None);
+        let cmd = TestHelloCommand;
+        let result = cmd.handle(&app, &["world".to_string()]);
+        assert!(result.is_ok());
+    }
 }
