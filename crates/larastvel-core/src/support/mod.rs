@@ -1,3 +1,4 @@
+pub mod arr;
 pub mod collection;
 pub mod datetime;
 pub mod helpers;
@@ -5,6 +6,7 @@ pub mod http_client;
 pub mod str;
 pub mod vite;
 
+pub use arr::Arr;
 pub use collection::{collect as collect_items, Collection};
 pub use datetime::{now, today, Dt};
 pub use helpers::*;

@@ -59,6 +59,7 @@ export default defineConfig({
           text: 'Digging Deeper',
           items: [
             { text: 'Caching', link: '/guide/caching' },
+            { text: 'Arr', link: '/guide/arr' },
             { text: 'Collections', link: '/guide/collections' },
             { text: 'Date & Time', link: '/guide/datetime' },
             { text: 'Events', link: '/guide/events' },
