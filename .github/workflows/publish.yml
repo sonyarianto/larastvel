@@ -1,0 +1,76 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — package and verify each crate without uploading"
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify tag matches crate versions
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for f in Cargo.toml crates/*/Cargo.toml; do
+            VER="$(grep -m1 '^version' "$f" | sed 's/version = "\(.*\)"/\1/')"
+            if [ "$VER" != "$TAG" ]; then
+              echo "::error::Version mismatch: $f is $VER but tag is v$TAG"
+              exit 1
+            fi
+          done
+          echo "All crates are at v$TAG"
+
+      # Dependency order: larastvel-macros -> larastvel-core ->
+      # larastvel-testing / larastvel-tinker / larastvel-cli -> larastvel-new
+      - name: Publish larastvel-macros
+        run: cargo publish -p larastvel-macros
+
+      - name: Publish larastvel-core
+        run: cargo publish -p larastvel-core
+
+      - name: Publish larastvel-testing
+        run: cargo publish -p larastvel-testing
+
+      - name: Publish larastvel-tinker
+        run: cargo publish -p larastvel-tinker
+
+      - name: Publish larastvel-cli
+        run: cargo publish -p larastvel-cli
+
+      - name: Publish larastvel-new
+        run: cargo publish -p larastvel-new
+
+  dry-run:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Dry-run publish all crates (order matters)
+        run: |
+          for p in larastvel-macros larastvel-core larastvel-testing larastvel-tinker larastvel-cli larastvel-new; do
+            cargo publish -p "$p" --dry-run --no-verify || exit 1
+          done
