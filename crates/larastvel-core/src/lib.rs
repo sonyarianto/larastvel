@@ -59,7 +59,8 @@ pub use auth::{
 pub use bootstrap::App;
 pub use broadcasting::{
     BroadcastError, BroadcastEvent, BroadcastManager, BroadcastMessage, Broadcaster, Channel,
-    NativeBroadcaster, PresenceChannelData, SubscriberRegistry,
+    NativeBroadcaster, PresenceChannelData, ReverbDatabaseBroadcaster, ReverbScalingStore,
+    SubscriberRegistry,
 };
 pub use cache::{
     prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, DEFAULT_TTL_SECONDS, FOREVER_TTL,
@@ -128,4 +129,4 @@ pub use validation::{
     custom, exists, rules, unique, unique_except, validate, validate_async, ValidatedJson,
     ValidatedQuery, ValidationError, ValidationErrors, ValidationRule, Validator,
 };
-pub use view::{ViewError, ViewFactory};
+pub use view::{Component, ViewError, ViewFactory};

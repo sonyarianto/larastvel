@@ -18,6 +18,7 @@
 //! | `@error('field')` / `@enderror` | `{% if errors["field"] %}` / `{% endif %}` |
 //! | `@csrf` | `<input type="hidden" ...>` |
 //! | `@method('VERB')` | `<input type="hidden" ...>` |
+//! | `<x-card>` / `<x-slot:name>` | component + slot syntax (see [`super::components`]) |
 //!
 //! Variable `$` prefixes and `->` accessors are converted automatically:
 //! `$user.name` → `user.name`, `$user->name` → `user.name`.
@@ -224,6 +225,84 @@ pub fn compile(input: &str) -> String {
 pub fn compile_with_csrf(input: &str, csrf_token: &str) -> String {
     let compiled = compile(input);
     compiled.replace("{{ csrf_token }}", csrf_token)
+}
+
+/// Convert Laravel's `<x-component>` syntax into `@component(...)` blocks
+/// consumed by the component render pipeline (see [`super::components`]).
+///
+/// - `<x-card title="Hi">body</x-card>` →
+///   `@component('components/card.html', {title: "Hi"})body@endcomponent`
+/// - `<x-card/>` → a component call with an empty body
+/// - `<x-slot:name>` blocks are left untouched (handled by slot extraction).
+///
+/// Like [`compile`], this is a linear pre-processor — nested components are
+/// not supported.
+pub fn compile_x_components(input: &str) -> String {
+    let mut output = input.to_string();
+
+    // Hold slot blocks aside so the generic x-component patterns below
+    // (which would otherwise match `<x-slot:…>`) skip them, then restore.
+    let mut held_slots: Vec<String> = Vec::new();
+    static X_SLOT: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"(?s)<x-slot:([a-zA-Z0-9_-]+)\s*>(.*?)</x-slot\s*>").unwrap());
+    output = X_SLOT
+        .replace_all(&output, |caps: &regex::Captures| {
+            held_slots.push(caps[0].to_string());
+            format!("__LARASTVEL_X_SLOT_{}__", held_slots.len() - 1)
+        })
+        .to_string();
+
+    // Self-closing: <x-card title="Hi" />
+    static X_SELF_CLOSING: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"(?s)<x-([a-zA-Z0-9_.-]+)\s*([^>]*?)/>").unwrap());
+    output = X_SELF_CLOSING
+        .replace_all(&output, |caps: &regex::Captures| {
+            component_block(&caps[1], &caps[2], "")
+        })
+        .to_string();
+
+    // Paired: <x-card title="Hi">body</x-card>. The closing tag name is
+    // accepted loosely (the regex crate has no backreferences) — the body
+    // ends at the first `</x-` close, which matches the non-nested
+    // limitation of this pre-processor.
+    static X_PAIRED: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?s)<x-([a-zA-Z0-9_.-]+)\s*([^>]*)>(.*?)</x-[a-zA-Z0-9_.-]+\s*>").unwrap()
+    });
+    output = X_PAIRED
+        .replace_all(&output, |caps: &regex::Captures| {
+            component_block(&caps[1], &caps[2], &caps[3])
+        })
+        .to_string();
+
+    for (i, slot) in held_slots.iter().enumerate() {
+        output = output.replace(&format!("__LARASTVEL_X_SLOT_{}__", i), slot);
+    }
+
+    output
+}
+
+/// Build a `@component('components/<name>.html', {attrs})…@endcomponent`
+/// block from an `<x-name attr="v">` tag.
+fn component_block(name: &str, attrs_raw: &str, body: &str) -> String {
+    static ATTR: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r#"([a-zA-Z_][a-zA-Z0-9_-]*)\s*=\s*"([^"]*)""#).unwrap());
+
+    let attrs: Vec<String> = ATTR
+        .captures_iter(attrs_raw)
+        .map(|caps| format!("{}: {:?}", &caps[1], &caps[2]))
+        .collect();
+
+    let template = format!("components/{}.html", name);
+    if attrs.is_empty() {
+        format!("@component('{}'){}@endcomponent", template, body)
+    } else {
+        format!(
+            "@component('{}', {{ {} }}){}@endcomponent",
+            template,
+            attrs.join(", "),
+            body
+        )
+    }
 }
 
 // =============================================================================

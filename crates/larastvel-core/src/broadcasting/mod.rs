@@ -2,8 +2,10 @@ pub mod ably;
 pub mod log;
 pub mod native;
 pub mod pusher;
+pub mod reverb;
 
 pub use native::{ws_handler, NativeBroadcaster, SubscriberRegistry};
+pub use reverb::{BroadcastRow, ReverbDatabaseBroadcaster, ReverbScalingStore};
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -44,11 +44,12 @@ side-by-side comparison.
 | Concurrency | `concurrent()` — run boxed async tasks in parallel, results in input order | ✅ |
 | Process | `ProcessBuilder` / `run()` / `foreground()` — output capture, env, cwd, timeout kill | ✅ |
 | Lazy collections | `LazyCollection` — lazy chainable iterator (filter/map/take/skip/chain/reduce) | ✅ |
+| Blade components & slots | `Component` trait / `@component` / `<x-card>` / `<x-slot:name>` / `@slot` — named slots + default `$slot` rendered through Tera | ✅ |
 | `artisan about` / `optimize` / `config:show` | `larastvel about` / `optimize` / `optimize:clear` / `config:show {section}` | ✅ |
 | Pagination | `Paginator<T>` / `PaginationParams` / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / middleware / token bucket | ✅ |
 | Encryption / Hashing | AES-256-GCM `Encrypter` / bcrypt `hash::make()` / `hash::check()` | ✅ |
-| Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` | ✅ |
+| Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` / Reverb DB scaling driver (`ReverbDatabaseBroadcaster` + `reverb_scaling` table) | ✅ |
 | Cache | `CacheManager` / Array / File / Database stores / `remember()` / batch ops / `touch()` TTL extension | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
 | Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
@@ -72,9 +73,7 @@ side-by-side comparison.
 
 | Laravel 13 Feature | Larastvel Equivalent | Status |
 |---|---|---|
-| Blade components (`x-slot` slots) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
 | Passkey authentication (WebAuthn) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
-| Reverb database broadcasting driver | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
 | Redis cache store | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
 
 ~100% feature parity with 1160+ unit tests (checked against Laravel 13.23.0).

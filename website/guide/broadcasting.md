@@ -7,6 +7,7 @@ Larastvel supports real-time event broadcasting via WebSocket and third-party se
 | Driver | Description |
 |--------|-------------|
 | **Native** | Self-hosted WebSocket server |
+| **Reverb DB** | Native broadcaster with database-backed cross-instance scaling (Laravel 13 `scaling.driver = database`) |
 | **Pusher** | Pusher Channels |
 | **Ably** | Ably Realtime |
 | **Log** | Log broadcaster for debugging |
@@ -27,6 +28,45 @@ router.ws("/ws", ws_handler);
 // Attach the registry to the final router via the Application
 app.with_layer(|router| router.layer(Extension(registry)));
 ```
+
+## Reverb Database Scaling
+
+Laravel 13's Reverb database driver lets multiple WebSocket server instances
+coordinate through the database instead of Redis. In Larastvel,
+`ReverbDatabaseBroadcaster` delivers to its own subscribers immediately and
+publishes to a shared `reverb_scaling` table; every other instance polls that
+table and replays new messages to its own clients.
+
+```rust
+use larastvel_core::broadcasting::{ReverbDatabaseBroadcaster, ReverbScalingStore};
+use std::sync::Arc;
+use std::time::Duration;
+
+// Shared store (one database, many instances)
+let store = ReverbScalingStore::new(db.clone());
+store.ensure_table_exists().await?;
+
+// Instance A: accepts broadcasts
+let broadcaster_a = Arc::new(ReverbDatabaseBroadcaster::new(
+    "native",
+    registry.clone(),
+    store.clone(),
+));
+
+// Instance B: polls the store for messages published elsewhere
+let broadcaster_b = Arc::new(ReverbDatabaseBroadcaster::new(
+    "native",
+    other_registry.clone(),
+    store,
+));
+let poller = broadcaster_b.spawn_scaling_poller(Duration::from_millis(50));
+// ... stop with `poller.abort()` or run inline via `run_scaling_poller(...)`
+```
+
+Broadcasts from any instance are fanned out to all instances' connected
+clients. Consumed messages are marked `sent_at` in the `reverb_scaling` table
+(`ReverbScalingStore::pending_count()` reports un-consumed rows, and
+`drain_pending()` polls once manually).
 
 ## Broadcast Manager
 

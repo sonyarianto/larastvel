@@ -94,6 +94,7 @@ Mail (to/cc/bcc/attachments)|pub struct Mailable|$CORE/mail
 Notifications|pub struct NotificationSender|$CORE/notifications
 Events & listeners|pub trait Listener|$CORE/events
 Broadcasting (websocket)|pub struct BroadcastMessage|$CORE/broadcasting
+Reverb DB scaling driver|pub struct ReverbDatabaseBroadcaster|$CORE/broadcasting
 Scheduling|pub struct ScheduleManager|$CORE/scheduling
 Rate limiting|pub struct RateLimiter|$CORE/rate_limiter
 Pagination|pub struct Paginator|$CORE/pagination
@@ -101,6 +102,7 @@ Pipeline|pub struct Pipeline|$CORE/pipeline
 Storage (filesystems)|pub struct StorageManager|$CORE/storage
 Translation|pub struct Translator|$CORE/translation
 View rendering|pub struct ViewFactory|$CORE/view
+Blade components & slots (x-slot/@slot)|extract_slots|$CORE/view
 AI chat SDK (chat/generate)|pub struct Ai|$CORE/ai
 AI agents (tool calling)|pub struct Agent|$CORE/ai
 AI media (image/tts/stt/moderation)|ImageOptions|$CORE/ai
@@ -123,9 +125,7 @@ Scaffolding (larastvel new)|create_project|$NEW
 # expected (acknowledged drift) and does NOT fail a --strict run.
 # Keep this list in sync with PARITY.md's "tracked gaps" section.
 DEFERRED_FEATURES="
-Blade components (x-slot)|x-slot|$CORE/view
 Passkey authentication (WebAuthn)|Passkey|$CORE/auth
-Reverb database broadcasting driver|reverb|$CORE/broadcasting
 Redis cache store|struct RedisStore|$CORE/cache
 "
 
