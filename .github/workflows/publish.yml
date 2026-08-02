@@ -61,3 +61,22 @@ jobs:
             cargo publish -p "$p" || exit 1
             wait_for "$p"
           done
+
+      # After a successful publish, create (or reuse) the GitHub Release.
+      # GitHub releases are NOT created anywhere else — without this step the
+      # Releases page silently lags behind crates.io (hit at v0.2.1).
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          BODY="$(awk -v v="${GITHUB_REF_NAME#v}" '
+            $0 ~ "^## v" v { on=1; next }
+            on && $0 ~ "^## v" { exit }
+            on { print }
+          ' CHANGELOG.md)"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "::notice::GitHub release $VERSION already exists — skipping"
+          else
+            gh release create "$VERSION" --title "$VERSION" --notes "$BODY"
+          fi

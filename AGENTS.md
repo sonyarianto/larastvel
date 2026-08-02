@@ -157,6 +157,9 @@ A regression in any probed symbol must show up as a `GAP` in the next run.
     The workflow is idempotent: already-published versions are skipped and
     index propagation is awaited, so a partial failure can be resumed with
     `gh workflow run publish.yml --ref vX.Y.Z`.
+    After publishing, the workflow also creates the GitHub Release (notes
+    pulled from `CHANGELOG.md`) — do NOT create it manually; without this
+    the Releases page silently lags behind crates.io (hit at v0.2.1).
  7. After every successful publish, `.github/workflows/scaffold-check.yml`
     builds a fresh scaffolded project against the just-published crates (also
     weekly and on manual dispatch) — an automatic guard for scaffold drift.
