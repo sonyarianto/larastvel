@@ -280,11 +280,7 @@ impl Arr {
             } else {
                 match current {
                     Value::Object(map) => {
-                        if let Some(next) = map.get_mut(*part) {
-                            current = next;
-                        } else {
-                            return None;
-                        }
+                        current = map.get_mut(*part)?;
                     }
                     _ => return None,
                 }

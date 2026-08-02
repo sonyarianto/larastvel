@@ -107,6 +107,17 @@ pub trait CacheStore: Send + Sync + std::fmt::Debug {
         self.increment(key, -by).await
     }
 
+    /// Extend the TTL of an existing key without re-fetching its value.
+    /// Returns `false` if the key does not exist or is expired.
+    async fn touch(&self, key: &str, ttl_seconds: u64) -> Result<bool, CacheError> {
+        if let Some(value) = self.get(key).await? {
+            self.set(key, &value, Some(ttl_seconds)).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Retrieve multiple keys at once.
     async fn many(&self, keys: &[&str]) -> Result<HashMap<String, Option<String>>, CacheError> {
         let mut result = HashMap::new();
@@ -246,6 +257,11 @@ impl CacheManager {
     /// Convenience: decrement on the default store.
     pub async fn decrement(&self, key: &str, by: i64) -> Result<i64, CacheError> {
         self.default_store()?.decrement(key, by).await
+    }
+
+    /// Convenience: extend the TTL of a key on the default store.
+    pub async fn touch(&self, key: &str, ttl_seconds: u64) -> Result<bool, CacheError> {
+        self.default_store()?.touch(key, ttl_seconds).await
     }
 }
 
@@ -479,5 +495,39 @@ mod tests {
 
         assert_eq!(manager.get("a").await.unwrap(), Some("1".to_string()));
         assert_eq!(manager.get("b").await.unwrap(), Some("2".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_touch_existing_key() {
+        let manager = setup_manager();
+        manager.set("touched", "value", Some(60)).await.unwrap();
+
+        assert!(manager.touch("touched", 3600).await.unwrap());
+        assert_eq!(
+            manager.get("touched").await.unwrap(),
+            Some("value".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_touch_missing_key() {
+        let manager = setup_manager();
+        assert!(!manager.touch("missing", 3600).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_touch_expired_key_returns_false() {
+        let manager = setup_manager();
+        manager.set("expired", "value", Some(0)).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        assert!(!manager.touch("expired", 3600).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_touch_preserves_value() {
+        let manager = setup_manager();
+        manager.set("k", "v", Some(1)).await.unwrap();
+        assert!(manager.touch("k", 3600).await.unwrap());
+        assert_eq!(manager.get("k").await.unwrap(), Some("v".to_string()));
     }
 }

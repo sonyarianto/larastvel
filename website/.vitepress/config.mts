@@ -7,7 +7,6 @@ export default defineConfig({
   base: process.env.VERCEL ? '/' : '/larastvel/',
   themeConfig: {
     appearance: 'dark',
-    logo: '/logo.png',
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Reference', link: '/reference/cli' },
@@ -116,7 +115,7 @@ export default defineConfig({
     ],
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright © Sony AK',
+      copyright: 'Copyright © Larastvel contributors',
     },
   },
 })

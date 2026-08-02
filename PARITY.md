@@ -36,9 +36,21 @@ side-by-side comparison.
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / middleware / token bucket | ✅ |
 | Encryption / Hashing | AES-256-GCM `Encrypter` / bcrypt `hash::make()` / `hash::check()` | ✅ |
 | Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` | ✅ |
-| Cache | `CacheManager` / Array / File / Database stores / `remember()` / batch ops | ✅ |
+| Cache | `CacheManager` / Array / File / Database stores / `remember()` / batch ops / `touch()` TTL extension | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
 | Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser / `schedule:run` CLI | ✅ |
+| Queue routing | `QueueManager::route()` / `routed_queue()` / central job→queue rules | ✅ |
+| Pagination default | 25 per page (Laravel 13 default) | ✅ |
 
-~100% feature parity with 611+ unit tests.
+## Laravel 13 gaps (not yet implemented)
+
+| Laravel 13 Feature | Larastvel Equivalent | Status |
+|---|---|---|
+| Laravel AI SDK (agents, embeddings, audio, images, vector stores) | — | ❌ Missing |
+| JSON:API resources (relationship inclusion, sparse fieldsets, links) | `ApiResource` / `JsonResource` / `ResourceCollection` (non-JSON:API) | ❌ Missing |
+| Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | — | ❌ Missing |
+| `PreventRequestForgery` (origin-aware CSRF) | token-based CSRF only, no origin check | ⚠️ Partial |
+| Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job]` / `#[middleware]` / `#[can]` only | ⚠️ Partial |
+
+~100% feature parity with 1000+ unit tests (checked against Laravel 13.23.0).

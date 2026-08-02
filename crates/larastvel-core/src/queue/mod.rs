@@ -298,6 +298,86 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_queue_manager_route_resolution() {
+        let mut manager = QueueManager::new("default");
+        manager.register("default", SyncQueue::new("default"));
+        manager.register("redis", InMemoryQueue::new("redis"));
+
+        manager.route("ProcessPodcast", "redis");
+        let routed = manager.routed_queue("ProcessPodcast").unwrap();
+        assert_eq!(routed.name(), "redis");
+
+        let unrouted = manager.routed_queue("SomeOtherJob").unwrap();
+        assert_eq!(unrouted.name(), "default");
+    }
+
+    #[tokio::test]
+    async fn test_queue_manager_route_to_missing_queue_errors() {
+        let mut manager = QueueManager::new("default");
+        manager.register("default", SyncQueue::new("default"));
+        manager.route("OrphanJob", "nonexistent");
+
+        let result = manager.routed_queue("OrphanJob");
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_queue_manager_unroute() {
+        let mut manager = QueueManager::new("default");
+        manager.register("default", SyncQueue::new("default"));
+        manager.register("redis", InMemoryQueue::new("redis"));
+
+        manager.route("JobA", "redis");
+        manager.unroute("JobA");
+        assert_eq!(manager.routed_queue("JobA").unwrap().name(), "default");
+    }
+
+    #[tokio::test]
+    async fn test_queue_manager_dispatch_respects_route() {
+        let mut manager = QueueManager::new("default");
+        manager.register("default", InMemoryQueue::new("default"));
+        manager.register("redis", InMemoryQueue::new("redis"));
+
+        let handled = Arc::new(AtomicBool::new(false));
+        manager.route("routed_job", "redis");
+
+        manager
+            .dispatch(TestJob {
+                name: "routed_job".to_string(),
+                handled: handled.clone(),
+            })
+            .await
+            .unwrap();
+
+        let redis_queue = manager.queue("redis").unwrap();
+        assert_eq!(redis_queue.count().await, 1);
+        assert_eq!(manager.queue("default").unwrap().count().await, 0);
+
+        let popped = redis_queue.pop().await.unwrap();
+        popped.handle().await.unwrap();
+        assert!(handled.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn test_queue_manager_dispatch_default_when_unrouted() {
+        let mut manager = QueueManager::new("default");
+        manager.register("default", InMemoryQueue::new("default"));
+        manager.register("redis", InMemoryQueue::new("redis"));
+
+        let handled = Arc::new(AtomicBool::new(false));
+        manager
+            .dispatch(TestJob {
+                name: "plain_job".to_string(),
+                handled: handled.clone(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(manager.queue("default").unwrap().count().await, 1);
+        assert_eq!(manager.queue("redis").unwrap().count().await, 0);
+    }
+
+    #[tokio::test]
     async fn test_dispatch_function() {
         let handled = Arc::new(AtomicBool::new(false));
         let job = TestJob {

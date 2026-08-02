@@ -6,7 +6,7 @@ use axum::{
 use serde::Serialize;
 use serde_json::{json, Value};
 
-const DEFAULT_PER_PAGE: usize = 15;
+const DEFAULT_PER_PAGE: usize = 25;
 const MAX_PER_PAGE: usize = 100;
 
 #[derive(Debug, Clone)]
@@ -242,7 +242,7 @@ mod tests {
     fn test_pagination_params_default() {
         let params = PaginationParams::new(None, None);
         assert_eq!(params.page, 1);
-        assert_eq!(params.per_page, 15);
+        assert_eq!(params.per_page, 25);
     }
 
     #[test]

@@ -199,9 +199,9 @@ fn save_session_to_response<ResBody>(
 
     let cookie_str = format!(
         "{cookie_name}={value}; Path={path}; HttpOnly; SameSite={same_site}{domain}{max_age}",
-        cookie_name = &config.cookie_name,
+        cookie_name = config.cookie_name,
         value = encoded,
-        path = &config.path,
+        path = config.path,
         same_site = config.same_site.as_str(),
         domain = config
             .domain
