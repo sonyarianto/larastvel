@@ -8,7 +8,7 @@ Larastvel uses Rust's `Result` types and Axum's error handling patterns.
 use larastvel_core::http::{Error as HttpError, LarastvelResult};
 
 async fn handler() -> Result<Json<Value>, HttpError> {
-    let user = find_user(id).ok_or(HttpError::not_found("User not found"))?;
+    let user = find_user(id).ok_or(HttpError::NotFound("User not found".into()))?;
     Ok(Json(user))
 }
 ```

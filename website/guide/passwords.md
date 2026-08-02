@@ -15,25 +15,51 @@ throttle_seconds = 60
 ## Usage
 
 ```rust
-use larastvel_core::auth::PasswordResetBroker;
-use larastvel_core::auth::PasswordResetConfig;
+use larastvel_core::auth::{PasswordResetBroker, PasswordResetConfig};
+use larastvel_core::mail::LogMailer;
+use std::sync::Arc;
 
 let config = PasswordResetConfig::default();
-let broker = PasswordResetBroker::new(db, config);
+let broker = PasswordResetBroker::new(
+    db,                                      // sea_orm::DatabaseConnection
+    config,
+    Arc::new(LogMailer::new("log")),         // Arc<dyn Mailer>
+    "noreply@example.com",                   // from_address
+    "http://localhost:8080",                 // app_url
+    "MyApp",                                 // app_name
+);
 
-// Create a reset token
-broker.create_token("user@example.com").await?;
+// Send a reset link (creates + emails the token)
+broker.send_reset_link("user@example.com").await?;
 
-// Validate and reset
-broker.reset("user@example.com", "token", "new-password").await?;
+// Validate the token and reset the password
+broker.reset("user@example.com", "token", "new-password-hash", |email, password| {
+    // Update the user's password in the database
+    Ok(())
+}).await?;
 ```
 
 ## Email Verification
 
 ```rust
 use larastvel_core::auth::EmailVerificationBroker;
+use larastvel_core::mail::LogMailer;
+use std::sync::Arc;
 
-let verifier = EmailVerificationBroker::new(db);
-verifier.send_verification_email("user@example.com").await?;
-verifier.verify("token").await?;
+let verifier = EmailVerificationBroker::new(
+    b"your-app-secret-key",                  // &[u8] JWT signing secret
+    Arc::new(LogMailer::new("log")),         // Arc<dyn Mailer>
+    "noreply@example.com",                   // from_address
+    "http://localhost:8080",                 // app_url
+    "MyApp",                                 // app_name
+    check_verified,                          // VerificationChecker closure
+    mark_verified,                           // MarkVerifiedCallback closure
+    3600,                                    // token_expiry_seconds
+);
+
+// Send a verification email
+verifier.send_verification_email("user-42", "user@example.com").await?;
+
+// Verify a token (returns (user_id, email))
+let (user_id, email) = verifier.verify_token("token")?;
 ```

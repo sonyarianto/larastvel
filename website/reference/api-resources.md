@@ -68,5 +68,5 @@ let json = collection.to_array();
 ## CLI Generator
 
 ```bash
-larastvel make:resource UserResource
+larastvel make resource UserResource
 ```

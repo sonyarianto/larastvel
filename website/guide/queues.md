@@ -25,7 +25,7 @@ async fn send_welcome_email(user_id: i32) -> Result<(), JobError> {
 }
 ```
 
-This generates a `SendWelcomeEmailJob` struct with `new()`, `dispatch()`, and `name()` methods.
+This generates a `SendWelcomeEmailJob` struct (the function name converted to PascalCase plus `Job`) with `new()`, `dispatch()`, and `name()` methods.
 
 The job can be dispatched manually:
 
@@ -46,9 +46,9 @@ async fn send_welcome_email(user_id: i32) -> Result<(), JobError> {
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| `tries` | 1 | Max attempts before the job is permanently failed |
-| `backoff` | 0 | Seconds to wait before retrying after a failure |
-| `timeout` | 30 | Job runs longer than this (seconds) are killed and retried (or failed with `fail_on_timeout`) |
+| `tries` | none (worker uses 3) | Max attempts before the job is permanently failed; the worker falls back to `DEFAULT_MAX_ATTEMPTS` (3) when unset |
+| `backoff` | none (0) | Seconds to wait before retrying after a failure; 0 when unset |
+| `timeout` | none | Job runs longer than this (seconds) are killed and retried (or failed with `fail_on_timeout`); no timeout when unset |
 | `fail_on_timeout` | off | Treat a timeout as a permanent failure instead of a retry |
 
 The worker enforces these: timed-out jobs stop executing, failed jobs with attempts remaining are re-released after the backoff delay, and jobs past `tries` are marked permanently failed.
@@ -56,8 +56,10 @@ The worker enforces these: timed-out jobs stop executing, failed jobs with attem
 ## Dispatching
 
 ```rust
-// Dispatch using the default sync queue
-dispatch(SendWelcomeEmail { user_id: 42 }).await?;
+use larastvel_core::queue::dispatch;
+
+// Dispatch a job (goes to the default queue)
+dispatch(SendWelcomeEmailJob::new(42)).await?;
 
 // Or use QueueManager for explicit queue control
 let mut manager = QueueManager::new("default");
@@ -65,7 +67,7 @@ manager.register("default", InMemoryQueue::new("default"));
 manager.register("sync", SyncQueue::new("sync"));
 
 let queue = manager.default_queue()?;
-queue.push(Box::new(SendWelcomeEmail { user_id: 42 })).await?;
+queue.push(Box::new(SendWelcomeEmailJob::new(42))).await?;
 ```
 
 ### Queue Routing
@@ -73,11 +75,11 @@ queue.push(Box::new(SendWelcomeEmail { user_id: 42 })).await?;
 Like Laravel's `Queue::route()`, jobs can be routed to specific queues centrally, without touching every dispatch site:
 
 ```rust
-manager.route("SendWelcomeEmailJob", "emails"); // job name -> queue name
-manager.route("SendSmsJob", "sms");
+manager.route("send_welcome_email", "emails"); // job name -> queue name
+manager.route("send_sms", "sms");
 
-let queue = manager.routed_queue("SendWelcomeEmailJob")?; // resolves by route, else default
-manager.dispatch(SendWelcomeEmail { user_id: 42 }).await?; // goes to the "emails" queue
+let queue = manager.routed_queue("send_welcome_email")?; // resolves by route, else default
+manager.dispatch(SendWelcomeEmailJob::new(42)).await?; // goes to the "emails" queue
 ```
 
 `routed_queue()` falls back to the default queue when no route matches; `unroute()` removes a rule.
@@ -88,18 +90,27 @@ manager.dispatch(SendWelcomeEmail { user_id: 42 }).await?; // goes to the "email
 use larastvel_core::queue::QueueWorker;
 
 let worker = QueueWorker::new(Arc::new(queue));
-worker.work_once().await?;    // process one job
-worker.process_next_job().await; // process next available
+
+worker.work_once().await?;          // process one job (Err if queue empty)
+while let Some(result) = worker.process_next_job().await {
+    // process next available job (None when queue is empty)
+}
+
+worker.is_running();                // check running state
+worker.stop();                      // stop the worker
 ```
+
+`work_once()` returns `Result<(), JobError>` and errors with `JobError::Queue("No jobs in queue")` when the queue is empty. `process_next_job()` returns `Option<Result<(), JobError>>` — `None` when there is nothing to process.
 
 ## Database Queue
 
 ```rust
-use larastvel_core::queue::DatabaseQueue;
+use larastvel_core::queue::{DatabaseQueue, JobBox, JobResolver};
 
 let resolver: JobResolver = Arc::new(|class, payload| {
     match class {
-        "send-welcome-email" => Some(Box::new(SendWelcomeEmail::from_payload(payload))),
+        // payload is a JSON string, e.g. {"name":"send_welcome_email"}
+        "send_welcome_email" => Some(Box::new(SendWelcomeEmailJob::new(0)) as JobBox),
         _ => None,
     }
 });
@@ -111,3 +122,5 @@ queue.ensure_table_exists().await?;
 // Run the worker via CLI
 // larastvel queue:work
 ```
+
+The `JobResolver` receives the job class name and the raw payload string, and returns the reconstructed job (or `None` if the class is unknown). Note that `DatabaseQueue::push` currently serializes only the job name — job arguments are not persisted, so the resolver must reconstruct the job with the values it needs.

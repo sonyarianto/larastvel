@@ -1,15 +1,17 @@
 # Routing
 
-Larastvel's router is built on Axum and wrapped in a `Registrar` that provides a Laravel-like API.
+Larastvel's router is built on Axum (0.8) and wrapped in a `Registrar` that provides a Laravel-like API. Route parameters use Axum's `{id}` syntax.
 
 ## Basic Routes
 
 ```rust
 router.get("/", home_page);
 router.post("/login", login_handler);
-router.put("/user/:id", update_user);
-router.delete("/user/:id", delete_user);
+router.put("/user/{id}", update_user);
+router.delete("/user/{id}", delete_user);
 ```
+
+`get`, `post`, `put`, `patch`, `delete`, and `ws` take a URI and a handler and register the route on the underlying Axum router.
 
 ## Route Groups
 
@@ -20,35 +22,61 @@ router.group("/admin", |r| {
 });
 ```
 
-## Named Routes
+Routes registered inside the closure are prefixed with the group path.
+
+## Route Listing
+
+`Registrar::list_routes()` returns the registered routes with their methods, URIs, and middleware:
 
 ```rust
-router.get("/user/:id", user_show).name("profile");
-// Generate: router.route("profile", &[("id", "42")])
+for route in router.list_routes() {
+    println!("{} {}", route.method, route.uri); // e.g. "GET /users"
+}
 ```
 
 ## Middleware
 
-### Global Middleware
+### Registering Middleware Aliases
 
-Middleware can be registered by alias or directly:
+Middleware aliases are registered with a name and a function that transforms the `MethodRouter` (usually applying an Axum layer):
 
 ```rust
-router.middleware("auth", auth_middleware);
-router.middleware("throttle:60,1", rate_limiter_middleware);
+router.middleware("auth", |r| r.layer(auth_layer));
+router.middleware("throttle", |r| r.layer(rate_limit_layer));
 ```
 
-### Per-Route / Per-Group
+### Applying Middleware
+
+Apply previously-registered aliases to all routes registered afterwards:
 
 ```rust
-router.get("/dashboard", dashboard_handler)
-    .middleware("auth")
-    .middleware("throttle:60,1");
+router.with_middleware(vec!["auth", "throttle"]);
 
+router.get("/dashboard", dashboard_handler);
+```
+
+Groups restore the previous middleware list when they exit:
+
+```rust
 router.group("/admin", |r| {
-    r.middleware("auth");
+    r.with_middleware(vec!["auth"]);
     r.get("/", admin_index);
 });
+```
+
+### Per-Route Middleware
+
+Inside a `#[route]` impl block, use the `#[middleware]` attribute to attach middleware aliases to a single handler:
+
+```rust
+#[route]
+impl AdminController {
+    #[get("/admin")]
+    #[middleware("auth")]
+    async fn admin_index() -> impl IntoResponse {
+        Html("<h1>Admin</h1>")
+    }
+}
 ```
 
 ## Authorization
@@ -120,6 +148,8 @@ The macro generates a `register_routes(&Registrar)` method on the struct. Call i
 
 ```rust
 // routes/api.rs
+use larastvel_core::routing::Registrar;
+
 pub fn api(router: &Registrar) {
     UserController::register_routes(router);
 }
@@ -129,35 +159,59 @@ Methods without a route attribute are left as-is (not registered). Each method i
 
 ## Controllers
 
-Use the `#[controller]` macro:
+A controller is an `impl` block that registers its own routes:
 
 ```rust
-#[controller]
+use larastvel_core::routing::Registrar;
+
+struct UserController;
+
 impl UserController {
+    fn register_routes(router: &Registrar) {
+        router.get("/users", Self::index);
+        router.get("/users/{id}", Self::show);
+    }
+
     async fn index() -> Json<Vec<User>> {
         // GET /users
     }
 
     async fn show(Path(id): Path<i32>) -> Json<User> {
-        // GET /users/:id
+        // GET /users/{id}
     }
 }
-
-router.get("/users", UserController::index);
-router.get("/users/:id", UserController::show);
 ```
+
+The `#[controller]` attribute is a marker that also generates an empty `register_routes(&Registrar)`; the routes themselves are registered manually as above (or with `#[route]`).
 
 ## Resources
 
+`#[derive(Resource)]` implements the `ResourceController` trait (with the resource name derived from the struct name) and generates a `register_routes(&Registrar)` that registers all seven resource routes:
+
 ```rust
+use larastvel_core::Resource;
+
 #[derive(Resource)]
-#[resource(controller = "UserController")]
 struct UserResource;
 
-router.resource("/users", UserResource::routes());
+// Register all resource routes
+UserResource::register_routes(router);
 ```
 
-Generates: `index`, `create`, `store`, `show`, `edit`, `update`, `destroy`.
+Generates: `GET /userresource`, `GET /userresource/create`, `POST /userresource`, `GET /userresource/{id}`, `GET /userresource/{id}/edit`, `PUT /userresource/{id}`, `DELETE /userresource/{id}`.
+
+Override the default handlers by implementing `ResourceController`:
+
+```rust
+#[async_trait::async_trait]
+impl ResourceController for UserResource {
+    const RESOURCE_NAME: &'static str = "users";
+
+    async fn index() -> Response {
+        Json(json!({"users": []})).into_response()
+    }
+}
+```
 
 ## WebSocket
 

@@ -27,7 +27,8 @@ assert_eq!(result, 4); // ((1 + 1) * 2)
 For reusable pipe logic, implement the `Pipe` trait:
 
 ```rust
-use larastvel_core::{Pipeline, into_pipe_fn, Next, Pipe};
+use larastvel_core::pipeline::into_pipe_fn;
+use larastvel_core::{Next, Pipe, Pipeline};
 use async_trait::async_trait;
 
 struct AddPipe(i32);

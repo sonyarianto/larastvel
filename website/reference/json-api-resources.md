@@ -132,7 +132,7 @@ let doc = PostResource::collection(posts)
     .to_array();
 ```
 
-Collections emit `data` (array), an automatic `meta.count`, any `links` / extra `meta`, and the aggregated `included` array. Top-level keys can also be merged with `additional()`.
+Collections emit `data` (array), an automatic `meta.count`, any `links` / extra `meta` set via `with_links()` / `with_meta()`, and the aggregated `included` array. On single resources, additional top-level keys can be merged with `additional()`.
 
 ## Responses
 

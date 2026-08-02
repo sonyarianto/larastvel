@@ -68,5 +68,5 @@ impl ServiceProvider for AppServiceProvider {
 ## CLI Generator
 
 ```bash
-larastvel make:provider AppServiceProvider
+larastvel make provider AppServiceProvider
 ```

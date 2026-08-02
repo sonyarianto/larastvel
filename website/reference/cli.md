@@ -14,22 +14,25 @@ Larastvel ships with an Artisan-like CLI.
 | `config:cache` | Cache configuration |
 | `config:clear` | Clear cached configuration |
 | `migrate` | Run pending database migrations |
-| `make:model` | Create a new model |
-| `make:controller` | Create a new controller |
-| `make:migration` | Create a new migration |
-| `make:seeder` | Create a new seeder |
-| `make:policy` | Create a new policy |
-| `make:test` | Create a new test |
-| `make:job` | Create a new job |
-| `make:event` | Create a new event |
-| `make:notification` | Create a new notification |
-| `make:rule` | Create a new validation rule |
-| `make:mail` | Create a new mail class |
-| `make:command` | Create a new CLI command |
-| `make:resource` | Create a new API resource |
-| `make:provider` | Create a new service provider |
-| `make:broadcast-event` | Create a new broadcast event |
-| `make:mail` | Create a new mail class |
+| `make model` | Create a new model |
+| `make controller` | Create a new controller |
+| `make migration` | Create a new migration |
+| `make seeder` | Create a new seeder |
+| `make policy` | Create a new policy |
+| `make test` | Create a new test |
+| `make job` | Create a new job |
+| `make event` | Create a new event |
+| `make listener` | Create a new listener |
+| `make notification` | Create a new notification |
+| `make rule` | Create a new validation rule |
+| `make command` | Create a new CLI command |
+| `make factory` | Create a new factory |
+| `make mail` | Create a new mail class |
+| `make scope` | Create a new query scope |
+| `make observer` | Create a new model observer |
+| `make resource` | Create a new API resource |
+| `make provider` | Create a new service provider |
+| `make broadcast-event` | Create a new broadcast event |
 | `db:seed` | Seed the database |
 | `notifications:table` | Create notifications migration |
 | `storage:link` | Create a symbolic link from public/storage to storage/app/public |
@@ -51,7 +54,7 @@ cargo run -p larastvel-cli -- queue:work
 
 # Or after installation
 larastvel serve
-larastvel make:controller PostController
+larastvel make controller PostController
 ```
 
 ## Dev Server
@@ -68,5 +71,5 @@ cargo run -p larastvel-cli -- serve
 ```bash
 cargo install larastvel-cli
 larastvel serve
-larastvel make:controller PostController
+larastvel make controller PostController
 ```

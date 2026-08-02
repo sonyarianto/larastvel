@@ -7,15 +7,24 @@ Larastvel provides Gates and Policies for authorization, inspired by Laravel.
 Gates are closures that determine if a user is authorized for an action.
 
 ```rust
-use larastvel_core::auth::{Gate, authorize};
+use larastvel_core::auth::{Gate, authorize, AuthenticatedUser, GateCheck};
 
-// Define a gate
-Gate::define("update-post", |user, post: &Post| {
-    user.id == post.user_id
+// Define a gate — the closure receives the user and string args
+let gate = Gate::new();
+gate.define("update-post", |user, args| {
+    if args.first().map(|s| s.as_str()) == Some(&user.user_id) {
+        GateCheck::Allowed
+    } else {
+        GateCheck::Denied("You do not own this post.".to_string())
+    }
 });
 
-// Check authorization
-if authorize("update-post", &post).await {
+// Check authorization (sync free function)
+let user = AuthenticatedUser {
+    user_id: "1".to_string(),
+    claims: /* ... */,
+};
+if authorize(&gate, &user, "update-post", &["1".to_string()]).is_ok() {
     // allowed
 }
 ```
@@ -30,6 +39,7 @@ Use the `#[policy]` macro to generate the `Policy` trait implementation. See the
 
 ```rust
 use larastvel_core::auth::{AuthenticatedUser, GateCheck};
+use larastvel_core::policy;
 
 #[policy("post")]
 #[derive(Debug)]
@@ -57,8 +67,11 @@ PostPolicy::register(&gate);
 Protect routes with the authorization middleware:
 
 ```rust
+// Register the middleware alias first — the closure applies a Tower layer to the MethodRouter
+router.middleware("auth", |r| r.layer(middleware::from_fn(auth_middleware)));
+
 router.group("/admin", |r| {
-    r.middleware("auth");
+    r.with_middleware(vec!["auth"]);
     r.get("/dashboard", admin_dashboard);
 });
 ```
@@ -67,6 +80,6 @@ router.group("/admin", |r| {
 
 | Function | Description |
 |----------|-------------|
-| `authorize(ability, resource)` | Check authorization |
-| `require_ability(ability)` | Middleware-style check |
-| `check_ability(user, ability, resource)` | Low-level check |
+| `authorize(gate, user, ability, args)` | Sync check, returns `Result<(), GateCheck>` |
+| `require_ability(ability)` | Middleware-style check (`Result<Response, GateCheck>`) |
+| `check_ability(ability, user, gate)` | Async low-level check |

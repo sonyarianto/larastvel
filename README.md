@@ -35,7 +35,7 @@ cargo run
 ```bash
 cargo install larastvel-cli
 larastvel serve
-larastvel make:controller PostController
+larastvel make controller PostController
 ```
 
 ### Routes
@@ -96,11 +96,11 @@ See [Configuration Reference](#configuration-reference) for all options.
 | **Authorization** | Gates, policies, before/after hooks, `authorize()` / `require_ability` |
 | **Broadcasting** | Pusher, Ably, Log, Native (self-hosted WebSocket) broadcast drivers |
 | **Caching** | `CacheManager` with array, file, database stores, TTL, `remember()`, batch ops |
-| **CLI** | 12 `make:*` generators, `serve`, `migrate`, `route:list`, `config:cache`, `schedule:run`, `queue:work`, and more |
+| **CLI** | 19 `make:*` generators, `serve`, `migrate`, `route:list`, `config:cache`, `schedule:run`, `queue:work`, and more |
 | **Console** | `routes/console.rs`, `Command` trait, `ConsoleKernel`, scheduled command registration |
 | **Database** | SQLite/Postgres/MySQL via SeaORM, migrations, seeders, model factories (Faker) |
 | **Encryption** | AES-256-GCM (`Encrypter`), bcrypt hashing (`hash::make` / `hash::check`) |
-| **Events** | `EventService`, `dispatch()`, `listen()`, `fake()` / `assertDispatched()` |
+| **Events** | `EventService`, `dispatch()`, `listen()`, `fake()` / `assert_dispatched()` |
 | **File Storage** | `Filesystem` trait, `LocalDisk` driver, `StorageManager` |
 | **Localization** | JSON translation files, `__()`, `trans_choice()`, pluralization |
 | **Mail** | SMTP (STARTTLS) and log mailers, `Mailable` builder, `MailManager` |
@@ -114,9 +114,10 @@ See [Configuration Reference](#configuration-reference) for all options.
 | **SMS** | Log and Vonage senders, `SmsMessage` builder |
 | **Task Scheduling** | Cron expression parser, `Schedule` builder, `ScheduleManager` |
 | **Templating** | Tera engine + Blade directives (`@auth`, `@csrf`, `@error`, `@guest`, `@method`) |
-| **Testing** | `TestClient`, `TestResponse`, `RefreshDatabase`, 611+ tests |
+| **Testing** | `TestClient`, `TestResponse`, `RefreshDatabase`, 1000+ tests |
 | **Validation** | 20 built-in rules, `ValidatedJson`/`ValidatedQuery` extractors |
 | **Vite** | Manifest-based asset tag generation |
+| **AI** | AI SDK foundation — text generation, streaming, structured output, embeddings with 30-day caching, OpenAI-compatible provider, `FakeAi` |
 
 ---
 
@@ -163,11 +164,11 @@ Ready-to-run examples in `examples/`:
 | Example | What it demonstrates |
 |---|---|
 | `auth_service_provider` | Auth, password reset, email verification working together |
-| `multi_channel` | Broadcasting on multiple channels |
+| `multi_channel_notification` | Broadcasting on multiple channels |
 | `unified_dashboard` | WebSocket dashboard with broadcast log, auth, rate limiting |
 | `websocket_broadcast` | Self-hosted WebSocket via NativeBroadcaster |
-| `mail`, `sms`, `notification` | Mail/SMS/Notification sending |
-| `password_reset` | Password reset flow |
+| `mail_controller`, `sms_controller`, `notification_controller` | Mail/SMS/Notification sending |
+| `password_reset_controller` | Password reset flow |
 
 Run any example: `cargo run --example <name>`
 

@@ -29,13 +29,16 @@ Create JSON translation files in `resources/lang/`:
 ## Usage
 
 ```rust
-use larastvel_core::translation::__;
+use larastvel_core::translation::{__, __with, trans_choice};
+use std::collections::HashMap;
 
 // Simple string
 __("welcome");  // "Selamat datang"
 
 // With replacements
-__("Hello :name", vec![("name", "John")]);
+let mut params = HashMap::new();
+params.insert("name".to_string(), "John".to_string());
+__with("welcome", params);
 
 // Pluralization
 trans_choice("apples", 1);  // "Satu apel"

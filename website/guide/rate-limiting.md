@@ -6,34 +6,49 @@ Larastvel provides token-bucket rate limiting with configurable limits.
 
 ```rust
 use larastvel_core::rate_limiter::{
-    RateLimiter, RateLimiterRegistry, RateLimitConfig, rate_limit_middleware,
+    rate_limiter, RateLimiter, RateLimiterRegistry, RateLimitConfig, rate_limit_middleware,
 };
 
 let mut registry = RateLimiterRegistry::new();
-registry.register("api", RateLimiter::new(60, 1)); // 60 requests per second
+let limiter = RateLimiter::new(RateLimitConfig::per_second(60).named("api"));
+registry.register(limiter); // keyed by the config's name ("api")
 
-// Apply to routes
-router.middleware("throttle", |r| {
-    r.layer(rate_limit_middleware(RateLimitConfig::new(60, 1)))
-});
+// Apply the middleware (it reads the registry from request extensions)
+// router.middleware("throttle", rate_limit_middleware)
 ```
 
 ## Global Rate Limiter
 
 ```rust
 use larastvel_core::rate_limiter::rate_limiter;
+use larastvel_core::rate_limiter::RateLimitConfig;
 
-let limiter = rate_limiter("api", 60, 1);
-if limiter.check("client-ip").await {
-    // allowed
-} else {
+let limiter = rate_limiter(RateLimitConfig::per_second(60).named("api"));
+
+if limiter.too_many_attempts("client-ip") {
     // rate limited
+} else {
+    limiter.hit("client-ip"); // record the attempt
+    // allowed
 }
 ```
 
 ## Custom Limits
 
 ```rust
-let strict = RateLimiter::new(10, 60);  // 10 requests per 60 seconds
-let generous = RateLimiter::new(1000, 3600); // 1000 per hour
+let strict = RateLimiter::new(RateLimitConfig::per_minute(10));   // 10 requests per 60 seconds
+let generous = RateLimiter::new(RateLimitConfig::per_hour(1000)); // 1000 per hour
 ```
+
+## Limiter API
+
+```rust
+limiter.hit("client-ip");              // record an attempt, returns the new attempt count
+limiter.too_many_attempts("client-ip");// has the limit been reached?
+limiter.attempts("client-ip");         // attempts in the current window
+limiter.remaining("client-ip");        // attempts left before the limit
+limiter.retry_after("client-ip");      // seconds until the window resets
+limiter.reset("client-ip");            // clear the window for an identifier
+```
+
+`RateLimitConfig` constructors: `per_second(n)`, `per_minute(n)`, `per_hour(n)`, all chainable with `.named("name")` (used as the registry key).

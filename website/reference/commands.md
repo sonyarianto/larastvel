@@ -58,7 +58,7 @@ fn run(&self, app: &Application, args: &[String]) -> Result<(), ConsoleError>
 ## CLI Generator
 
 ```bash
-larastvel make:command YourCommand
+larastvel make command YourCommand
 ```
 
 This scaffolds a command struct with the `#[command]` attribute and a placeholder `run()` method.

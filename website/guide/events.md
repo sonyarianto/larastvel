@@ -95,10 +95,10 @@ EventService::dispatch(OrderShipped {
 
 ```bash
 # Generate an event + listener pair
-larastvel make:event OrderShipped
+larastvel make event OrderShipped
 
 # Generate a standalone listener
-larastvel make:listener SendNotification
+larastvel make listener SendNotification
 ```
 
 ## Testing

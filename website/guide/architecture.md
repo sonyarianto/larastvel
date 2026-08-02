@@ -84,7 +84,7 @@ impl InspireCommand {
 Generate a scaffolded command with:
 
 ```bash
-larastvel make:command InspireCommand
+larastvel make command InspireCommand
 ```
 
 ## Service Providers
@@ -108,5 +108,5 @@ impl AppServiceProvider {
 Generate a scaffolded provider with:
 
 ```bash
-larastvel make:provider AppServiceProvider
+larastvel make provider AppServiceProvider
 ```

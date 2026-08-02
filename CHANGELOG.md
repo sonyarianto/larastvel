@@ -44,7 +44,7 @@ All 6 workspace crates published to crates.io.
 - `PARITY.md` extracted from README
 
 ### 🧪 Testing
-- 611+ unit tests across the workspace
+- 1000+ unit tests across the workspace
 - CI: `cargo fmt --check` → `clippy` → `build` → `test` on push/PR to main
 
 ## v0.1.0 (Initial development)

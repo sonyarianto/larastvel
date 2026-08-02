@@ -33,27 +33,25 @@ impl PostPolicy {
 The macro generates:
 
 ```rust
-impl Policy for PostPolicy {
-    fn resource(&self) -> &'static str {
-        "post"
-    }
-
-    fn check(&self, user: &AuthenticatedUser, ability: &str, args: &[String]) -> Option<GateCheck> {
-        self.check_ability(user, ability, args)
+impl PostPolicy {
+    /// Register this policy with the given gate.
+    pub fn register(gate: &larastvel_core::auth::Gate) {
+        gate.register_policy("post", std::sync::Arc::new(PostPolicy));
     }
 }
-```
 
-Plus a `register()` helper:
-
-```rust
-impl PostPolicy {
-    pub fn register(gate: &Gate) {
-        gate.register_policy(Self::resource_static(), Arc::new(Self));
+impl larastvel_core::auth::Policy for PostPolicy {
+    fn resource(&self) -> &str {
+        "post"
     }
 
-    fn resource_static() -> &'static str {
-        "post"
+    fn check(
+        &self,
+        user: &AuthenticatedUser,
+        ability: &str,
+        args: &[String],
+    ) -> Option<GateCheck> {
+        self.check_ability(user, ability, args)
     }
 }
 ```
@@ -75,5 +73,5 @@ PostPolicy::register(&gate);
 ## CLI Generator
 
 ```bash
-larastvel make:policy PostPolicy
+larastvel make policy PostPolicy
 ```

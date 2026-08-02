@@ -36,11 +36,26 @@ The `#[table]` macro generates the full SeaORM entity boilerplate (`DeriveEntity
 The `DbModel` trait provides Laravel-style helpers on top of SeaORM entities:
 
 ```rust
+use larastvel_core::sea_orm::{IntoActiveModel, Set};
+
 let users = User::all().await?;
-let user = User::find(1).await?;
-User::create(user_data).await?;
-User::update(1, update_data).await?;
-User::delete(1).await?;
+let user = User::find(1).await?.unwrap();
+
+// Insert — DbModel::insert takes an ActiveModel
+let created = User::insert(user::ActiveModel {
+    name: Set("John".to_string()),
+    email: Set("john@example.com".to_string()),
+    ..Default::default()
+})
+.await?;
+
+// Update — DbModel::update takes an ActiveModel
+let mut active: user::ActiveModel = created.clone().into_active_model();
+active.name = Set("Jane".to_string());
+User::update(active).await?;
+
+// Delete — DbModel::delete takes the model
+User::delete(created).await?;
 ```
 
 ## Query Scopes
@@ -82,7 +97,7 @@ let users = User::recent(7).all().await?;
 Generate a scaffolded scope with:
 
 ```bash
-larastvel make:scope popular
+larastvel make scope popular
 ```
 
 ## Model Observers
@@ -120,7 +135,7 @@ The `DbModel` trait automatically dispatches these events:
 Generate a scaffolded observer with:
 
 ```bash
-larastvel make:observer UserObserver
+larastvel make observer UserObserver
 ```
 
 ## Migrations
@@ -209,16 +224,16 @@ impl UserResource {
 
 ```rust
 let resource = UserResource::make(user);
-let json = resource.value();
+let json = resource.to_array();
 
-let collection = UserResource::collect(users);
-let json = collection.value();
+let collection = UserResource::collection(users);
+let json = collection.to_array();
 ```
 
 Generate a scaffolded resource with:
 
 ```bash
-larastvel make:resource UserResource
+larastvel make resource UserResource
 ```
 
 For spec-compliant JSON:API output — resource objects, sparse fieldsets, `?include=` compound documents — see the [JSON:API Resources](/reference/json-api-resources) reference.

@@ -16,7 +16,8 @@ paths = ["resources/views"]
 ```rust
 use larastvel_core::view::ViewFactory;
 
-let html = ViewFactory::render("welcome", &ctx)?;
+let factory = ViewFactory::new(&config);
+let html = factory.render("welcome", &ctx).await?;
 ```
 
 Or use the `view` shorthand on routes:

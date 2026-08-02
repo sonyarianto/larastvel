@@ -72,5 +72,5 @@ mail.send(&mailer).await?;
 ## CLI Generator
 
 ```bash
-larastvel make:mail WelcomeMail
+larastvel make mail WelcomeMail
 ```

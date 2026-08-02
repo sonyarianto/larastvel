@@ -16,18 +16,18 @@ Routes matching `/api/*` and `/health` are automatically CSRF-excepted.
 ```rust
 use larastvel_core::session::SessionHandle;
 
-async fn handler(session: SessionHandle) -> impl IntoResponse {
+async fn handler(mut session: SessionHandle) -> impl IntoResponse {
     // Read
-    let count: Option<i32> = session.get("counter").await.unwrap();
+    let count: Option<&str> = session.get("counter");
 
     // Write
-    session.set("counter", count.unwrap_or(0) + 1).await.unwrap();
+    session.put("counter", count.unwrap_or("0"));
 
     // Flash data
-    session.flash("status", "Saved!").await.unwrap();
+    session.flash("status", "Saved!");
 
     // Remove
-    session.remove("counter").await.unwrap();
+    session.forget("counter");
 }
 ```
 

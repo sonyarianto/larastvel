@@ -12,7 +12,7 @@ Larastvel aims for ~100% feature parity with Laravel. Below is a side-by-side co
 | `bootstrap/app.php` | `Application` / `App` builder | ✅ |
 | `app/Providers/*` | `ServiceProvider`, `EventServiceProvider`, `RouteServiceProvider` | ✅ |
 | Artisan CLI (25+ commands) | `larastvel-cli` — serve, route:list, key:generate, migrate, db:seed, make:*, queue:work, etc. | ✅ |
-| `make:*` generators | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, notification, rule, mail, command | ✅ |
+| `make:*` generators | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, listener, notification, rule, command, factory, mail, scope, observer, resource, provider, broadcast-event | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | Eloquent ORM | `DbModel` + SeaORM + `ApiResource` / `JsonResource` / `ResourceCollection` | ✅ |
 | JSON:API resources | `JsonApiResource` trait + `JsonApiItem` / `JsonApiCollection` — `?include=` compound documents, `?fields[type]=` sparse fieldsets, `when_included()`, `application/vnd.api+json` | ✅ |
@@ -44,7 +44,9 @@ Larastvel aims for ~100% feature parity with Laravel. Below is a side-by-side co
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
 | Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser | ✅ |
+| AI SDK foundation — text generation, streaming, structured output, embeddings | `Ai` facade + `AiProvider` trait — generate/chat/chat_stream/structured/embed with 30-day caching, OpenAI-compatible provider, FakeAi | ✅ |
+| AI SDK agents / media (agents, images, audio, TTS/STT, vector stores, reranking) | — | ❌ Missing (next phase) |
 
 **All features are fully implemented.**
 
-The Laravel AI SDK (agents, embeddings, audio, images, vector stores) is the only remaining Laravel 13 feature not yet available. See [PARITY.md](https://github.com/sonyarianto/larastvel/blob/main/PARITY.md) for the tracked gap list.
+The Laravel AI SDK foundation (text generation, streaming, structured output, embeddings) is available; the agents/media surface (agents, images, audio, TTS/STT, vector stores, reranking) is the remaining Laravel 13 feature not yet available. See [PARITY.md](https://github.com/sonyarianto/larastvel/blob/main/PARITY.md) for the tracked gap list.

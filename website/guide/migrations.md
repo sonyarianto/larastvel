@@ -5,7 +5,7 @@ Larastvel uses SeaORM's migration system for database schema management.
 ## Creating Migrations
 
 ```bash
-larastvel make:migration create_users_table
+larastvel make migration create_users_table
 ```
 
 ## Writing Migrations
@@ -47,25 +47,38 @@ larastvel migrate:rollback # rollback last batch
 ## Factories & Seeding
 
 ```rust
-use larastvel_core::models::factory::{Faker, ModelFactory};
+use larastvel_core::database::DatabaseSeeder;
+use larastvel_core::models::factory::{factory_create, factory_create_count, Faker, ModelFactory};
 
-let mut faker = Faker::new();
-
-// Generate fake data
-let name = faker.name();
-let email = faker.email();
+// Faker is a unit struct — its methods are static
+let name = Faker::name();
+let email = Faker::email();
 
 // Define a factory
-factory.define(User::default(), |faker| {
-    User {
-        name: faker.name(),
-        email: faker.email(),
-    }
-});
+#[derive(Default)]
+struct UserFactory;
 
-// Create records
-factory.create(User::default(), 10)?;
+impl ModelFactory for UserFactory {
+    type ActiveModel = user::ActiveModel;
+
+    fn definition() -> Self::ActiveModel {
+        use sea_orm::Set;
+        user::ActiveModel {
+            id: sea_orm::NotSet,
+            name: Set(Faker::name()),
+            email: Set(Faker::email()),
+        }
+    }
+}
+
+// Build in-memory instances (not persisted)
+let draft = UserFactory::make();
+let batch = UserFactory::make_count(10);
+
+// Persist records
+let user = factory_create::<UserFactory>().await?;
+let users = factory_create_count::<UserFactory>(10).await?;
 
 // Seed the database
-seeder.call(UserSeeder).await?;
+DatabaseSeeder::run_seeder::<UserSeeder>(&conn).await?;
 ```

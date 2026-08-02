@@ -10,8 +10,8 @@ use larastvel_core::sms::{LogSmsSender, VonageSmsSender, SmsMessage, SmsSender};
 // Log sender (development)
 let sender = LogSmsSender::new();
 
-// Vonage sender (production)
-let sender = VonageSmsSender::new("api_key", "api_secret");
+// Vonage sender (production) — api_key, api_secret, and the `from` number
+let sender = VonageSmsSender::new("api_key", "api_secret", "+15551234567");
 ```
 
 ## Sending Messages

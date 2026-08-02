@@ -67,5 +67,5 @@ factory_create_count::<UserFactory>(10).await?;
 ## CLI Generator
 
 ```bash
-larastvel make:factory UserFactory
+larastvel make factory UserFactory
 ```

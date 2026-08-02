@@ -201,10 +201,10 @@ let result = validate(&data, vec![
 ]);
 ```
 
-Generate a new custom rule with `make:rule`:
+Generate a new custom rule with `make rule`:
 
 ```bash
-cargo run make:rule UpperCase
+cargo run make rule UpperCase
 ```
 
 ## ValidationErrors API

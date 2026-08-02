@@ -81,5 +81,5 @@ manager.broadcast(&event).await?;
 ## CLI Generator
 
 ```bash
-larastvel make:broadcast-event NewMessage
+larastvel make broadcast-event NewMessage
 ```

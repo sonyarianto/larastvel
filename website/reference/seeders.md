@@ -39,11 +39,11 @@ The macro generates:
 ```rust
 #[larastvel_core::async_trait]
 impl Seeder for UserSeeder {
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "user_seeder" // or custom name
     }
 
-    async fn run(&self, conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
+    async fn run(conn: &DbConn) -> Result<(), Box<dyn std::error::Error>> {
         Self::seed(conn).await
     }
 }
@@ -68,5 +68,5 @@ cargo run -p larastvel-cli -- db:seed
 ## CLI Generator
 
 ```bash
-larastvel make:seeder UserSeeder
+larastvel make seeder UserSeeder
 ```
