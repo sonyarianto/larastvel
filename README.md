@@ -1,3 +1,5 @@
+# Larastvel
+
 [![CI](https://github.com/sonyarianto/larastvel/actions/workflows/ci.yml/badge.svg)](https://github.com/sonyarianto/larastvel/actions)
 ![Rust](https://img.shields.io/badge/rust-stable-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
