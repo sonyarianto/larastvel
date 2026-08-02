@@ -1,5 +1,6 @@
 extern crate self as larastvel_core;
 
+pub mod ai;
 pub mod auth;
 pub mod bootstrap;
 pub mod broadcasting;
@@ -38,6 +39,10 @@ pub use serde;
 pub use serde_json;
 pub use tokio;
 
+pub use ai::{
+    Ai, AiProvider, ChatOptions, ChatResponse, EmbeddingOptions, FakeAi, Message,
+    OpenAICompatibleProvider, ProviderError, ResponseFormat, Role, Usage,
+};
 pub use async_trait::async_trait;
 pub use auth::{
     authorize, check_ability, require_ability, require_verified_email, Auth, AuthError,

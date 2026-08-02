@@ -372,7 +372,23 @@ impl Config {
             ["logging", "format"] => Some(self.logging.format.clone()),
             _ => {
                 let full_key = parts.join(".");
-                self.extra.get(&full_key).map(|v| v.to_string())
+                // Literal keys in `extra` may themselves contain dots.
+                if let Some(value) = self.extra.get(&full_key) {
+                    return Some(value.to_string());
+                }
+                // Otherwise, resolve the dot path through nested sections —
+                // e.g. `ai.provider` resolves `extra["ai"]["provider"]`.
+                let mut current: Option<&toml::Value> = None;
+                for part in &parts {
+                    current = match current {
+                        None => self.extra.get(*part),
+                        Some(value) => value.get(*part),
+                    };
+                    if current.is_none() {
+                        break;
+                    }
+                }
+                current.map(|v| v.to_string())
             }
         }
     }
