@@ -756,10 +756,7 @@ mod tests {
         }
 
         let queue = Arc::new(InMemoryQueue::new("retry"));
-        queue
-            .push(Box::new(FlakyJob::new()))
-            .await
-            .unwrap();
+        queue.push(Box::new(FlakyJob::new())).await.unwrap();
 
         let worker = QueueWorker::new(queue.clone());
         assert!(worker.process_next_job().await.unwrap().is_ok());
@@ -780,10 +777,7 @@ mod tests {
         }
 
         let queue = Arc::new(InMemoryQueue::new("give-up"));
-        queue
-            .push(Box::new(AlwaysFailsJob::new()))
-            .await
-            .unwrap();
+        queue.push(Box::new(AlwaysFailsJob::new())).await.unwrap();
 
         let worker = QueueWorker::new(queue.clone());
         let first = worker.process_next_job().await.unwrap();
@@ -803,10 +797,7 @@ mod tests {
         }
 
         let queue = Arc::new(InMemoryQueue::new("backoff"));
-        queue
-            .push(Box::new(DelayedJob::new()))
-            .await
-            .unwrap();
+        queue.push(Box::new(DelayedJob::new())).await.unwrap();
 
         let worker = QueueWorker::new(queue.clone());
         let result = worker.process_next_job().await.unwrap();
@@ -832,7 +823,10 @@ mod tests {
 
         let worker = QueueWorker::new(queue.clone());
         let result = worker.process_next_job().await.unwrap();
-        assert!(result.is_ok(), "timeout without fail_on_timeout should release");
+        assert!(
+            result.is_ok(),
+            "timeout without fail_on_timeout should release"
+        );
         assert_eq!(queue.count().await, 1);
     }
 
@@ -845,10 +839,7 @@ mod tests {
         }
 
         let queue = Arc::new(InMemoryQueue::new("timeout-fatal"));
-        queue
-            .push(Box::new(SlowFatalJob::new()))
-            .await
-            .unwrap();
+        queue.push(Box::new(SlowFatalJob::new())).await.unwrap();
 
         let worker = QueueWorker::new(queue.clone());
         let result = worker.process_next_job().await.unwrap();

@@ -200,9 +200,7 @@ fn verify_origin(
     allow_same_site: bool,
     origin_only: bool,
 ) -> OriginVerdict {
-    let sec_fetch_site = headers
-        .get("Sec-Fetch-Site")
-        .and_then(|v| v.to_str().ok());
+    let sec_fetch_site = headers.get("Sec-Fetch-Site").and_then(|v| v.to_str().ok());
 
     match sec_fetch_site {
         Some("same-origin") => OriginVerdict::Pass,
