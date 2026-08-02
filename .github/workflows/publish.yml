@@ -3,12 +3,8 @@ name: Publish to crates.io
 on:
   push:
     tags: ["v*"]
+  # Manual resume after a partial failure: gh workflow run publish.yml --ref vX.Y.Z
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Dry run — package and verify each crate without uploading"
-        type: boolean
-        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -64,22 +60,4 @@ jobs:
             echo "Publishing $p ..."
             cargo publish -p "$p" || exit 1
             wait_for "$p"
-          done
-
-  dry-run:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Dry-run publish all crates (order matters)
-        run: |
-          for p in larastvel-macros larastvel-core larastvel-testing larastvel-tinker larastvel-cli larastvel-new; do
-            cargo publish -p "$p" --dry-run --no-verify || exit 1
           done
