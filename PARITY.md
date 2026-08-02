@@ -49,7 +49,7 @@ side-by-side comparison.
 |---|---|---|
 | Laravel AI SDK (agents, embeddings, audio, images, vector stores) | — | ❌ Missing |
 | JSON:API resources (relationship inclusion, sparse fieldsets, links) | `ApiResource` / `JsonResource` / `ResourceCollection` (non-JSON:API) | ❌ Missing |
-| Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | — | ❌ Missing |
+| Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | `VectorSimilarityQuery` — cosine / L2 / inner product on `Select<E>` | ✅ |
 | `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
 | Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |
 

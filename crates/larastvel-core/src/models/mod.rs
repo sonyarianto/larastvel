@@ -1,5 +1,6 @@
 pub mod factory;
 pub mod serialization;
+pub mod vector;
 
 use std::sync::OnceLock;
 

@@ -77,6 +77,7 @@ pub use middleware::presets::{
 pub use middleware::{cors_middleware, request_logger};
 pub use models::factory::{factory_create, factory_create_count, Faker, ModelFactory};
 pub use models::serialization::{ApiResource, JsonResource, ResourceCollection, SerializesToArray};
+pub use models::vector::{VectorDistance, VectorSimilarityQuery};
 pub use notifications::{
     BroadcastPayload, DatabaseNotification, Notifiable, Notification, NotificationChannel,
     NotificationError, NotificationSender,
