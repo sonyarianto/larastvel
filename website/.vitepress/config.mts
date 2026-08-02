@@ -74,6 +74,7 @@ export default defineConfig({
             { text: 'Notifications', link: '/guide/notifications' },
             { text: 'Pipeline', link: '/guide/pipeline' },
             { text: 'Prompt', link: '/guide/prompt' },
+            { text: 'AI', link: '/guide/ai' },
             { text: 'Queues', link: '/guide/queues' },
             { text: 'Rate Limiting', link: '/guide/rate-limiting' },
             { text: 'Task Scheduling', link: '/guide/scheduling' },
