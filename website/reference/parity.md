@@ -15,6 +15,12 @@ Larastvel aims for ~100% feature parity with Laravel. Below is a side-by-side co
 | `make:*` generators | `larastvel make:*` — model, controller, migration, seeder, policy, test, job, event, notification, rule, mail, command | ✅ |
 | `app/Http/Controllers/` | `#[controller]` / `#[derive(Resource)]` macros | ✅ |
 | Eloquent ORM | `DbModel` + SeaORM + `ApiResource` / `JsonResource` / `ResourceCollection` | ✅ |
+| JSON:API resources | `JsonApiResource` trait + `JsonApiItem` / `JsonApiCollection` — `?include=` compound documents, `?fields[type]=` sparse fieldsets, `when_included()`, `application/vnd.api+json` | ✅ |
+| Semantic / vector search | `VectorSimilarityQuery` — cosine / L2 / inner product (`<=>`, `<->`, `<#>`) on `Select<E>` | ✅ |
+| Origin-aware CSRF | `Sec-Fetch-Site` verification (Laravel 13 `PreventRequestForgery`) + `allow_same_site()` / `use_origin_only()` | ✅ |
+| Queue routing | `QueueManager::route()` / `routed_queue()` / central job→queue rules | ✅ |
+| Queue job attributes | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |
+| Pagination default | 25 per page (Laravel 13 default) | ✅ |
 | Model Factories (Faker) | `ModelFactory`, `factory_create()`, Faker helpers | ✅ |
 | Blade templating | Tera + Blade directives (`@auth`/`@csrf`/`@error`/`@guest`/`@method`) | ✅ |
 | Migrations | `src/database/migrations/` + Migrator | ✅ |
@@ -40,3 +46,5 @@ Larastvel aims for ~100% feature parity with Laravel. Below is a side-by-side co
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser | ✅ |
 
 **All features are fully implemented.**
+
+The Laravel AI SDK (agents, embeddings, audio, images, vector stores) is the only remaining Laravel 13 feature not yet available. See [PARITY.md](https://github.com/sonyarianto/larastvel/blob/main/PARITY.md) for the tracked gap list.

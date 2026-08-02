@@ -47,6 +47,10 @@ cache.put_many(vec![("a", "1"), ("b", "2")], Duration::from_secs(60)).await?;
 let vals = cache.get_many(&["a", "b"]).await?;
 cache.delete_many(&["a", "b"]).await?;
 
+// Touch — extend the TTL of an existing key without re-fetching
+cache.put("key", "value", Duration::from_secs(60)).await?;
+cache.touch("key", Duration::from_secs(3600)).await?;
+
 // Clear
 cache.flush().await?;
 ```

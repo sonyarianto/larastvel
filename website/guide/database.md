@@ -220,3 +220,5 @@ Generate a scaffolded resource with:
 ```bash
 larastvel make:resource UserResource
 ```
+
+For spec-compliant JSON:API output — resource objects, sparse fieldsets, `?include=` compound documents — see the [JSON:API Resources](/reference/json-api-resources) reference.

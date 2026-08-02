@@ -33,6 +33,26 @@ The job can be dispatched manually:
 SendWelcomeEmailJob::new(42).dispatch().await?;
 ```
 
+### Job Attributes
+
+Matching Laravel's `#[Tries]`, `#[Backoff]`, `#[Timeout]`, and `#[FailOnTimeout]`, the `#[job]` macro accepts tuning attributes:
+
+```rust
+#[job(tries = 3, backoff = 5, timeout = 30, fail_on_timeout)]
+async fn send_welcome_email(user_id: i32) -> Result<(), JobError> {
+    // ...
+}
+```
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `tries` | 1 | Max attempts before the job is permanently failed |
+| `backoff` | 0 | Seconds to wait before retrying after a failure |
+| `timeout` | 30 | Job runs longer than this (seconds) are killed and retried (or failed with `fail_on_timeout`) |
+| `fail_on_timeout` | off | Treat a timeout as a permanent failure instead of a retry |
+
+The worker enforces these: timed-out jobs stop executing, failed jobs with attempts remaining are re-released after the backoff delay, and jobs past `tries` are marked permanently failed.
+
 ## Dispatching
 
 ```rust
@@ -47,6 +67,20 @@ manager.register("sync", SyncQueue::new("sync"));
 let queue = manager.default_queue()?;
 queue.push(Box::new(SendWelcomeEmail { user_id: 42 })).await?;
 ```
+
+### Queue Routing
+
+Like Laravel's `Queue::route()`, jobs can be routed to specific queues centrally, without touching every dispatch site:
+
+```rust
+manager.route("SendWelcomeEmailJob", "emails"); // job name -> queue name
+manager.route("SendSmsJob", "sms");
+
+let queue = manager.routed_queue("SendWelcomeEmailJob")?; // resolves by route, else default
+manager.dispatch(SendWelcomeEmail { user_id: 42 }).await?; // goes to the "emails" queue
+```
+
+`routed_queue()` falls back to the default queue when no route matches; `unroute()` removes a rule.
 
 ## Queue Worker
 

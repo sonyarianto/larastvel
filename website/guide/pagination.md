@@ -1,6 +1,6 @@
 # Pagination
 
-Larastvel provides a paginator for paginating query results.
+Larastvel provides a paginator for paginating query results. Like Laravel 13, the default page size is 25 items per page.
 
 ## Basic Usage
 
@@ -10,12 +10,12 @@ use larastvel_core::pagination::{paginate, PaginationParams, Paginator};
 // From request query params
 let params: PaginationParams = PaginationParams {
     page: Some(1),
-    per_page: Some(15),
+    per_page: Some(25),
 };
 
 // Paginate a vector of items
 let items = vec!["item1", "item2", /* ... */];
-let paginator = paginate(items, params.page.unwrap_or(1), params.per_page.unwrap_or(15));
+let paginator = paginate(items, params.page.unwrap_or(1), params.per_page.unwrap_or(25));
 
 // Get paginated results
 let paginated = paginator.to_json();
@@ -45,7 +45,7 @@ paginator.to_json();     // serialize to JSON
 {
   "data": [...],
   "total": 100,
-  "per_page": 15,
+  "per_page": 25,
   "current_page": 1,
   "last_page": 7,
   "has_more": true

@@ -41,6 +41,25 @@ CSRF tokens are validated via:
 
 Validation uses constant-time comparison via `subtle::ConstantEq`.
 
+### Origin Verification
+
+Matching Laravel 13's `PreventRequestForgery`, state-changing requests are also checked against the `Sec-Fetch-Site` header. Requests from cross-site origins are rejected with a `419` "Origin mismatch." response, protecting against cross-site request forgery even when a token leaks.
+
+`CsrfLayer` allows tuning the verification:
+
+```rust
+use larastvel_core::session::csrf::CsrfLayer;
+
+// Default: cross-site requests must carry Sec-Fetch-Site: same-origin / same-site
+let layer = CsrfLayer::new();
+
+// Relax: trust all same-site requests (includes subdomains)
+let relaxed = layer.allow_same_site(true);
+
+// Strict: only requests with Sec-Fetch-Site: same-origin pass
+let strict = relaxed.use_origin_only(true);
+```
+
 ### Get CSRF Token in Templates
 
 ```html

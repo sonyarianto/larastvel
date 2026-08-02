@@ -56,12 +56,14 @@ fn to_array(model: &ModelType) -> serde_json::Value
 ```rust
 // Single model
 let resource = UserResource::make(user);
-let json = resource.value();
+let json = resource.to_array();
 
 // Collection
-let collection = UserResource::collect(users);
-let json = collection.value();
+let collection = UserResource::collection(users);
+let json = collection.to_array();
 ```
+
+`to_json()` renders pretty-printed JSON, and `into_inner()` unwraps the original model(s).
 
 ## CLI Generator
 
