@@ -9,7 +9,7 @@ homepage = "https://larastvel.vercel.app"
 authors = ["Sony AK <sony@sony-ak.com>"]
 
 [dependencies]
-larastvel-core = "0.2"
+larastvel-core = { path = "../larastvel-core", version = "0.2" }
 axum.workspace = true
 tower.workspace = true
 serde.workspace = true

@@ -20,4 +20,4 @@ serde_json.workspace = true
 tracing.workspace = true
 colored.workspace = true
 uuid.workspace = true
-larastvel-core = "0.2"
+larastvel-core = { path = "../larastvel-core", version = "0.2" }

@@ -42,10 +42,19 @@ jobs:
       # Dependency order: larastvel-macros -> larastvel-core ->
       # larastvel-testing / larastvel-tinker / larastvel-cli -> larastvel-new.
       # Idempotent: crates already at the tagged version are skipped, so a
-      # re-run after a partial failure can resume where it left off.
+      # re-run after a partial failure can resume where it left off. After
+      # each publish we wait until the new version is visible in the sparse
+      # index, so downstream verification never resolves a stale version.
       - name: Publish crates (dependency order)
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          wait_for() {
+            until curl -s "https://index.crates.io/la/ra/$1" | grep -q "\"vers\":\"$VERSION\""; do
+              echo "waiting for $1 v$VERSION to appear in the index..."
+              sleep 10
+            done
+            echo "$1 v$VERSION is visible in the index"
+          }
           for p in larastvel-macros larastvel-core larastvel-testing larastvel-tinker larastvel-cli larastvel-new; do
             PUBLISHED="$(curl -s -H "User-Agent: larastvel-release" "https://crates.io/api/v1/crates/$p" | python3 -c 'import json,sys; print(json.load(sys.stdin)["crate"]["max_version"])' 2>/dev/null)"
             if [ "$PUBLISHED" = "$VERSION" ]; then
@@ -54,6 +63,7 @@ jobs:
             fi
             echo "Publishing $p ..."
             cargo publish -p "$p" || exit 1
+            wait_for "$p"
           done
 
   dry-run:

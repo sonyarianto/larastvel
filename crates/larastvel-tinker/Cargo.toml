@@ -16,4 +16,4 @@ path = "src/main.rs"
 tokio.workspace = true
 clap.workspace = true
 rustyline = "18"
-larastvel-core = "0.2"
+larastvel-core = { path = "../larastvel-core", version = "0.2" }
