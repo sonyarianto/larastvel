@@ -112,3 +112,7 @@ publishing.
   was re-aligned with `larastvel-new` in v0.2.1).
 - The CLI uses clap subcommands: `larastvel make migration` (space form) —
   NOT `make:migration` (that's the hand-written help text style only).
+- **Cross-crate dependencies must use `{ path = "../<crate>", version = "0.x" }`**
+  (never a bare `version`): `cargo publish` verification copies the workspace
+  `Cargo.lock` into the package, and a bare version dep resolves the stale
+  registry version from the lock, breaking publish (hit at v0.2.1).
