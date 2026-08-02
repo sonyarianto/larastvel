@@ -86,14 +86,19 @@ cd website && npm run build
    README badge is dynamic (crates.io) — no change needed.
 4. Run quality gates above, then commit and push.
 5. Tag the release: `git tag v0.3.0 && git push origin v0.3.0`.
-6. **Publishing happens automatically** via `.github/workflows/publish.yml`
-   when the tag is pushed — it verifies the tag matches all crate versions,
-   then publishes in dependency order:
-   `larastvel-macros` → `larastvel-core` → `larastvel-testing` /
-   `larastvel-tinker` / `larastvel-cli` → `larastvel-new`.
-   A `workflow_dispatch` dry-run mode is available for smoke-testing.
-7. Requires the `CARGO_REGISTRY_TOKEN` GitHub secret — set via
-   `gh secret set CARGO_REGISTRY_TOKEN`.
+ 6. **Publishing happens automatically** via `.github/workflows/publish.yml`
+    when the tag is pushed — it verifies the tag matches all crate versions,
+    then publishes in dependency order:
+    `larastvel-macros` → `larastvel-core` → `larastvel-testing` /
+    `larastvel-tinker` / `larastvel-cli` → `larastvel-new`.
+    The workflow is idempotent: already-published versions are skipped and
+    index propagation is awaited, so a partial failure can be resumed with
+    `gh workflow run publish.yml --ref vX.Y.Z`.
+ 7. After every successful publish, `.github/workflows/scaffold-check.yml`
+    builds a fresh scaffolded project against the just-published crates (also
+    weekly and on manual dispatch) — an automatic guard for scaffold drift.
+ 8. Requires the `CARGO_REGISTRY_TOKEN` GitHub secret — set via
+    `gh secret set CARGO_REGISTRY_TOKEN`.
 
 Do not run `cargo publish` locally for releases; the CI workflow owns
 publishing.
@@ -109,7 +114,8 @@ publishing.
   `larastvel-macros`; both are re-exported from core.
 - `crates/larastvel-cli` and `crates/larastvel-new` both generate project
   scaffolds — they must stay in sync (the CLI scaffold regressed once and
-  was re-aligned with `larastvel-new` in v0.2.1).
+  was re-aligned with `larastvel-new` in v0.2.1). The `scaffold-check`
+  workflow is the automated guard: keep it green when changing scaffolds.
 - The CLI uses clap subcommands: `larastvel make migration` (space form) —
   NOT `make:migration` (that's the hand-written help text style only).
 - **Cross-crate dependencies must use `{ path = "../<crate>", version = "0.x" }`**
