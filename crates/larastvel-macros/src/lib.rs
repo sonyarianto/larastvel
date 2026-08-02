@@ -346,8 +346,61 @@ pub fn listener(attr: TokenStream, item: TokenStream) -> TokenStream {
 //   async fn __process_podcast_inner(podcast_id: i32) -> Result<(), JobError> { ... }
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Attribute: #[job(tries = 5, backoff = 10, timeout = 30, fail_on_timeout)]
+//
+// Generates a `*Job` struct implementing `ShouldQueue` from an async fn, with
+// optional Laravel-style queue attributes: `tries`, `backoff`, `timeout`, and
+// `fail_on_timeout`.
+// ---------------------------------------------------------------------------
+
+#[derive(Default)]
+struct JobAttrs {
+    tries: Option<u64>,
+    backoff: Option<u64>,
+    timeout: Option<u64>,
+    fail_on_timeout: bool,
+}
+
+impl Parse for JobAttrs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut attrs = JobAttrs::default();
+        while !input.is_empty() {
+            let ident: syn::Ident = input.parse()?;
+            let name = ident.to_string();
+            match name.as_str() {
+                "fail_on_timeout" => attrs.fail_on_timeout = true,
+                "tries" | "backoff" | "timeout" => {
+                    input.parse::<syn::Token![=]>()?;
+                    let lit: syn::LitInt = input.parse()?;
+                    let value = lit.base10_parse::<u64>().map_err(|_| {
+                        syn::Error::new(lit.span(), format!("#[job] {name} must be an integer"))
+                    })?;
+                    match name.as_str() {
+                        "tries" => attrs.tries = Some(value),
+                        "backoff" => attrs.backoff = Some(value),
+                        _ => attrs.timeout = Some(value),
+                    }
+                }
+                _ => {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        format!("unknown #[job] attribute: {name}"),
+                    ))
+                }
+            }
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<syn::Token![,]>()?;
+        }
+        Ok(attrs)
+    }
+}
+
 #[proc_macro_attribute]
-pub fn job(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn job(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attrs = parse_macro_input!(attr as JobAttrs);
     let func = parse_macro_input!(item as syn::ItemFn);
 
     if func.sig.asyncness.is_none() {
@@ -399,6 +452,24 @@ pub fn job(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
+    let tries = match attrs.tries {
+        Some(t) => quote! { Some(#t) },
+        None => quote! { None },
+    };
+    let backoff = match attrs.backoff {
+        Some(b) => quote! { Some(#b) },
+        None => quote! { None },
+    };
+    let timeout = match attrs.timeout {
+        Some(t) => quote! { Some(#t) },
+        None => quote! { None },
+    };
+    let fail_on_timeout = if attrs.fail_on_timeout {
+        quote! { true }
+    } else {
+        quote! { false }
+    };
+
     let expanded = quote! {
         #[derive(Debug)]
         #vis struct #struct_name {
@@ -421,6 +492,22 @@ pub fn job(_attr: TokenStream, item: TokenStream) -> TokenStream {
         impl larastvel_core::queue::ShouldQueue for #struct_name {
             fn name(&self) -> &str {
                 #fn_name_str
+            }
+
+            fn max_attempts(&self) -> Option<u64> {
+                #tries
+            }
+
+            fn backoff_seconds(&self) -> Option<u64> {
+                #backoff
+            }
+
+            fn timeout_seconds(&self) -> Option<u64> {
+                #timeout
+            }
+
+            fn fail_on_timeout(&self) -> bool {
+                #fail_on_timeout
             }
 
             async fn handle(&self) -> Result<(), larastvel_core::queue::JobError> {

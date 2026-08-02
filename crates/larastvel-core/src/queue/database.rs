@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
@@ -11,6 +11,7 @@ pub struct DatabaseQueue {
     table_name: String,
     db: sea_orm::DatabaseConnection,
     resolver: JobResolver,
+    last_reserved: Arc<Mutex<Option<i64>>>,
 }
 
 impl std::fmt::Debug for DatabaseQueue {
@@ -31,6 +32,7 @@ impl Clone for DatabaseQueue {
             table_name: self.table_name.clone(),
             db: self.db.clone(),
             resolver: self.resolver.clone(),
+            last_reserved: self.last_reserved.clone(),
         }
     }
 }
@@ -42,6 +44,7 @@ impl DatabaseQueue {
             table_name: "jobs".to_string(),
             db,
             resolver,
+            last_reserved: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -86,14 +89,15 @@ impl Queue for DatabaseQueue {
         .map_err(|e| JobError::Queue(format!("Serialization error: {}", e)))?;
 
         let class = job.name().to_string();
+        let max_attempts = job.max_attempts().unwrap_or(3);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;
 
         let sql = format!(
-            "INSERT INTO {} (queue, payload, class, attempts, available_at, created_at)
-             VALUES (?1, ?2, ?3, 0, ?4, ?4)",
+            "INSERT INTO {} (queue, payload, class, attempts, max_attempts, available_at, created_at)
+             VALUES (?1, ?2, ?3, 0, ?4, ?5, ?5)",
             self.table_name
         );
         use sea_orm::ConnectionTrait;
@@ -105,6 +109,7 @@ impl Queue for DatabaseQueue {
                     self.name.clone().into(),
                     payload.into(),
                     class.into(),
+                    (max_attempts as i64).into(),
                     now.into(),
                 ],
             ))
@@ -113,9 +118,9 @@ impl Queue for DatabaseQueue {
         Ok(())
     }
 
-    async fn pop(&self) -> Option<JobBox> {
+    async fn pop(&self) -> Option<(JobBox, u64)> {
         let sql = format!(
-            "SELECT id, payload, class FROM {}
+            "SELECT id, payload, class, attempts FROM {}
              WHERE queue = ?1 AND (reserved_at IS NULL OR reserved_at < ?2)
              AND attempts < max_attempts
              AND available_at <= ?2
@@ -147,6 +152,7 @@ impl Queue for DatabaseQueue {
         let job = resolver(&class, &payload)?;
 
         let id: Option<i64> = row.try_get_by_index::<i64>(0).ok();
+        let attempts: i64 = row.try_get_by_index::<i64>(3).unwrap_or(0);
         if let Some(job_id) = id {
             let update_sql = format!(
                 "UPDATE {} SET reserved_at = ?1, attempts = attempts + 1 WHERE id = ?2",
@@ -160,9 +166,75 @@ impl Queue for DatabaseQueue {
                     [now.into(), job_id.into()],
                 ))
                 .await;
+
+            let mut last = self.last_reserved.lock().unwrap();
+            *last = Some(job_id);
         }
 
-        Some(job)
+        Some((job, (attempts + 1) as u64))
+    }
+
+    /// Release the last reserved row back to the queue with a delay, keeping
+    /// its attempt count. Assumes a single worker per queue instance.
+    async fn release(
+        &self,
+        job: JobBox,
+        attempts: u64,
+        delay_seconds: u64,
+    ) -> Result<(), JobError> {
+        let _ = (job, attempts);
+        let id = {
+            let last = self.last_reserved.lock().unwrap();
+            *last
+        };
+        let Some(job_id) = id else {
+            return Ok(());
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let sql = format!(
+            "UPDATE {} SET reserved_at = NULL, available_at = ?1 WHERE id = ?2",
+            self.table_name
+        );
+        use sea_orm::ConnectionTrait;
+        self.db
+            .execute(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                &sql,
+                [(now + delay_seconds as i64).into(), job_id.into()],
+            ))
+            .await
+            .map_err(|e| JobError::Queue(format!("Failed to release job: {}", e)))?;
+        Ok(())
+    }
+
+    /// Permanently fail the last reserved row by exhausting its attempts.
+    async fn fail(&self, job: JobBox) -> Result<(), JobError> {
+        let _ = job;
+        let id = {
+            let last = self.last_reserved.lock().unwrap();
+            *last
+        };
+        let Some(job_id) = id else {
+            return Ok(());
+        };
+        let sql = format!(
+            "UPDATE {} SET attempts = max_attempts, reserved_at = NULL WHERE id = ?1",
+            self.table_name
+        );
+        use sea_orm::ConnectionTrait;
+        self.db
+            .execute(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                &sql,
+                [job_id.into()],
+            ))
+            .await
+            .map_err(|e| JobError::Queue(format!("Failed to fail job: {}", e)))?;
+        Ok(())
     }
 
     async fn count(&self) -> usize {

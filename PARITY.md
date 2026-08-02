@@ -27,7 +27,7 @@ side-by-side comparison.
 | Password Reset | `PasswordResetBroker` / tokens / throttle / expiry / reset email / callback | ✅ |
 | Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / middleware | ✅ |
 | Authorization / Gates | `Gate` / `Policy` / `require_ability` middleware / before/after hooks | ✅ |
-| Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `dispatch()` / `ShouldQueue` | ✅ |
+| Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `dispatch()` / `ShouldQueue` / retries with backoff, timeout, `fail_on_timeout` | ✅ |
 | Notifications / Mail | 5 channels (Mail, Database, Broadcast, SMS, Webhook), `Mailable` builder, `SmtpMailer` / `LogMailer` | ✅ |
 | File Storage | `Filesystem` trait / `LocalDisk` driver / `StorageManager` | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
@@ -51,6 +51,6 @@ side-by-side comparison.
 | JSON:API resources (relationship inclusion, sparse fieldsets, links) | `ApiResource` / `JsonResource` / `ResourceCollection` (non-JSON:API) | ❌ Missing |
 | Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | — | ❌ Missing |
 | `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
-| Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job]` / `#[middleware]` / `#[can]` only | ⚠️ Partial |
+| Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |
 
 ~100% feature parity with 1000+ unit tests (checked against Laravel 13.23.0).

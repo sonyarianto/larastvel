@@ -22,8 +22,19 @@ impl Queue for SyncQueue {
         job.handle().await
     }
 
-    async fn pop(&self) -> Option<JobBox> {
+    async fn pop(&self) -> Option<(JobBox, u64)> {
         None
+    }
+
+    /// Sync jobs run exactly once per push — a failed attempt is not retried.
+    async fn release(
+        &self,
+        job: JobBox,
+        attempts: u64,
+        delay_seconds: u64,
+    ) -> Result<(), JobError> {
+        let _ = (job, attempts, delay_seconds);
+        Ok(())
     }
 
     async fn count(&self) -> usize {

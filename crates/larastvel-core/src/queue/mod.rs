@@ -24,6 +24,24 @@ pub enum JobError {
 pub trait ShouldQueue: Send + Sync + std::fmt::Debug {
     async fn handle(&self) -> Result<(), JobError>;
     fn name(&self) -> &str;
+    /// Maximum attempts before the job is considered permanently failed.
+    /// `None` falls back to the worker default of 3 attempts.
+    fn max_attempts(&self) -> Option<u64> {
+        None
+    }
+    /// Seconds to wait before releasing the job for another attempt.
+    fn backoff_seconds(&self) -> Option<u64> {
+        None
+    }
+    /// Maximum seconds a single attempt may run before it is aborted.
+    /// `None` disables the timeout.
+    fn timeout_seconds(&self) -> Option<u64> {
+        None
+    }
+    /// Treat a timeout as a permanent failure instead of a retryable one.
+    fn fail_on_timeout(&self) -> bool {
+        false
+    }
 }
 
 pub type JobBox = Box<dyn ShouldQueue>;
@@ -31,7 +49,25 @@ pub type JobBox = Box<dyn ShouldQueue>;
 #[async_trait]
 pub trait Queue: Send + Sync + std::fmt::Debug {
     async fn push(&self, job: JobBox) -> Result<(), JobError>;
-    async fn pop(&self) -> Option<JobBox>;
+    /// Pop the next available job together with the number of attempts it has
+    /// already consumed (including this one).
+    async fn pop(&self) -> Option<(JobBox, u64)>;
+    /// Requeue a job after a failed attempt, optionally delaying it by
+    /// `delay_seconds`. The default implementation re-pushes immediately.
+    async fn release(
+        &self,
+        job: JobBox,
+        attempts: u64,
+        delay_seconds: u64,
+    ) -> Result<(), JobError> {
+        let _ = (attempts, delay_seconds);
+        self.push(job).await
+    }
+    /// Mark a job as permanently failed. The default implementation drops it.
+    async fn fail(&self, job: JobBox) -> Result<(), JobError> {
+        let _ = job;
+        Ok(())
+    }
     async fn count(&self) -> usize;
     fn name(&self) -> &str;
 }
@@ -129,7 +165,7 @@ mod tests {
         assert!(popped.is_some());
         assert_eq!(queue.count().await, 0);
 
-        popped.unwrap().handle().await.unwrap();
+        popped.unwrap().0.handle().await.unwrap();
         assert!(handled.load(Ordering::SeqCst));
     }
 
@@ -174,9 +210,9 @@ mod tests {
             .unwrap();
 
         let job1 = queue.pop().await.unwrap();
-        job1.handle().await.unwrap();
+        job1.0.handle().await.unwrap();
         let job2 = queue.pop().await.unwrap();
-        job2.handle().await.unwrap();
+        job2.0.handle().await.unwrap();
 
         let r = results.lock().unwrap();
         assert_eq!(*r, vec![1, 2]);
@@ -354,7 +390,7 @@ mod tests {
         assert_eq!(manager.queue("default").unwrap().count().await, 0);
 
         let popped = redis_queue.pop().await.unwrap();
-        popped.handle().await.unwrap();
+        popped.0.handle().await.unwrap();
         assert!(handled.load(Ordering::SeqCst));
     }
 
@@ -475,7 +511,7 @@ mod tests {
         let popped = queue.pop().await;
         assert!(popped.is_some());
 
-        popped.unwrap().handle().await.unwrap();
+        popped.unwrap().0.handle().await.unwrap();
         assert!(handled.load(Ordering::SeqCst));
     }
 
@@ -661,5 +697,194 @@ mod tests {
         let result = FailingJob::new().dispatch().await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JobError::Failed(_)));
+    }
+
+    // --- #[job] attribute macro tests (tries/backoff/timeout/fail_on_timeout) ---
+
+    #[tokio::test]
+    async fn test_job_macro_attributes() {
+        #[job(tries = 5, backoff = 10, timeout = 30, fail_on_timeout)]
+        async fn attr_job() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        let job = AttrJob::new();
+        assert_eq!(<AttrJob as ShouldQueue>::max_attempts(&job), Some(5));
+        assert_eq!(<AttrJob as ShouldQueue>::backoff_seconds(&job), Some(10));
+        assert_eq!(<AttrJob as ShouldQueue>::timeout_seconds(&job), Some(30));
+        assert!(<AttrJob as ShouldQueue>::fail_on_timeout(&job));
+    }
+
+    #[tokio::test]
+    async fn test_job_macro_attribute_defaults() {
+        #[job]
+        async fn plain_job() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        let job = PlainJob::new();
+        assert_eq!(<PlainJob as ShouldQueue>::max_attempts(&job), None);
+        assert_eq!(<PlainJob as ShouldQueue>::backoff_seconds(&job), None);
+        assert_eq!(<PlainJob as ShouldQueue>::timeout_seconds(&job), None);
+        assert!(!<PlainJob as ShouldQueue>::fail_on_timeout(&job));
+    }
+
+    #[tokio::test]
+    async fn test_job_macro_partial_attributes() {
+        #[job(tries = 1)]
+        async fn limited_job() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        let job = LimitedJob::new();
+        assert_eq!(<LimitedJob as ShouldQueue>::max_attempts(&job), Some(1));
+        assert_eq!(<LimitedJob as ShouldQueue>::backoff_seconds(&job), None);
+    }
+
+    #[tokio::test]
+    async fn test_worker_retries_then_succeeds() {
+        static ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+
+        #[job(tries = 3, backoff = 0)]
+        async fn flaky_job() -> Result<(), JobError> {
+            let attempt = ATTEMPTS.fetch_add(1, Ordering::SeqCst);
+            if attempt < 2 {
+                Err(JobError::Failed("flaky".to_string()))
+            } else {
+                Ok(())
+            }
+        }
+
+        let queue = Arc::new(InMemoryQueue::new("retry"));
+        queue
+            .push(Box::new(FlakyJob::new()))
+            .await
+            .unwrap();
+
+        let worker = QueueWorker::new(queue.clone());
+        assert!(worker.process_next_job().await.unwrap().is_ok());
+        assert!(worker.process_next_job().await.unwrap().is_ok());
+        assert!(worker.process_next_job().await.unwrap().is_ok());
+        assert_eq!(ATTEMPTS.load(Ordering::SeqCst), 3);
+        assert_eq!(queue.count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_worker_permanent_failure_after_tries() {
+        static FAILED_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+
+        #[job(tries = 2)]
+        async fn always_fails() -> Result<(), JobError> {
+            FAILED_ATTEMPTS.fetch_add(1, Ordering::SeqCst);
+            Err(JobError::Failed("always".to_string()))
+        }
+
+        let queue = Arc::new(InMemoryQueue::new("give-up"));
+        queue
+            .push(Box::new(AlwaysFailsJob::new()))
+            .await
+            .unwrap();
+
+        let worker = QueueWorker::new(queue.clone());
+        let first = worker.process_next_job().await.unwrap();
+        assert!(first.is_ok(), "attempt 1 should be released for retry");
+        let second = worker.process_next_job().await.unwrap();
+        assert!(second.is_err(), "attempt 2 should fail permanently");
+
+        assert_eq!(FAILED_ATTEMPTS.load(Ordering::SeqCst), 2);
+        assert_eq!(queue.count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_worker_backoff_delays_retry() {
+        #[job(tries = 3, backoff = 30)]
+        async fn delayed_job() -> Result<(), JobError> {
+            Err(JobError::Failed("backoff".to_string()))
+        }
+
+        let queue = Arc::new(InMemoryQueue::new("backoff"));
+        queue
+            .push(Box::new(DelayedJob::new()))
+            .await
+            .unwrap();
+
+        let worker = QueueWorker::new(queue.clone());
+        let result = worker.process_next_job().await.unwrap();
+        assert!(result.is_ok(), "failed attempt should be released");
+
+        assert_eq!(queue.count().await, 1, "job should be pending");
+        assert!(
+            queue.pop().await.is_none(),
+            "job must not be available before the backoff elapses"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_worker_timeout_releases_job() {
+        #[job(timeout = 0)]
+        async fn slow_job() -> Result<(), JobError> {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            Ok(())
+        }
+
+        let queue = Arc::new(InMemoryQueue::new("timeout"));
+        queue.push(Box::new(SlowJob::new())).await.unwrap();
+
+        let worker = QueueWorker::new(queue.clone());
+        let result = worker.process_next_job().await.unwrap();
+        assert!(result.is_ok(), "timeout without fail_on_timeout should release");
+        assert_eq!(queue.count().await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_worker_timeout_fail_on_timeout() {
+        #[job(timeout = 0, fail_on_timeout)]
+        async fn slow_fatal_job() -> Result<(), JobError> {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            Ok(())
+        }
+
+        let queue = Arc::new(InMemoryQueue::new("timeout-fatal"));
+        queue
+            .push(Box::new(SlowFatalJob::new()))
+            .await
+            .unwrap();
+
+        let worker = QueueWorker::new(queue.clone());
+        let result = worker.process_next_job().await.unwrap();
+        assert!(result.is_err(), "fail_on_timeout should fail permanently");
+        assert_eq!(queue.count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_db_queue_tries_limit() {
+        #[job(tries = 1)]
+        async fn one_shot() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        let db = sea_orm::Database::connect("sqlite::memory:")
+            .await
+            .expect("Failed to connect to in-memory SQLite");
+
+        let resolver: JobResolver = Arc::new(|class, _payload| {
+            if class == "one_shot" {
+                Some(Box::new(OneShotJob::new()) as JobBox)
+            } else {
+                None
+            }
+        });
+
+        let queue = DatabaseQueue::new("db-tries", db.clone(), resolver);
+        queue.ensure_table_exists().await.unwrap();
+
+        queue.push(Box::new(OneShotJob::new())).await.unwrap();
+        let (_, attempts) = queue.pop().await.unwrap();
+        assert_eq!(attempts, 1);
+        assert!(
+            queue.pop().await.is_none(),
+            "job with tries=1 must not be popped again"
+        );
+        assert_eq!(queue.count().await, 0);
     }
 }
