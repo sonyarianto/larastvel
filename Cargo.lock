@@ -1875,7 +1875,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-app"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "axum",
  "dotenvy",
@@ -1890,7 +1890,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-cli"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "clap",
  "colored",
@@ -1904,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-core"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -1951,7 +1951,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-macros"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1960,7 +1960,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-new"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "clap",
  "colored",
@@ -1971,7 +1971,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-testing"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -1991,7 +1991,7 @@ dependencies = [
 
 [[package]]
 name = "larastvel-tinker"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "clap",
  "larastvel-core",

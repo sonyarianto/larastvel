@@ -10,7 +10,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Reference', link: '/reference/cli' },
-      { text: 'v0.2.1', link: '/reference/versions' },
+      { text: 'v0.2.2', link: '/reference/versions' },
       { text: 'GitHub', link: 'https://github.com/sonyarianto/larastvel' },
     ],
     sidebar: {

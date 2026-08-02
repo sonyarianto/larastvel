@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.2 (2026-08-02)
 
 ### ✨ New
 - **First-party image processing** (`Image` facade, Laravel 13.20 parity): `Image::from_bytes/base64/path/url/storage`, immutable `ImageInstance` pipeline (`resize`/`scale`/`cover`/`crop`/`contain`/`rotate`/`grayscale`/`blur`/`sharpen`/`flip`/`orient`), outputs (`to_png/jpg/webp/gif/bmp`, `to_base64`, `to_data_uri`), `save`/`store`/`store_publicly` under `storage/app`, `dominant_color`/`dimensions`, and test fake `Image::fake()` + `assert_resized`/`assert_covered`/`assert_cropped`/`assert_stored`…
