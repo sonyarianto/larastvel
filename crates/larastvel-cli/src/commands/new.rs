@@ -11,47 +11,52 @@ pub async fn create_project(name: &str) {
         std::process::exit(1);
     }
 
-    std::fs::create_dir_all(&path).unwrap();
+    std::fs::create_dir_all(path.join("src/database/migrations")).unwrap();
     std::fs::create_dir_all(path.join("src/models")).unwrap();
-    std::fs::create_dir_all(path.join("src/controllers")).unwrap();
+    std::fs::create_dir_all(path.join("src/routes")).unwrap();
     std::fs::create_dir_all(path.join("resources/views")).unwrap();
     std::fs::create_dir_all(path.join("resources/js")).unwrap();
     std::fs::create_dir_all(path.join("resources/css")).unwrap();
     std::fs::create_dir_all(path.join("public")).unwrap();
-    std::fs::create_dir_all(path.join("routes")).unwrap();
     std::fs::create_dir_all(path.join("config")).unwrap();
-    std::fs::create_dir_all(path.join("database/migrations")).unwrap();
     std::fs::create_dir_all(path.join("storage/logs")).unwrap();
     std::fs::create_dir_all(path.join("storage/app")).unwrap();
+    std::fs::create_dir_all(path.join("tests")).unwrap();
 
-    let main_rs = format!(
-        r#"use larastvel_core::{{Application, Config, DatabaseManager, logging}};
+    let main_rs = r#"use larastvel_core::{Application, DatabaseManager, logging};
 
-mod controllers;
+mod database;
 mod models;
 mod routes;
 
 #[tokio::main]
-async fn main() {{
+async fn main() {
     let app = Application::new(None);
     logging::init(&app.config());
 
     let db = DatabaseManager::new(&app.config());
-    match db.connect().await {{
-        Ok(conn) => {{
+    match db.connect().await {
+        Ok(conn) => {
             tracing::info!("Database connected successfully");
             let _ = larastvel_core::models::set_global_database(conn);
-        }}
-        Err(e) => tracing::warn!("Database connection failed: {{}} (app will still run)", e),
-    }}
+        }
+        Err(e) => tracing::warn!("Database connection failed: {} (app will still run)", e),
+    }
+
+    if let Err(e) = db.migrate::<database::migrator::Migrator>().await {
+        tracing::warn!("Migration failed: {} (app will still run)", e);
+    }
+
     let app = app.with_database(db);
 
-    println!("⚡ {name} starting up...");
+    let router = app.router();
+    routes::web::web(&router);
+    routes::api::api(&router);
+
+    println!("⚡ starting up...");
     app.run().await;
-}}
-"#,
-        name = name
-    );
+}
+"#;
 
     let cargo_toml = format!(
         r#"[package]
@@ -188,37 +193,30 @@ export default {
 };
 "#;
 
-    let routes_file = r#"use larastvel_core::routing::Registrar;
+    let routes_mod = r#"pub mod web;
+pub mod api;
+"#;
+
+    let routes_web = r#"use larastvel_core::routing::Registrar;
 
 pub fn web(router: &Registrar) {
     router.get("/", || async {
         larastvel_core::axum::response::Html("<h1>Welcome to Larastvel</h1>")
     });
 }
+"#;
+
+    let routes_api = r#"use larastvel_core::routing::Registrar;
 
 pub fn api(router: &Registrar) {
     router.group("/api", |r| {
         r.get("/health", || async {
-            larastvel_core::axum::response::Json(serde_json::json!({"status": "ok"}))
+            larastvel_core::axum::response::Json(serde_json::json!({
+                "status": "ok",
+                "framework": "Larastvel",
+            }))
         });
     });
-}
-"#;
-
-    let controllers_mod = "pub mod home_controller;\n";
-
-    let home_controller = r#"use larastvel_core::{route, get};
-use larastvel_core::axum::response::{IntoResponse, Json, Response};
-use serde_json::json;
-
-pub struct HomeController;
-
-#[route]
-impl HomeController {
-    #[get("/")]
-    pub async fn index() -> Response {
-        Json(json!({"message": "Welcome to Larastvel"})).into_response()
-    }
 }
 "#;
 
@@ -252,17 +250,97 @@ pub struct User {
 }
 "#;
 
-    std::fs::write(path.join("src/controllers/mod.rs"), controllers_mod).unwrap();
-    std::fs::write(
-        path.join("src/controllers/home_controller.rs"),
-        home_controller,
-    )
-    .unwrap();
-    std::fs::write(path.join("src/models/mod.rs"), models_mod).unwrap();
-    std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
+    let database_mod = r#"pub mod migrator;
+pub mod migrations;
+"#;
+
+    let database_migrator = r#"use larastvel_core::sea_orm_migration::prelude::*;
+
+use super::migrations;
+
+pub struct Migrator;
+
+#[async_trait::async_trait]
+impl MigratorTrait for Migrator {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(migrations::m20220101_000001_create_users_table::Migration)]
+    }
+}
+"#;
+
+    let database_migrations_mod = r#"pub mod m20220101_000001_create_users_table;
+"#;
+
+    let database_users_migration = r#"use larastvel_core::sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(Users::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Users::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Users::Name).string().not_null())
+                    .col(ColumnDef::new(Users::Email).string().not_null())
+                    .col(ColumnDef::new(Users::Password).string().not_null())
+                    .col(ColumnDef::new(Users::EmailVerifiedAt).date_time().null())
+                    .col(ColumnDef::new(Users::CreatedAt).date_time().not_null())
+                    .col(ColumnDef::new(Users::UpdatedAt).date_time().not_null())
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Users::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(Iden)]
+enum Users {
+    Table,
+    Id,
+    Name,
+    Email,
+    Password,
+    EmailVerifiedAt,
+    CreatedAt,
+    UpdatedAt,
+}
+"#;
+
     std::fs::write(path.join("Cargo.toml"), cargo_toml).unwrap();
     std::fs::write(path.join("src/main.rs"), main_rs).unwrap();
-    std::fs::create_dir_all(path.join("config")).unwrap();
+    std::fs::write(path.join("src/models/mod.rs"), models_mod).unwrap();
+    std::fs::write(path.join("src/models/user.rs"), user_model).unwrap();
+    std::fs::write(path.join("src/routes/mod.rs"), routes_mod).unwrap();
+    std::fs::write(path.join("src/routes/web.rs"), routes_web).unwrap();
+    std::fs::write(path.join("src/routes/api.rs"), routes_api).unwrap();
+    std::fs::write(path.join("src/database/mod.rs"), database_mod).unwrap();
+    std::fs::write(path.join("src/database/migrator.rs"), database_migrator).unwrap();
+    std::fs::write(
+        path.join("src/database/migrations/mod.rs"),
+        database_migrations_mod,
+    )
+    .unwrap();
+    std::fs::write(
+        path.join("src/database/migrations/m20220101_000001_create_users_table.rs"),
+        database_users_migration,
+    )
+    .unwrap();
     std::fs::write(path.join("config/app.toml"), config_app).unwrap();
     std::fs::write(path.join("config/database.toml"), config_database).unwrap();
     std::fs::write(path.join("config/logging.toml"), config_logging).unwrap();
@@ -275,7 +353,6 @@ pub struct User {
     std::fs::write(path.join("resources/js/bootstrap.js"), bootstrap_js).unwrap();
     std::fs::write(path.join("tailwind.config.js"), tailwind_config).unwrap();
     std::fs::write(path.join("postcss.config.js"), postcss_config).unwrap();
-    std::fs::write(path.join("routes/web.rs"), routes_file).unwrap();
     std::fs::write(path.join(".env"), env_file).unwrap();
 
     println!(
