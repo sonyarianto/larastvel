@@ -8,6 +8,7 @@ use super::image::{ImageOptions, ImageResponse};
 use super::media::AudioOptions;
 use super::messages::{ChatOptions, ChatResponse, EmbeddingOptions, Message};
 use super::moderation::ModerationResponse;
+use super::rerank::{RerankOptions, RerankResponse};
 
 /// An error raised by an AI provider.
 #[derive(Debug, thiserror::Error)]
@@ -118,5 +119,16 @@ pub trait AiProvider: Send + Sync + Debug {
     /// "unsupported".
     async fn moderate(&self, _content: &str) -> Result<ModerationResponse, ProviderError> {
         Err(ProviderError::Unsupported("moderation".into()))
+    }
+
+    /// Rerank documents by relevance to a query. Defaults to
+    /// "unsupported".
+    async fn rerank(
+        &self,
+        _query: &str,
+        _documents: &[String],
+        _options: &RerankOptions,
+    ) -> Result<RerankResponse, ProviderError> {
+        Err(ProviderError::Unsupported("reranking".into()))
     }
 }

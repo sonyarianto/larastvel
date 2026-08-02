@@ -1,1 +1,2 @@
 pub mod m20220101_000001_create_users_table;
+pub mod m20260102_000002_create_vector_store_items_table;

@@ -41,9 +41,11 @@ pub use tokio;
 
 pub use ai::{
     Agent, AgentResult, AgentTask, AgentTaskStatus, AgentTool, Ai, AiProvider, AudioOptions,
-    ChatOptions, ChatResponse, EmbeddingOptions, FakeAi, ImageOptions, ImageResponse, ImageResult,
-    Media, Message, ModerationCategory, ModerationResponse, OpenAICompatibleProvider,
-    ProviderError, ResponseFormat, Role, ToolCall, ToolDefinition, ToolError, Usage,
+    ChatOptions, ChatResponse, EmbeddingOptions, FakeAi, FileVectorStore, ImageOptions,
+    ImageResponse, ImageResult, Media, Message, ModerationCategory, ModerationResponse,
+    OpenAICompatibleProvider, PostgresVectorStore, PostgresVectorStoreOptions, ProviderError,
+    RerankOptions, RerankResponse, RerankResult, ResponseFormat, Role, ToolCall, ToolDefinition,
+    ToolError, Usage, VectorQueryItem, VectorQueryResult, VectorStore, VectorStoreError,
 };
 pub use async_trait::async_trait;
 pub use auth::{

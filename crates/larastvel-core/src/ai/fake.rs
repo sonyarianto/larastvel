@@ -9,6 +9,7 @@ use super::media::{AudioOptions, Media};
 use super::messages::{ChatOptions, ChatResponse, EmbeddingOptions, Message};
 use super::moderation::ModerationResponse;
 use super::provider::{AiProvider, ChatStream, ProviderError};
+use super::rerank::{RerankOptions, RerankResponse, RerankResult};
 
 /// A fake AI provider for tests, mirroring the Laravel AI SDK's faking
 /// utilities (`Ai::fake()`).
@@ -181,6 +182,25 @@ impl AiProvider for FakeAi {
         Ok(ModerationResponse {
             flagged: false,
             categories: Vec::new(),
+        })
+    }
+
+    async fn rerank(
+        &self,
+        _query: &str,
+        documents: &[String],
+        _options: &RerankOptions,
+    ) -> Result<RerankResponse, ProviderError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(RerankResponse {
+            results: documents
+                .iter()
+                .enumerate()
+                .map(|(index, _)| RerankResult {
+                    index,
+                    relevance_score: 0.5,
+                })
+                .collect(),
         })
     }
 }

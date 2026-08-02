@@ -7,6 +7,7 @@ use super::media::{AudioOptions, Media};
 use super::messages::{ChatOptions, ChatResponse, EmbeddingOptions, Message, ResponseFormat};
 use super::moderation::{ModerationCategory, ModerationResponse};
 use super::provider::{AiProvider, ChatStream, ProviderError};
+use super::rerank::{RerankOptions, RerankResponse, RerankResult};
 
 /// An OpenAI-compatible chat / embeddings provider.
 ///
@@ -96,6 +97,10 @@ impl OpenAICompatibleProvider {
         format!("{}/moderations", self.base_url)
     }
 
+    fn rerank_url(&self) -> String {
+        format!("{}/rerank", self.base_url)
+    }
+
     fn chat_body(&self, messages: &[Message], options: &ChatOptions, streaming: bool) -> Value {
         let model = options.model.clone().unwrap_or_else(|| self.model.clone());
 
@@ -158,6 +163,8 @@ impl OpenAICompatibleProvider {
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))
     }
 }
+
+const DEFAULT_RERANK_MODEL: &str = "gpt-5-mini";
 
 #[async_trait]
 impl AiProvider for OpenAICompatibleProvider {
@@ -408,6 +415,35 @@ impl AiProvider for OpenAICompatibleProvider {
             flagged,
             categories,
         })
+    }
+
+    async fn rerank(
+        &self,
+        query: &str,
+        documents: &[String],
+        options: &RerankOptions,
+    ) -> Result<RerankResponse, ProviderError> {
+        let body = json!({
+            "model": options.model.clone().unwrap_or_else(|| DEFAULT_RERANK_MODEL.to_string()),
+            "query": query,
+            "documents": documents,
+        });
+        let result = self.post_json(&self.rerank_url(), &body).await?;
+        let results = result["results"]
+            .as_array()
+            .map(|results| {
+                results
+                    .iter()
+                    .filter_map(|entry| {
+                        Some(RerankResult {
+                            index: entry["index"].as_u64()? as usize,
+                            relevance_score: entry["relevance_score"].as_f64()?,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(RerankResponse { results })
     }
 }
 
@@ -966,5 +1002,35 @@ mod tests {
         let (base, _) = mock_server(r#"{"results": []}"#.into(), "application/json").await;
         let error = provider(&base).moderate("x").await.unwrap_err();
         assert!(matches!(error, ProviderError::InvalidResponse(_)));
+    }
+
+    #[tokio::test]
+    async fn test_rerank() {
+        let (base, captured) = mock_server(
+            r#"{"results": [{"index": 2, "relevance_score": 0.9}, {"index": 0, "relevance_score": 0.3}]}"#.into(),
+            "application/json",
+        )
+        .await;
+
+        let response = provider(&base)
+            .rerank(
+                "Where is the nearest coffee shop?",
+                &["Mall A".into(), "Mall B".into(), "Cafe C".into()],
+                &RerankOptions {
+                    model: Some("custom-rerank".into()),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.results.len(), 2);
+        assert_eq!(response.results[0].index, 2);
+        assert_eq!(response.results[0].relevance_score, 0.9);
+        assert_eq!(response.best(), Some(2));
+
+        let body: Value = serde_json::from_str(&captured.lock().unwrap().clone().unwrap()).unwrap();
+        assert_eq!(body["model"], "custom-rerank");
+        assert_eq!(body["query"], "Where is the nearest coffee shop?");
+        assert_eq!(body["documents"][1], "Mall B");
     }
 }

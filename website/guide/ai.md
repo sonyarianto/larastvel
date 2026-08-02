@@ -6,8 +6,8 @@ and structured output) and embeddings, plus testing fakes.
 
 The foundation is implemented: `Ai` facade, `AiProvider` trait, an
 OpenAI-compatible HTTP provider, agents with tool calling, failover, media
-(images, audio, moderation), 30-day embedding caching, and `FakeAi`.
-Reranking and vector stores are the next phase.
+(images, audio, moderation), reranking, vector stores (`FileVectorStore` +
+`PostgresVectorStore`), 30-day embedding caching, and `FakeAi`.
 
 ## Configuration
 
@@ -268,6 +268,81 @@ if result.is_flagged("violence") {
     // per-category check
 }
 ```
+
+## Reranking
+
+Rerank candidate documents by relevance to a query — Laravel's
+`Ai::rerank()->query(...)->documents(...)->send()`:
+
+```rust
+use larastvel_core::ai::{RerankOptions, RerankResponse};
+
+let response: RerankResponse = ai
+    .rerank(
+        "Where is the nearest coffee shop?",
+        &["Mall A".into(), "Mall B".into(), "Cafe C".into()],
+        &RerankOptions::default(),
+    )
+    .await?;
+
+response.best();   // Some(2) — the index of the most relevant document
+```
+
+Results are ordered by relevance: each `RerankResult` has `index` (into the
+original documents array) and `relevance_score`.
+
+## Vector Stores
+
+Vector stores ingest documents, embed them, and answer similarity queries —
+Laravel's `Ai::vectorStore()`:
+
+```rust
+use larastvel_core::ai::VectorStore;
+
+// File-backed store (no database needed):
+let store = ai.vector_store().await?;   // storage/ai/vector-store.json
+// or with a custom path / embedding model:
+// let store = FileVectorStore::new(ai.clone(), "storage/ai/docs.json").await?
+//     .with_embedding_model("text-embedding-3-small");
+
+store.add_file_content("docs/intro.md", "Larastvel is a Rust framework").await?;
+store.add_file("docs/api.md", "Axum powers the routing").await?;
+
+let result = store.query("routing framework", 5).await?;   // Vec<VectorQueryItem>
+for item in result.items {
+    println!("{}: {}", item.id, item.content);
+}
+
+store.delete("docs/api.md").await?;
+```
+
+The file store persists records (path, content, embedding) as JSON with
+atomic writes, and reuses the manager's embedding cache — re-adding the same
+content never re-embeds. Queries scan in-memory with cosine similarity.
+
+### PostgreSQL + pgvector
+
+For larger collections, `PostgresVectorStore` mirrors Laravel 13's
+pgvector-backed store:
+
+```rust
+use larastvel_core::ai::{PostgresVectorStore, PostgresVectorStoreOptions};
+
+let store = PostgresVectorStore::new(conn, ai.clone(), PostgresVectorStoreOptions {
+    table: "vector_store_items".into(),   // default
+    embedding_dim: 1536,                  // default (text-embedding-3-small)
+});
+store.add_file_content("docs/legal.md", "Terms of service...").await?;
+let result = store.query("refund policy", 3).await?;
+```
+
+It manages a `vector_store_items` table (`file_path`, `content`,
+`embedding vector(1536)`, `additional_arguments jsonb`), matched with cosine
+distance (`<=>`) — the Laravel default. The scaffolded app ships with a
+migration creating that table plus an HNSW index (see
+`src/database/migrations/m20260102_000002_create_vector_store_items_table.rs`).
+For ad-hoc semantic search on your own tables, use `VectorSimilarityQuery`
+(`where_vector_similar_to`).
 
 ## Custom Providers
 

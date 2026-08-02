@@ -26,6 +26,8 @@ mod messages;
 mod moderation;
 mod openai;
 mod provider;
+mod rerank;
+mod vector_store;
 
 pub use agent::{
     Agent, AgentResult, AgentTask, AgentTaskStatus, AgentTool, ToolError, DEFAULT_AGENT_MAX_TURNS,
@@ -40,9 +42,13 @@ pub use messages::{
 pub use moderation::{ModerationCategory, ModerationResponse};
 pub use openai::OpenAICompatibleProvider;
 pub use provider::{AiProvider, ChatStream, ProviderError};
-
+pub use rerank::{RerankOptions, RerankResponse, RerankResult};
 use std::sync::Arc;
 use std::time::Duration;
+pub use vector_store::{
+    FileVectorStore, PostgresVectorStore, PostgresVectorStoreOptions, VectorQueryItem,
+    VectorQueryResult, VectorStore, VectorStoreError, DEFAULT_VECTOR_STORE_PATH,
+};
 
 use serde::de::DeserializeOwned;
 
@@ -61,8 +67,8 @@ const DEFAULT_OPENAI_EMBEDDING_MODEL: &str = "text-embedding-3-small";
 ///
 /// Wrap a provider ([`OpenAICompatibleProvider`] or [`FakeAi`]) and call
 /// [`Ai::generate`], [`Ai::chat`], [`Ai::chat_stream`], [`Ai::structured`],
-/// or [`Ai::embed`].
-#[derive(Debug)]
+/// [`Ai::embed`], [`Ai::agent`], or the media methods.
+#[derive(Debug, Clone)]
 pub struct Ai {
     provider: Arc<dyn AiProvider>,
     default_model: Option<String>,
@@ -373,6 +379,25 @@ impl Ai {
     pub async fn moderate(&self, content: &str) -> Result<ModerationResponse, ProviderError> {
         self.provider.moderate(content).await
     }
+
+    /// Rerank documents by relevance to a query — Laravel's
+    /// `Ai::rerank()->query(...)->documents(...)->send()`.
+    pub async fn rerank(
+        &self,
+        query: &str,
+        documents: &[String],
+        options: &RerankOptions,
+    ) -> Result<RerankResponse, ProviderError> {
+        self.provider.rerank(query, documents, options).await
+    }
+
+    /// Create the default file-backed vector store — Laravel's
+    /// `Ai::vectorStore()`. Embeddings go through this manager (sharing its
+    /// embedding cache), persisted to
+    /// [`DEFAULT_VECTOR_STORE_PATH`](`DEFAULT_VECTOR_STORE_PATH`).
+    pub async fn vector_store(&self) -> Result<FileVectorStore, VectorStoreError> {
+        FileVectorStore::new(Arc::new(self.clone()), DEFAULT_VECTOR_STORE_PATH).await
+    }
 }
 
 fn env_or(config: &crate::config::Config, key: &str, env: &str) -> Option<String> {
@@ -623,6 +648,45 @@ mod tests {
         assert!(variation.first().is_some());
 
         fake.assert_call_count(6);
+    }
+
+    #[tokio::test]
+    async fn test_rerank_with_fake() {
+        let fake = Arc::new(FakeAi::new());
+        let ai = Ai::new(fake.clone());
+
+        let response = ai
+            .rerank(
+                "coffee",
+                &["Mall A".into(), "Cafe C".into()],
+                &RerankOptions::default(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.results.len(), 2);
+        assert_eq!(response.results[0].index, 0);
+        fake.assert_call_count(1);
+    }
+
+    #[tokio::test]
+    async fn test_vector_store_facade() {
+        let ai = Arc::new(Ai::new(Arc::new(FakeAi::new())));
+        let store = FileVectorStore::new(ai.clone(), "/tmp/larastvel-test-vector-store-3.json")
+            .await
+            .unwrap();
+        store
+            .add_file_content("doc.md", "semantic search docs")
+            .await
+            .unwrap();
+
+        let result = store.query("search", 1).await.unwrap();
+        assert_eq!(result.first().unwrap().id, "doc.md");
+        assert_eq!(result.first().unwrap().content, "semantic search docs");
+
+        let default_store = ai.vector_store().await.unwrap();
+        assert_eq!(default_store.path(), DEFAULT_VECTOR_STORE_PATH);
+
+        let _ = tokio::fs::remove_file("/tmp/larastvel-test-vector-store-3.json").await;
     }
 
     #[tokio::test]
