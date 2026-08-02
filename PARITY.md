@@ -36,7 +36,12 @@ side-by-side comparison.
 | Form Validation | 24 rules (incl. DB-backed `unique`/`unique_except`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
 | Validation DB rules | `unique` / `unique:except` / `exists` (SQL-backed, async validation via `validate_async()` / `#[validate]`) | ✅ |
 | Route model binding | `ModelPath<E>` extractor — implicit `{user}` → model by primary key, 404 on missing | ✅ |
+| Route conflict detection | `route:conflicts` — detects overlapping route definitions (duplicates + static shadowing `{param}`/`*`) | ✅ |
+| Route metadata | `Registrar::route_with_metadata()` / `RouteDefinition::metadata` — survives route caching | ✅ |
 | Global helpers | `redirect()` / `back()` / `abort()` / `abort_if()` / `abort_unless()` | ✅ |
+| Concurrency | `concurrent()` — run boxed async tasks in parallel, results in input order | ✅ |
+| Process | `ProcessBuilder` / `run()` / `foreground()` — output capture, env, cwd, timeout kill | ✅ |
+| Lazy collections | `LazyCollection` — lazy chainable iterator (filter/map/take/skip/chain/reduce) | ✅ |
 | `artisan about` / `optimize` / `config:show` | `larastvel about` / `optimize` / `optimize:clear` / `config:show {section}` | ✅ |
 | Pagination | `Paginator<T>` / `PaginationParams` / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / middleware / token bucket | ✅ |
@@ -68,5 +73,8 @@ side-by-side comparison.
 | Job batches (`Bus::batch`) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
 | Blade components (`x-slot` slots) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
 | Signed URLs (`signedRoute`) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
+| Passkey authentication (WebAuthn) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
+| Reverb database broadcasting driver | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
+| Redis cache store | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
 
-~100% feature parity with 1100+ unit tests (checked against Laravel 13.23.0).
+~100% feature parity with 1150+ unit tests (checked against Laravel 13.23.0).

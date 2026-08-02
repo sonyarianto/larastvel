@@ -65,6 +65,9 @@ pub enum Commands {
     /// Clear the cached routes file
     #[command(name = "route:clear")]
     RouteClear,
+    /// Detect overlapping route definitions
+    #[command(name = "route:conflicts")]
+    RouteConflicts,
     /// Display the current environment variables (.env + config)
     Env,
     /// Put the application into maintenance mode

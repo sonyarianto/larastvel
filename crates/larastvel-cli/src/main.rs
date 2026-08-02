@@ -84,6 +84,9 @@ async fn main() {
         Some(Commands::RouteClear) => {
             route_clear();
         }
+        Some(Commands::RouteConflicts) => {
+            route_conflicts_list();
+        }
         Some(Commands::Env) => {
             env_display();
         }
@@ -246,6 +249,7 @@ async fn main() {
             println!("  config:clear     Clear the cached config file");
             println!("  route:cache      Cache all registered routes into a single file");
             println!("  route:clear      Clear the cached routes file");
+            println!("  route:conflicts  Detect overlapping route definitions");
             println!(
                 "  env              Display the current environment variables (.env + config)"
             );

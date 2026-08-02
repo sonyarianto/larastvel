@@ -30,7 +30,7 @@ pub use new::create_project;
 pub use notifications::create_notifications_table;
 pub use optimize::{optimize_all, optimize_clear};
 pub use queue::{queue_failed_list, queue_flush, queue_forget, queue_retry, queue_work};
-pub use route::{route_cache, route_clear};
+pub use route::{route_cache, route_clear, route_conflicts_list};
 pub use schedule::{run_schedule_command, schedule_list};
 pub use seed::run_seed_command;
 pub use serve::start_server;

@@ -11,6 +11,7 @@ Larastvel ships with an Artisan-like CLI.
 | `route:list` | List all registered routes |
 | `route:cache` | Cache routes for faster resolution |
 | `route:clear` | Clear cached routes |
+| `route:conflicts` | Detect overlapping route definitions (reads the routes cache) |
 | `config:cache` | Cache configuration |
 | `config:clear` | Clear cached configuration |
 | `migrate` | Run pending database migrations |

@@ -128,6 +128,10 @@ pub struct RouteDefinition {
     pub uri: String,
     pub handler_name: String,
     pub middleware: Vec<String>,
+    /// Arbitrary user metadata attached to the route — Laravel's
+    /// `Route::metadata()` (route caching is metadata-compatible).
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
 }
 
 impl Registrar {
@@ -299,6 +303,17 @@ impl Registrar {
         method_router: MethodRouter,
         handler_name: &str,
     ) {
+        self.add_method_route_with_metadata(method, uri, method_router, handler_name, None);
+    }
+
+    fn add_method_route_with_metadata(
+        &self,
+        method: &str,
+        uri: &str,
+        method_router: MethodRouter,
+        handler_name: &str,
+        metadata: Option<serde_json::Value>,
+    ) {
         let current = self.current_middleware.lock().unwrap().clone();
         let middleware_names = current.clone();
         let aliases = self.middleware_aliases.lock().unwrap();
@@ -322,7 +337,44 @@ impl Registrar {
             uri: uri.to_string(),
             handler_name: handler_name.to_string(),
             middleware: middleware_names,
+            metadata,
         });
+    }
+
+    /// Register a route carrying arbitrary metadata — Laravel's
+    /// `Route::metadata()`. The metadata is stored on the route definition
+    /// and survives route caching. `method` is one of `GET`, `POST`, `PUT`,
+    /// `PATCH`, `DELETE`, or `ANY`.
+    ///
+    /// ```rust,ignore
+    /// registrar.route_with_metadata(
+    ///     "GET",
+    ///     "/reports/sales",
+    ///     sales_report,
+    ///     Some(serde_json::json!({ "seo": { "robots": "noindex" } })),
+    /// );
+    /// ```
+    pub fn route_with_metadata<H, T>(
+        &self,
+        method: &str,
+        uri: &str,
+        handler: H,
+        metadata: Option<serde_json::Value>,
+    ) where
+        H: Handler<T, ()>,
+        T: 'static,
+    {
+        let uri = self.resolve_uri(uri);
+        let name = std::any::type_name::<H>().to_string();
+        let method_router = match method {
+            "GET" => get(handler),
+            "POST" => post(handler),
+            "PUT" => put(handler),
+            "PATCH" => patch(handler),
+            "DELETE" => delete(handler),
+            _ => any(handler),
+        };
+        self.add_method_route_with_metadata(method, &uri, method_router, &name, metadata);
     }
 
     pub fn build(&self) -> AxumRouter {
@@ -337,6 +389,72 @@ impl Registrar {
     pub fn list_routes(&self) -> Vec<RouteDefinition> {
         self.routes.lock().unwrap().clone()
     }
+
+    /// Detect overlapping route definitions — Laravel's `route:conflicts`.
+    ///
+    /// Two routes conflict when they share an HTTP method and their URI
+    /// patterns can match the same path (identical URIs, or static segments
+    /// shadowing a `{param}` / `*` wildcard in the same position).
+    pub fn route_conflicts(&self) -> Vec<RouteConflict> {
+        find_route_conflicts(&self.list_routes())
+    }
+}
+
+/// A pair of route definitions that can match the same request.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RouteConflict {
+    pub method: String,
+    pub first_uri: String,
+    pub second_uri: String,
+    pub first_handler: String,
+    pub second_handler: String,
+}
+
+/// True when two URI patterns can match the same path: `{param}` and `*`
+/// segments act as wildcards, static segments must be identical, and the
+/// segment counts must match.
+pub fn paths_conflict(a: &str, b: &str) -> bool {
+    let segs_a = segment_patterns(a);
+    let segs_b = segment_patterns(b);
+    if segs_a.len() != segs_b.len() {
+        return false;
+    }
+    segs_a
+        .iter()
+        .zip(segs_b.iter())
+        .all(|(x, y)| x == y || *x == "*" || *y == "*")
+}
+
+fn segment_patterns(uri: &str) -> Vec<&str> {
+    uri.trim_matches('/')
+        .split('/')
+        .map(|s| {
+            if s.starts_with('{') || s == "*" {
+                "*"
+            } else {
+                s
+            }
+        })
+        .collect()
+}
+
+/// Find all conflicting route pairs in a route list.
+pub fn find_route_conflicts(routes: &[RouteDefinition]) -> Vec<RouteConflict> {
+    let mut conflicts = Vec::new();
+    for (i, a) in routes.iter().enumerate() {
+        for b in routes.iter().skip(i + 1) {
+            if a.method == b.method && paths_conflict(&a.uri, &b.uri) {
+                conflicts.push(RouteConflict {
+                    method: a.method.clone(),
+                    first_uri: a.uri.clone(),
+                    second_uri: b.uri.clone(),
+                    first_handler: a.handler_name.clone(),
+                    second_handler: b.handler_name.clone(),
+                });
+            }
+        }
+    }
+    conflicts
 }
 
 #[async_trait::async_trait]
@@ -1740,5 +1858,105 @@ mod tests {
             String::from_path_value("uuid-123"),
             Some("uuid-123".to_string())
         );
+    }
+
+    // --- route conflict detection tests ---
+
+    fn def(method: &str, uri: &str, handler: &str) -> RouteDefinition {
+        RouteDefinition {
+            method: method.to_string(),
+            uri: uri.to_string(),
+            handler_name: handler.to_string(),
+            middleware: vec![],
+            metadata: None,
+        }
+    }
+
+    #[test]
+    fn test_route_metadata_stored_and_serialized() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.route_with_metadata(
+            "GET",
+            "/reports/sales",
+            |()| async { Json(serde_json::json!({})) },
+            Some(serde_json::json!({ "seo": { "robots": "noindex" } })),
+        );
+
+        let listed = registrar.list_routes();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(
+            listed[0].metadata.as_ref().unwrap()["seo"]["robots"],
+            "noindex"
+        );
+
+        let json = serde_json::to_string(&listed[0]).unwrap();
+        let back: RouteDefinition = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.metadata.as_ref().unwrap()["seo"]["robots"], "noindex");
+    }
+
+    #[test]
+    fn test_route_definition_defaults_metadata_when_absent() {
+        let json = r#"{"method":"GET","uri":"/users","handler_name":"h","middleware":[]}"#;
+        let parsed: RouteDefinition = serde_json::from_str(json).unwrap();
+        assert!(parsed.metadata.is_none());
+    }
+
+    #[test]
+    fn test_paths_conflict_duplicate() {
+        assert!(paths_conflict("/users/{id}", "/users/{id}"));
+        assert!(paths_conflict("/users", "/users"));
+    }
+
+    #[test]
+    fn test_paths_conflict_static_shadowing_dynamic() {
+        assert!(paths_conflict("/users/{id}", "/users/new"));
+        assert!(paths_conflict("/posts/{slug}/edit", "/posts/featured/edit"));
+        assert!(!paths_conflict("/users/{id}", "/users/new/extra"));
+        assert!(!paths_conflict("/users/{id}", "/posts/new"));
+    }
+
+    #[test]
+    fn test_paths_conflict_wildcard() {
+        assert!(paths_conflict("/files/{path}", "/files/*"));
+        assert!(paths_conflict("/a/*", "/a/{x}"));
+    }
+
+    #[test]
+    fn test_paths_conflict_ignores_method_mismatch() {
+        let routes = vec![
+            def("GET", "/users", "get_users"),
+            def("POST", "/users", "create_user"),
+        ];
+        assert!(find_route_conflicts(&routes).is_empty());
+    }
+
+    #[test]
+    fn test_find_route_conflicts_reports_pairs() {
+        let routes = vec![
+            def("GET", "/users", "users_index"),
+            def("GET", "/users/{id}", "users_show"),
+            def("GET", "/users/new", "users_new"),
+            def("GET", "/posts", "posts_index"),
+        ];
+        let conflicts = find_route_conflicts(&routes);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].first_uri, "/users/{id}");
+        assert_eq!(conflicts[0].second_uri, "/users/new");
+    }
+
+    #[test]
+    fn test_registrar_route_conflicts() {
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get("/users", |()| async { Json(serde_json::json!({})) });
+        registrar.get("/users/{id}", |()| async { Json(serde_json::json!({})) });
+        registrar.get("/users/new", |()| async { Json(serde_json::json!({})) });
+
+        let conflicts = registrar.route_conflicts();
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].second_uri, "/users/new");
     }
 }

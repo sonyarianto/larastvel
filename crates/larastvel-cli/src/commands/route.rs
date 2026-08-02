@@ -1,4 +1,5 @@
 use colored::*;
+use larastvel_core::routing::{find_route_conflicts, RouteDefinition};
 
 pub async fn route_cache() {
     println!("{}", "⚡ Caching routes...".green().bold());
@@ -75,6 +76,71 @@ pub fn route_clear() {
         println!(
             "{}",
             "No cached routes found. Run 'route:cache' first.".yellow()
+        );
+    }
+}
+
+pub fn route_conflicts_list() {
+    let cache_path = std::path::Path::new("bootstrap/cache/routes.json");
+    if !cache_path.exists() {
+        println!(
+            "{}",
+            "No cached routes found. Run 'route:cache' first.".yellow()
+        );
+        return;
+    }
+
+    let content = match std::fs::read_to_string(cache_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{}", format!("Error reading routes cache: {}", e).red());
+            return;
+        }
+    };
+    let routes: Vec<RouteDefinition> = match serde_json::from_str(&content) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("{}", format!("Error parsing routes cache: {}", e).red());
+            return;
+        }
+    };
+
+    let conflicts = find_route_conflicts(&routes);
+    if conflicts.is_empty() {
+        println!(
+            "{}",
+            format!(
+                "✓ No route conflicts found ({} routes checked).",
+                routes.len()
+            )
+            .green()
+            .bold()
+        );
+        return;
+    }
+
+    println!(
+        "{}",
+        format!("Found {} route conflict(s):", conflicts.len())
+            .red()
+            .bold()
+    );
+    for c in &conflicts {
+        println!(
+            "  {}",
+            format!(
+                "{} {}  vs  {} {}",
+                c.method, c.first_uri, c.method, c.second_uri
+            )
+            .yellow()
+        );
+        println!(
+            "    {}",
+            format!(
+                "{} ({}) and {} ({})",
+                c.first_uri, c.first_handler, c.second_uri, c.second_handler
+            )
+            .dimmed()
         );
     }
 }

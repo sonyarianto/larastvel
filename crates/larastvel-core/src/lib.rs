@@ -5,6 +5,7 @@ pub mod auth;
 pub mod bootstrap;
 pub mod broadcasting;
 pub mod cache;
+pub mod concurrency;
 pub mod config;
 pub mod console;
 pub mod database;
@@ -20,6 +21,7 @@ pub mod models;
 pub mod notifications;
 pub mod pagination;
 pub mod pipeline;
+pub mod process;
 pub mod queue;
 pub mod rate_limiter;
 pub mod routing;
@@ -62,6 +64,7 @@ pub use broadcasting::{
 pub use cache::{
     prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, DEFAULT_TTL_SECONDS, FOREVER_TTL,
 };
+pub use concurrency::{concurrent, ConcurrencyError};
 pub use config::Config;
 pub use console::{Command, ConsoleKernel};
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
@@ -97,6 +100,7 @@ pub use notifications::{
 };
 pub use pagination::{paginate, PaginationParams, Paginator};
 pub use pipeline::{pipe_fn, Next, Pipe, Pipeline};
+pub use process::{foreground, run as process_run, ProcessBuilder, ProcessResult};
 pub use queue::{
     dispatch, DatabaseQueue, FailedJob, FailedJobStore, InMemoryQueue, JobError, JobResolver,
     Queue, QueueManager, QueueWorker, ShouldQueue, SyncQueue,
@@ -112,7 +116,8 @@ pub use sms::{LogSmsSender, SmsError, SmsMessage, SmsSender, VonageSmsSender};
 pub use storage::{Filesystem, LocalDisk, StorageError, StorageManager};
 pub use support::{
     app_path, base_path, collect_items, config_path, now, public_path, resource_path, storage_path,
-    today, Arr, Collection, Dt, Http, Number, PendingRequest, Prompt, Str, Stringable, Vite,
+    today, Arr, Collection, Dt, Http, LazyCollection, Number, PendingRequest, Prompt, Str,
+    Stringable, Vite,
 };
 pub use translation::{
     __with, has_translation, load_translation_directory, load_translation_file,

@@ -70,6 +70,8 @@ Route groups / view / websocket|pub fn group|$CORE/routing
 Middleware aliases + presets|pub fn with_middleware|$CORE/routing
 Resource controllers|pub trait ResourceController|$CORE/routing
 Route model binding (implicit {model})|ModelPath|$CORE/routing
+Route conflict detection (route:conflicts)|route_conflicts|$CORE/routing
+Route metadata (->metadata())|route_with_metadata|$CORE/routing
 Route/controller/validate macros|pub fn route\(|$MACROS
 Auth (JWT guards)|pub struct Auth|$CORE/auth
 Policies & Gate|struct Gate|$CORE/auth
@@ -79,6 +81,9 @@ Caching (file/redis stores)|pub struct CacheManager|$CORE/cache
 Str helpers (slug/studly/camel/snake)|pub struct Str|$CORE/support
 Stringable|struct Stringable|$CORE/support
 Collection (map/filter/pluck/reduce)|pub struct Collection|$CORE/support
+LazyCollection|pub struct LazyCollection|$CORE/support
+Concurrency helpers (concurrent)|pub async fn concurrent|$CORE/concurrency
+Process facade (run/foreground/timeout)|pub struct ProcessBuilder|$CORE/process
 Faker (name/email/word/uuid/...)|pub struct Faker|$CORE/models
 Http client (Http facade)|pub struct Http|$CORE/support
 Path helpers (base_path/storage_path/...)|pub fn base_path|$CORE/support
@@ -119,6 +124,9 @@ DEFERRED_FEATURES="
 Job batches (Bus::batch)|JobBatch|$CORE/queue
 Blade components (x-slot)|x-slot|$CORE/view
 Signed URLs (signedRoute)|signed_route|$CORE/routing
+Passkey authentication (WebAuthn)|Passkey|$CORE/auth
+Reverb database broadcasting driver|reverb|$CORE/broadcasting
+Redis cache store|struct RedisStore|$CORE/cache
 "
 
 is_deferred() {
