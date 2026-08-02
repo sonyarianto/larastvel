@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### ✨ New
+- **First-party image processing** (`Image` facade, Laravel 13.20 parity): `Image::from_bytes/base64/path/url/storage`, immutable `ImageInstance` pipeline (`resize`/`scale`/`cover`/`crop`/`contain`/`rotate`/`grayscale`/`blur`/`sharpen`/`flip`/`orient`), outputs (`to_png/jpg/webp/gif/bmp`, `to_base64`, `to_data_uri`), `save`/`store`/`store_publicly` under `storage/app`, `dominant_color`/`dimensions`, and test fake `Image::fake()` + `assert_resized`/`assert_covered`/`assert_cropped`/`assert_stored`…
+- **Container conditional bindings** (`#[BindWhen]`, Laravel 13.22 parity): `Application::bind_if` / `bind_if_config` / `bind_default`, `Config::set`, `Application::config_bool`, and the `#[bind_when]` attribute macro generating a `<Trait>ConditionalBindings` registrar
+- **`email:dns` validation rule** (Laravel 13.22 parity) — format + real DNS check, skipped under `fake_dns_lookups(true)`
+- **CookieJar**: `Cookie` / `CookieJar` with `(name, path)`-keyed `queued()` (Laravel 13.24 fix), `queue`/`unqueue`/`forget`/`to_set_cookie_headers`
+- **Scheduling polish**: `ScheduledEvent::timezone()` (IANA) honored by `is_due`, new `next_run()` for `schedule:list`
+
+### 🐛 Fixed
+- EXIF orientation is not decodable by the `image` crate's decoders — `orient` stays in the pipeline but decodes without EXIF metadata
+- CookieJar queued cookies clobbered when the same name was queued on different paths — now keyed by `(name, path)`
+
 ## v0.2.1 (2026-08-02)
 
 ### ✨ New

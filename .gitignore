@@ -5,6 +5,7 @@
 node_modules/
 public/build/
 storage/logs/*.log
+storage/app/
 .DS_Store
 
 # VitePress website

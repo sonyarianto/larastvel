@@ -8,12 +8,14 @@ pub mod cache;
 pub mod concurrency;
 pub mod config;
 pub mod console;
+pub mod cookie;
 pub mod database;
 pub mod encryption;
 pub mod events;
 pub mod foundation;
 pub mod hash;
 pub mod http;
+pub mod image;
 pub mod logging;
 pub mod mail;
 pub mod middleware;
@@ -70,18 +72,20 @@ pub use cache::{
 pub use concurrency::{concurrent, ConcurrencyError};
 pub use config::Config;
 pub use console::{Command, ConsoleKernel};
+pub use cookie::{Cookie, CookieJar, CookieKey, SameSite};
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
 pub use encryption::{generate_key, EncryptError, Encrypter};
 pub use events::EventService;
 pub use foundation::maintenance::{constant_time_eq, MaintenanceMode};
 pub use foundation::{
-    Application, DeferrableProvider, EventServiceProvider, Kernel, RouteServiceProvider,
-    ServiceProvider,
+    Application, ConditionalBinding, DeferrableProvider, EventServiceProvider, Kernel,
+    RouteServiceProvider, ServiceProvider,
 };
 pub use hash::{check as hash_check, is_hashed, make as hash_make, needs_rehash, HashError};
 pub use http::{Error as HttpError, JsonResponse, LarastvelResult, Request};
+pub use image::{Background, Image, ImageError, ImageInstance, OutputFormat, RecordedOp};
 pub use larastvel_macros::{
-    api_resource, broadcast_event, can, command, controller, delete, factory, get, job,
+    api_resource, bind_when, broadcast_event, can, command, controller, delete, factory, get, job,
     json_api_resource, listener, mail, middleware, notification, observer, patch, policy, post,
     provider, put, queued_listener, route, rule, scope, seeder, table, validate, validated_query,
     ws, Resource,

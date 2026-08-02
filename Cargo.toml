@@ -72,3 +72,5 @@ md-5 = "0.10"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls-tls"] }
 dialoguer = { version = "0.11", features = ["fuzzy-select"] }
 criterion = { version = "0.6", features = ["html_reports"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+chrono-tz = "0.10"

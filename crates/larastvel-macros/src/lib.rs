@@ -3,7 +3,7 @@ use quote::quote;
 use syn::spanned::Spanned;
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, ImplItem, ItemImpl, ItemStruct, Lit,
+    parse_macro_input, Ident, ImplItem, ItemImpl, ItemStruct, ItemTrait, Lit, LitStr,
 };
 
 fn snake_to_pascal(s: &str) -> String {
@@ -2013,4 +2013,120 @@ pub fn mail(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute: #[bind_when(alias = "name", condition_key = "config.path")]
+//
+// Mirrors Laravel 13.22's `#[BindWhen]`: declares a conditional container
+// binding on a trait. Conditions are evaluated at resolve time; when the
+// config value at `condition_key` is truthy, the binding resolves the
+// configured instance for the trait's alias.
+//
+// Usage:
+//   #[bind_when(alias = "payment-gateway", condition_key = "features.payments.beta")]
+//   trait PaymentGateway: Send + Sync + 'static {}
+//
+// Expands to (in addition to the original trait) a companion struct
+// `PaymentGatewayConditionalBindings` with:
+//   pub const ALIAS: &'static str = "payment-gateway";
+//   pub const CONDITION_KEY: &'static str = "features.payments.beta";
+//   pub fn conditional_enabled(app: &Application) -> bool;
+//   pub fn register_conditional_binding(
+//       app, when_enabled: impl FnOnce() -> Arc<dyn PaymentGateway>,
+//   ) { app.bind_if_config(...); }
+//   pub fn resolve(app) -> Option<Arc<dyn PaymentGateway>> { ... }
+// ---------------------------------------------------------------------------
+
+#[proc_macro_attribute]
+pub fn bind_when(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as BindWhenArgs);
+    let input = parse_macro_input!(item as ItemTrait);
+    let name = &input.ident;
+    let helper = syn::Ident::new(&format!("{}ConditionalBindings", name), name.span());
+    let alias = &args.alias;
+    let condition_key = &args.condition_key;
+
+    let expanded = quote! {
+        #input
+
+        /// Auto-generated registry for this trait's `#[bind_when]` conditional
+        /// container bindings (declared next to the trait, like Laravel's
+        /// `#[BindWhen]` attribute).
+        #[allow(non_camel_case_types)]
+        pub struct #helper;
+
+        impl #helper {
+            /// The container alias registered for this trait's conditional bindings.
+            pub const ALIAS: &'static str = #alias;
+
+            /// Config key gating the conditional binding.
+            pub const CONDITION_KEY: &'static str = #condition_key;
+
+            /// Whether the conditional binding is currently enabled per config.
+            pub fn conditional_enabled(app: &larastvel_core::foundation::Application) -> bool {
+                app.config_bool(Self::CONDITION_KEY)
+            }
+
+            /// Register this trait's conditional binding.
+            ///
+            /// The binding is stored under [`Self::ALIAS`] and can be resolved
+            /// again with [`resolve`](Self::resolve). Conditions are evaluated
+            /// at resolve time against the live application config.
+            pub fn register_conditional_binding(
+                app: &larastvel_core::foundation::Application,
+                when_enabled: impl FnOnce() -> std::sync::Arc<dyn #name>,
+            ) {
+                app.bind_if_config(Self::ALIAS, Self::CONDITION_KEY, when_enabled());
+            }
+
+            /// Resolve the conditional binding for this trait, if the
+            /// condition is currently satisfied.
+            pub fn resolve(
+                app: &larastvel_core::foundation::Application,
+            ) -> Option<std::sync::Arc<dyn #name>> {
+                app.make_by_alias(Self::ALIAS)
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+struct BindWhenArgs {
+    alias: String,
+    condition_key: String,
+}
+
+impl Parse for BindWhenArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut alias = None;
+        let mut condition_key = None;
+
+        while !input.is_empty() {
+            let ident: Ident = input.parse()?;
+            input.parse::<syn::Token![=]>()?;
+            let value: LitStr = input.parse()?;
+            let name = ident.to_string();
+            if name == "alias" {
+                alias = Some(value.value());
+            } else if name == "condition_key" {
+                condition_key = Some(value.value());
+            } else {
+                return Err(syn::Error::new(
+                    ident.span(),
+                    format!("unknown #[bind_when] attribute: {name}"),
+                ));
+            }
+            if !input.is_empty() {
+                input.parse::<syn::Token![,]>()?;
+            }
+        }
+
+        Ok(BindWhenArgs {
+            alias: alias.ok_or_else(|| input.error("missing `alias = \"...\"` argument"))?,
+            condition_key: condition_key
+                .ok_or_else(|| input.error("missing `condition_key = \"...\"` argument"))?,
+        })
+    }
 }

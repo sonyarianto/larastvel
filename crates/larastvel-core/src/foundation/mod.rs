@@ -43,9 +43,49 @@ pub struct Application {
     inner: Arc<Mutex<AppInner>>,
 }
 
+/// A conditional container binding, mirroring Laravel's `#[BindWhen]`.
+///
+/// The binding is only active when its `condition` returns `true` against the
+/// application's [`Config`]. Rules are evaluated in declaration order and the
+/// first one whose condition holds is the one used when the binding name is
+/// resolved via [`Application::make_by_alias`].
+pub struct ConditionalBinding {
+    /// The condition that gates this binding.
+    pub condition: Box<dyn Fn(&Config) -> bool + Send + Sync>,
+    /// The instance returned when the condition holds.
+    pub instance: Box<dyn Any + Send + Sync>,
+}
+
+impl ConditionalBinding {
+    pub fn new(
+        condition: impl Fn(&Config) -> bool + Send + Sync + 'static,
+        instance: impl Any + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            condition: Box::new(condition),
+            instance: Box::new(instance),
+        }
+    }
+}
+
+/// Whether a config value parses as a truthy token.
+///
+/// Tolerates the quoted string form (`"1"`) produced by `Config::get` for
+/// values stored in the `extra` section.
+pub fn config_truthy(config: &Config, key: &str) -> bool {
+    config
+        .get(key)
+        .map(|v| {
+            let v = v.trim().trim_matches('"');
+            matches!(v, "1" | "true" | "yes" | "on")
+        })
+        .unwrap_or(false)
+}
+
 struct AppInner {
     instances: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
     aliases: HashMap<String, TypeId>,
+    conditional_bindings: HashMap<String, Vec<ConditionalBinding>>,
     config: Config,
     console: Option<ConsoleKernel>,
     db: Option<DatabaseManager>,
@@ -67,6 +107,7 @@ impl Application {
         let inner = Arc::new(Mutex::new(AppInner {
             instances: HashMap::new(),
             aliases: HashMap::new(),
+            conditional_bindings: HashMap::new(),
             config,
             console: None,
             db: None,
@@ -89,6 +130,20 @@ impl Application {
 
     pub fn config(&self) -> Config {
         self.inner.lock().unwrap().config.clone()
+    }
+
+    /// Whether the config value at `key` parses as a truthy token.
+    ///
+    /// Convenience wrapper around [`config_truthy`]; used by `#[bind_when]`'s
+    /// generated `conditional_enabled`.
+    pub fn config_bool(&self, key: &str) -> bool {
+        let config = self.config();
+        config_truthy(&config, key)
+    }
+
+    /// Replace the application configuration at runtime.
+    pub fn set_config(&self, config: Config) {
+        self.inner.lock().unwrap().config = config;
     }
 
     /// Register a provider that will be eagerly registered and booted.
@@ -167,16 +222,87 @@ impl Application {
 
     /// Resolve a previously bound instance by string alias.
     ///
+    /// Conditional bindings registered with [`bind_if`](Self::bind_if) take
+    /// precedence: each condition is evaluated in declaration order and the
+    /// first match is returned. Otherwise the plain alias – if any – is used.
+    ///
     /// If the alias matches a service provided by a deferred provider, that
     /// provider will be registered and booted before the instance is returned.
     pub fn make_by_alias<T: Any + Send + Sync + Clone>(&self, alias: &str) -> Option<T> {
         self.boot_deferred_for_name(alias);
+
+        if let Some(instance) = self.resolve_conditional::<T>(alias) {
+            return Some(instance);
+        }
+
         let inner = self.inner.lock().unwrap();
         let id = inner.aliases.get(alias)?;
         inner
             .instances
             .get(id)
             .and_then(|b| b.downcast_ref::<T>())
+            .cloned()
+    }
+
+    /// Register a conditional binding under `name`.
+    ///
+    /// This mirrors Laravel's `#[BindWhen]` attribute: when `name` is resolved
+    /// via [`make_by_alias`](Self::make_by_alias), each `condition` is
+    /// evaluated in declaration order against the application config and the
+    /// instance of the first matching rule is returned. Later rules act as
+    /// fallbacks.
+    pub fn bind_if<T: Any + Send + Sync + 'static>(
+        &self,
+        name: impl Into<String>,
+        condition: impl Fn(&Config) -> bool + Send + Sync + 'static,
+        instance: T,
+    ) {
+        self.inner
+            .lock()
+            .unwrap()
+            .conditional_bindings
+            .entry(name.into())
+            .or_default()
+            .push(ConditionalBinding::new(condition, instance));
+    }
+
+    /// Register a convenience conditional binding gated on a config key.
+    ///
+    /// The condition holds when the config value at `config_key` parses as a
+    /// truthy token (`"1"`, `"true"`, `"yes"`).
+    pub fn bind_if_config<T: Any + Send + Sync + 'static>(
+        &self,
+        name: impl Into<String>,
+        config_key: impl Into<String>,
+        instance: T,
+    ) {
+        let key = config_key.into();
+        let condition = move |config: &Config| config_truthy(config, &key);
+        self.bind_if(name, condition, instance);
+    }
+
+    /// Register an unconditional fallback binding for a conditional name.
+    ///
+    /// A conditional name whose `bind_if` rules all return false stays
+    /// resolvable when a default binding is also registered.
+    pub fn bind_default<T: Any + Send + Sync + 'static>(
+        &self,
+        name: impl Into<String>,
+        instance: T,
+    ) {
+        self.bind_if(name, |_| true, instance);
+    }
+
+    /// Evaluate the conditional bindings registered for `name` in declaration
+    /// order and return the first matching instance, cloned as `T`.
+    fn resolve_conditional<T: Any + Send + Sync + Clone>(&self, name: &str) -> Option<T> {
+        let inner = self.inner.lock().unwrap();
+        let rules = inner.conditional_bindings.get(name)?;
+        let config = inner.config.clone();
+        rules
+            .iter()
+            .find(|r| (r.condition)(&config))
+            .and_then(|r| r.instance.downcast_ref::<T>())
             .cloned()
     }
 
@@ -621,6 +747,134 @@ mod tests {
         fn register_services(&self, _app: &Application) {
             // no-op for testing
         }
+    }
+
+    #[test]
+    fn test_bind_if_config_conditional_binding() {
+        let app = Application::new(None);
+        app.bind_if_config(
+            "gateway",
+            "features.payments.beta",
+            "beta-gateway".to_string(),
+        );
+        assert!(app.make_by_alias::<String>("gateway").is_none());
+    }
+
+    #[test]
+    fn test_conditional_binding_first_match_by_declaration_order() {
+        let app = Application::new(None);
+        app.bind_if_config("gateway", "features.payments.beta", "beta".to_string());
+        app.bind_default("gateway", "fallback".to_string());
+
+        let mut config = app.config();
+        config.set("features.payments.beta", "1");
+        app.set_config(config);
+
+        let resolved: Option<String> = app.make_by_alias("gateway");
+        assert_eq!(resolved, Some("beta".to_string()));
+    }
+
+    #[test]
+    fn test_conditional_binding_falls_back_to_default() {
+        let app = Application::new(None);
+        app.bind_if_config("gateway", "features.payments.beta", "beta".to_string());
+        app.bind_default("gateway", "fallback".to_string());
+
+        let resolved: Option<String> = app.make_by_alias("gateway");
+        assert_eq!(resolved, Some("fallback".to_string()));
+    }
+
+    #[test]
+    fn test_conditional_binding_closure_condition_on_config() {
+        let app = Application::new(None);
+        app.bind_if(
+            "gateway",
+            |config| config.get("app.env") == Some("production".to_string()),
+            "prod".to_string(),
+        );
+        app.bind_default("gateway", "dev".to_string());
+
+        assert_eq!(
+            app.make_by_alias::<String>("gateway"),
+            Some("dev".to_string())
+        );
+
+        let mut config = app.config();
+        config.set("app.env", "production");
+        app.set_config(config);
+        assert_eq!(
+            app.make_by_alias::<String>("gateway"),
+            Some("prod".to_string())
+        );
+    }
+
+    #[test]
+    fn test_conditional_binding_does_not_affect_plain_aliases() {
+        let app = Application::new(None);
+        app.alias("answer", std::any::TypeId::of::<i32>());
+        app.bind(42i32);
+        assert_eq!(app.make_by_alias::<i32>("answer"), Some(42));
+    }
+
+    // -----------------------------------------------------------------------
+    // #[bind_when] macro tests
+    // -----------------------------------------------------------------------
+
+    use larastvel_macros::bind_when;
+
+    #[bind_when(alias = "payment-gateway", condition_key = "features.payments.beta")]
+    trait PaymentGatewayTestCase: Send + Sync + 'static {
+        fn name(&self) -> &'static str;
+    }
+
+    struct BetaGatewayTestCase;
+    impl PaymentGatewayTestCase for BetaGatewayTestCase {
+        fn name(&self) -> &'static str {
+            "beta"
+        }
+    }
+
+    #[test]
+    fn test_bind_when_macro_constants() {
+        assert_eq!(
+            PaymentGatewayTestCaseConditionalBindings::ALIAS,
+            "payment-gateway"
+        );
+        assert_eq!(
+            PaymentGatewayTestCaseConditionalBindings::CONDITION_KEY,
+            "features.payments.beta"
+        );
+    }
+
+    #[test]
+    fn test_bind_when_macro_registers_and_resolves() {
+        let app = Application::new(None);
+        PaymentGatewayTestCaseConditionalBindings::register_conditional_binding(&app, || {
+            std::sync::Arc::new(BetaGatewayTestCase) as std::sync::Arc<dyn PaymentGatewayTestCase>
+        });
+
+        let mut config = app.config();
+        config.set(
+            PaymentGatewayTestCaseConditionalBindings::CONDITION_KEY,
+            "1",
+        );
+        app.set_config(config);
+
+        assert!(PaymentGatewayTestCaseConditionalBindings::conditional_enabled(&app));
+        let gateway = PaymentGatewayTestCaseConditionalBindings::resolve(&app);
+        assert!(gateway.is_some());
+        assert_eq!(gateway.unwrap().name(), "beta");
+    }
+
+    #[test]
+    fn test_bind_when_macro_not_enabled_when_config_false() {
+        let app = Application::new(None);
+        PaymentGatewayTestCaseConditionalBindings::register_conditional_binding(&app, || {
+            std::sync::Arc::new(BetaGatewayTestCase) as std::sync::Arc<dyn PaymentGatewayTestCase>
+        });
+
+        assert!(!PaymentGatewayTestCaseConditionalBindings::conditional_enabled(&app));
+        assert!(PaymentGatewayTestCaseConditionalBindings::resolve(&app).is_none());
     }
 
     #[test]

@@ -50,6 +50,9 @@ pub enum Rule {
     /// The field value must be a valid URL whose host resolves in DNS
     /// (mirrors Laravel's `active_url`).
     ActiveUrl,
+    /// The field value must be a valid email whose domain resolves in DNS
+    /// (mirrors Laravel's `email:dns`).
+    EmailDns,
     Ip,
     Base64,
     Regex(Regex),
@@ -111,6 +114,7 @@ impl std::fmt::Debug for Rule {
             Self::AlphaNumeric => write!(f, "AlphaNumeric"),
             Self::Url => write!(f, "Url"),
             Self::ActiveUrl => write!(f, "ActiveUrl"),
+            Self::EmailDns => write!(f, "EmailDns"),
             Self::Ip => write!(f, "Ip"),
             Self::Base64 => write!(f, "Base64"),
             Self::Regex(_) => write!(f, "Regex"),
@@ -140,6 +144,14 @@ pub fn required() -> Rule {
 }
 pub fn email() -> Rule {
     Rule::Email
+}
+/// Validate an email address and require its domain to have DNS records.
+///
+/// Mirrors Laravel's `email:dns` rule (13.22). When DNS lookups are faked
+/// (see [`fake_dns_lookups`](crate::validation::fake_dns_lookups)) the DNS
+/// check is skipped so tests stay hermetic.
+pub fn email_dns() -> Rule {
+    Rule::EmailDns
 }
 pub fn min(n: usize) -> Rule {
     Rule::Min(n)
@@ -274,6 +286,25 @@ pub(crate) fn check_rule(
                 Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
             if !email_regex.is_match(s) {
                 return Some(format!("The {} must be a valid email address.", field));
+            }
+            None
+        }
+        Rule::EmailDns => {
+            let s = value.and_then(|v| v.as_str())?;
+            let email_regex =
+                Regex::new(r"^[a-zA-Z0-9._%+-]+@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$").unwrap();
+            let Some(caps) = email_regex.captures(s) else {
+                return Some(format!("The {} must be a valid email address.", field));
+            };
+            let domain = &caps[1];
+            if !dns_lookups_faked() {
+                let resolves = (domain, 25u16)
+                    .to_socket_addrs()
+                    .map(|mut addrs| addrs.next().is_some())
+                    .unwrap_or(false);
+                if !resolves {
+                    return Some(format!("The {} must be a valid email address.", field));
+                }
             }
             None
         }

@@ -89,6 +89,8 @@ CSRF protection|csrf|$CORE/session
 Caching (file/redis stores)|pub struct CacheManager|$CORE/cache
 Redis cache store|pub struct RedisStore|$CORE/cache
 Cache locks (Lock/with_lock/get_locked)|pub struct Lock|$CORE/cache
+CookieJar (queue/queued/unqueue)|pub struct CookieJar|$CORE/cookie
+CookieJar::queued() (name+path keyed, 13.24 fix)|pub fn queued|$CORE/cookie
 Str helpers (slug/studly/camel/snake)|pub struct Str|$CORE/support
 Stringable|struct Stringable|$CORE/support
 Collection (map/filter/pluck/reduce)|pub struct Collection|$CORE/support
@@ -104,7 +106,8 @@ Notifications|pub struct NotificationSender|$CORE/notifications
 Events & listeners|pub trait Listener|$CORE/events
 Broadcasting (websocket)|pub struct BroadcastMessage|$CORE/broadcasting
 Reverb DB scaling driver|pub struct ReverbDatabaseBroadcaster|$CORE/broadcasting
-Scheduling|pub struct ScheduleManager|$CORE/scheduling
+Scheduling (cron + due events)|pub struct ScheduleManager|$CORE/scheduling
+Scheduling next-run + event timezone|pub fn next_run|$CORE/scheduling
 Rate limiting|pub struct RateLimiter|$CORE/rate_limiter
 Pagination|pub struct Paginator|$CORE/pagination
 Pipeline|pub struct Pipeline|$CORE/pipeline
@@ -130,14 +133,17 @@ CLI make generators|make_migration|$CLI
 TestClient/RefreshDatabase|pub struct TestClient|$TESTING
 Tinker REPL|Tinker|$TINKER
 Scaffolding (larastvel new)|create_project|$NEW
+First-party image processing (Image facade, resize/cover/crop)|pub struct ImageInstance|$CORE/image
+Image test fake (Image::fake + assert_resized)|pub fn assert_resized|$CORE/image
+Container #[BindWhen] attribute (macro + bind_if)|bind_when|$MACROS
+Container conditional bindings (bind_if/bind_default)|pub fn bind_if|$CORE/foundation
+email:dns validation option|pub fn email_dns|$CORE/validation
 "
 
 # Features documented as known gaps in PARITY.md. A red probe here is
 # expected (acknowledged drift) and does NOT fail a --strict run.
 # Keep this list in sync with PARITY.md's "tracked gaps" section.
 DEFERRED_FEATURES="
-First-party image processing (Image/ImageManager, resize/cover/crop)|pub struct ImageManager|$CORE
-Container attribute #[BindWhen] (conditional bindings)|BindWhen|$CORE
 "
 
 is_deferred() {

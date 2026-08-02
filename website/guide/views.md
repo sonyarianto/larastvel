@@ -87,7 +87,7 @@ Laravel-style components with named slots (Laravel's `x-slot`). Three syntaxes a
 @endcomponent
 ```
 
-Both render `components/card.html` with `title`, `header`, and `slot` (the default, unnamed body) variables available. Slot content is compiled and rendered with the page context before being passed to the component — so `{{ user.name }}` inside a slot works.
+Both render `components/card.html` with `title`, `header`, and `slot` (the default, unnamed body) variables available. Slot content is compiled and rendered with the page context before being passed to the component — so <code v-pre>{{ user.name }}</code> inside a slot works.
 
 Self-closing components are supported: `<x-icon name="heart" />`.
 

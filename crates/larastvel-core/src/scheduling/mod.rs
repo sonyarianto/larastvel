@@ -343,4 +343,64 @@ mod tests {
             .block_on(event.run());
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_cron_next_run_after() {
+        let cron = parse_cron("* * * * *").unwrap();
+        let from = chrono::Local.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let next = cron.next_run_after(from).unwrap();
+        assert_eq!(next, from + chrono::Duration::minutes(1));
+    }
+
+    #[test]
+    fn test_cron_next_run_respects_hour() {
+        let cron = parse_cron("0 9 * * *").unwrap();
+        let from = chrono::Local
+            .with_ymd_and_hms(2026, 1, 1, 8, 30, 0)
+            .unwrap();
+        let next = cron.next_run_after(from).unwrap();
+        assert_eq!(
+            next,
+            chrono::Local.with_ymd_and_hms(2026, 1, 1, 9, 0, 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_cron_next_run_rolls_to_next_day() {
+        let cron = parse_cron("30 23 * * *").unwrap();
+        let from = chrono::Local
+            .with_ymd_and_hms(2026, 1, 1, 23, 30, 0)
+            .unwrap();
+        let next = cron.next_run_after(from).unwrap();
+        assert_eq!(
+            next,
+            chrono::Local
+                .with_ymd_and_hms(2026, 1, 2, 23, 30, 0)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_event_next_run_and_timezone() {
+        let cron = parse_cron("0 9 * * *").unwrap();
+        let event = ScheduledEvent::new(cron, "daily").timezone("Asia/Jakarta");
+        assert_eq!(event.timezone_name(), Some("Asia/Jakarta"));
+        // A next run must always be within 24h for a daily cron.
+        let next = event.next_run().unwrap();
+        let now = chrono::Local::now();
+        let span = next - now;
+        assert!(
+            span < chrono::Duration::hours(26),
+            "next run way beyond expected"
+        );
+    }
+
+    #[test]
+    fn test_timezone_is_due_does_not_panic_for_unknown_zone() {
+        let cron = parse_cron("0 0 1 1 *").unwrap();
+        let event = ScheduledEvent::new(cron, "tz").timezone("Not/AZone");
+        let now = chrono::Local::now();
+        // Falls back to local-time matching.
+        assert!(!event.is_due(&(now + chrono::Duration::minutes(1))));
+    }
 }

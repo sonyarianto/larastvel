@@ -1,4 +1,4 @@
-use chrono::{Datelike, Timelike};
+use chrono::Timelike;
 
 use super::SchedulingError;
 
@@ -33,13 +33,65 @@ pub struct CronExpression {
 
 impl CronExpression {
     pub fn is_due(&self, dt: &chrono::DateTime<chrono::Local>) -> bool {
-        self.minute.matches(dt.minute() as i32)
-            && self.hour.matches(dt.hour() as i32)
-            && self.day_of_month.matches(dt.day() as i32)
-            && self.month.matches(dt.month() as i32)
-            && self
-                .day_of_week
-                .matches(dt.weekday().num_days_from_sunday() as i32)
+        use chrono::Datelike;
+        self.matches_fields(
+            dt.minute() as i32,
+            dt.hour() as i32,
+            dt.day() as i32,
+            dt.month() as i32,
+            dt.weekday().num_days_from_sunday() as i32,
+        )
+    }
+
+    fn matches_dt<Tz: chrono::TimeZone>(&self, dt: &chrono::DateTime<Tz>) -> bool {
+        use chrono::Datelike;
+        self.matches_fields(
+            dt.minute() as i32,
+            dt.hour() as i32,
+            dt.day() as i32,
+            dt.month() as i32,
+            dt.weekday().num_days_from_sunday() as i32,
+        )
+    }
+
+    /// Whether the cron expression is due at the given (possibly
+    /// timezone-aware) instant.
+    pub(crate) fn is_due_in<Tz: chrono::TimeZone>(&self, dt: &chrono::DateTime<Tz>) -> bool {
+        self.matches_dt(dt)
+    }
+
+    fn matches_fields(
+        &self,
+        minute: i32,
+        hour: i32,
+        day_of_month: i32,
+        month: i32,
+        day_of_week: i32,
+    ) -> bool {
+        self.minute.matches(minute)
+            && self.hour.matches(hour)
+            && self.day_of_month.matches(day_of_month)
+            && self.month.matches(month)
+            && self.day_of_week.matches(day_of_week)
+    }
+
+    /// Compute the next run strictly after `from` (searches minute-by-minute,
+    /// bounded to five years ahead).
+    pub fn next_run_after<Tz: chrono::TimeZone>(
+        &self,
+        from: chrono::DateTime<Tz>,
+    ) -> Option<chrono::DateTime<Tz>> {
+        let mut candidate = from + chrono::Duration::minutes(1);
+        let deadline = candidate
+            .clone()
+            .checked_add_signed(chrono::Duration::days(365 * 5))?;
+        while candidate <= deadline {
+            if self.matches_dt(&candidate) {
+                return Some(candidate);
+            }
+            candidate = candidate.checked_add_signed(chrono::Duration::minutes(1))?;
+        }
+        None
     }
 }
 

@@ -112,6 +112,23 @@ fake_dns_lookups(true);
 fake_dns_lookups(false);
 ```
 
+## `email:dns` rule
+
+Laravel 13.22's `email:dns` option is available as the `email_dns()` rule:
+the value must be a valid email address **and** its domain must resolve in
+DNS (i.e. the mailbox domain actually accepts mail). Like `active_url()`, the
+DNS resolution is skipped while `fake_dns_lookups(true)` is active, so
+offline tests still exercise the email format check:
+
+```rust
+use larastvel_core::validation::{validate, rules};
+
+let result = validate(
+    &json!({ "contact": "not-an-email" }),
+    &[("contact", &[rules::required(), rules::email_dns()])],
+)?;
+```
+
 ## Attribute Macro Validation
 
 Use the `#[validate]` attribute to validate JSON request bodies directly in handler functions:

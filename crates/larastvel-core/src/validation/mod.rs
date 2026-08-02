@@ -14,7 +14,7 @@ use serde_json::Value;
 pub use self::dns::fake_dns_lookups;
 use self::rules::check_rule;
 pub use self::rules::{
-    active_url, base64, custom, exists, unique, unique_except, Rule, ValidationError,
+    active_url, base64, custom, email_dns, exists, unique, unique_except, Rule, ValidationError,
     ValidationRule,
 };
 
@@ -513,6 +513,36 @@ mod tests {
             assert!(!prev);
             assert!(fake_dns_lookups(false));
             assert!(!fake_dns_lookups(false));
+        }
+    }
+
+    mod email_dns {
+        use super::*;
+
+        #[test]
+        fn faked_lookups_pass_for_well_formed_email() {
+            let prev = fake_dns_lookups(true);
+            let d = data(vec![("val", json!("john@example.com"))]);
+            assert!(validate(&d, vec![("val", vec![rules::email_dns()])]).is_ok());
+            fake_dns_lookups(prev);
+        }
+
+        #[test]
+        fn faked_lookups_still_fail_malformed_email() {
+            let prev = fake_dns_lookups(true);
+            let d = data(vec![("val", json!("not-an-email"))]);
+            let err = validate(&d, vec![("val", vec![rules::email_dns()])]).unwrap_err();
+            assert!(err.has("val"));
+            let d2 = data(vec![("val", json!("missing@tld"))]);
+            let err2 = validate(&d2, vec![("val", vec![rules::email_dns()])]).unwrap_err();
+            assert!(err2.has("val"));
+            fake_dns_lookups(prev);
+        }
+
+        #[test]
+        fn plain_email_still_validates_without_dns() {
+            let d = data(vec![("val", json!("john@example.com"))]);
+            assert!(validate(&d, vec![("val", vec![rules::email()])]).is_ok());
         }
     }
 

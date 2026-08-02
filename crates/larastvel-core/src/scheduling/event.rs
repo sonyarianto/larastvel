@@ -59,7 +59,42 @@ impl ScheduledEvent {
     }
 
     pub fn is_due(&self, dt: &chrono::DateTime<chrono::Local>) -> bool {
+        if let Some(tz_name) = &self.timezone {
+            if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
+                let dt_in_tz = dt.with_timezone(&tz);
+                return self.cron.is_due_in(&dt_in_tz);
+            }
+        }
         self.cron.is_due(dt)
+    }
+
+    /// The next time this event will run, evaluated against the current
+    /// time. When a timezone is configured (see [`timezone`](Self::timezone)),
+    /// the next run is computed in that timezone and returned in local time —
+    /// this is what `schedule:list` resolves to display "Next Run".
+    pub fn next_run(&self) -> Option<chrono::DateTime<chrono::Local>> {
+        let now = chrono::Local::now();
+        if let Some(tz_name) = &self.timezone {
+            if let Ok(tz) = tz_name.parse::<chrono_tz::Tz>() {
+                let now_in_tz = now.with_timezone(&tz);
+                return self
+                    .cron
+                    .next_run_after(now_in_tz)
+                    .map(|dt| dt.with_timezone(&chrono::Local));
+            }
+        }
+        self.cron.next_run_after(now)
+    }
+
+    /// Set the timezone this event is evaluated in (IANA name, e.g.
+    /// `"Asia/Jakarta"`).
+    pub fn timezone(mut self, tz: impl Into<String>) -> Self {
+        self.timezone = Some(tz.into());
+        self
+    }
+
+    pub fn timezone_name(&self) -> Option<&str> {
+        self.timezone.as_deref()
     }
 
     pub async fn run(&self) -> Result<(), JobError> {

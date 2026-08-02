@@ -49,6 +49,8 @@ md-5.workspace = true
 lettre.workspace = true
 futures-util = "0.3"
 dialoguer.workspace = true
+image.workspace = true
+chrono-tz.workspace = true
 
 [dev-dependencies]
 tower.workspace = true

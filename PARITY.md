@@ -37,6 +37,7 @@ side-by-side comparison.
 | Form Validation | 26 rules (incl. `base64`, `active_url`, DB-backed `unique`/`unique_except`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
 | Validation DB rules | `unique` / `unique:except` / `exists` (SQL-backed, async validation via `validate_async()` / `#[validate]`) | ✅ |
 | `active_url` rule + DNS lookup faking | `active_url()` rule (real DNS resolution) + `fake_dns_lookups(bool)` — offline tests skip only the network call (Laravel 13.22 `Validator::fakeDnsLookups()`) | ✅ |
+| `email:dns` validation option (Laravel 13.22) | `email_dns()` rule — validates email format then requires the domain to resolve in DNS (skipped while `fake_dns_lookups(true)`) | ✅ |
 | Route model binding | `ModelPath<E>` extractor — implicit `{user}` → model by primary key, 404 on missing | ✅ |
 | Route-key binding (`#[RouteKey]`, Laravel 13.21) | `RouteKey` trait + `#[table("…", route_key = "column")]` — binds `{post}` by slug-style column instead of the primary key, 404 on unknown key | ✅ |
 | Route conflict detection | `route:conflicts` — detects overlapping route definitions (duplicates + static shadowing `{param}`/`*`) | ✅ |
@@ -56,14 +57,18 @@ side-by-side comparison.
 | Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` / Reverb DB scaling driver (`ReverbDatabaseBroadcaster` + `reverb_scaling` table) | ✅ |
 | Cache | `CacheManager` / Array / File / Database / Redis stores / `remember()` / batch ops / `touch()` TTL extension / atomic locks — `CacheManager::lock()` / `store_lock()` / `with_lock()` / `get_locked()`, `Lock::get/release/refresh/block` (Array + Redis: `SET NX PX`, Lua compare-and-release) | ✅ |
 | Maintenance mode | `MaintenanceMode` (`down` file under `storage/framework/`), `larastvel down/up`, timing-safe `--secret` bypass (`hash_equals`-style comparison, Laravel 13.23 PR #60896) | ✅ |
+| CookieJar (Laravel 13.24 `queued()` fix) | `Cookie` / `CookieJar` — queued cookies keyed by `(name, path)` so same-name cookies on different paths don't clobber; `queue()` / `queued(name, path?)` / `unqueue()` / `forget()` / `to_set_cookie_headers()` | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
 | Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser / `schedule:run` CLI | ✅ |
+| Scheduled-event timezone & next run | `ScheduledEvent::timezone("Asia/Jakarta")` (IANA, applied to `is_due`) + `next_run()` — computed in the event timezone, returned in local time (`schedule:list` "Next Run") | ✅ |
 | Queue routing | `QueueManager::route()` / `routed_queue()` / central job→queue rules | ✅ |
 | Pagination default | 25 per page (Laravel 13 default) | ✅ |
 | JSON:API resources (relationship inclusion, sparse fieldsets, links) | `JsonApiResource` trait + `JsonApiItem` / `JsonApiCollection` — `?include=` compound documents, `?fields[type]=` sparse fieldsets, `when_included()`, `application/vnd.api+json` | ✅ |
 | AI SDK foundation — text generation, streaming, structured output, embeddings | `Ai` facade + `AiProvider` trait — `generate()`, `chat()`, `chat_stream()`, `structured()`, `embed()` with 30-day caching, OpenAI-compatible HTTP provider, `FakeAi` for tests | ✅ |
 | AI SDK agents / media (agents, images, audio, TTS/STT, vector stores, reranking) | `Ai::agent()` — persona prompt, `AgentTool` tool calling loop (JSON-schema tools, error recovery, turn limit), `AgentTask` / `AgentResult` / `AgentTaskStatus`; failover via `chat_with_fallback()` / `generate_with_fallback()`; `Media` value type; image create/edit/variation; TTS / STT; moderation; reranking (`Ai::rerank()`); vector stores (`FileVectorStore`, `PostgresVectorStore` + pgvector) | ✅ |
+| First-party image processing (`Image` facade, Laravel 13.20) | `Image` facade + `ImageInstance` — `from_bytes/base64/path/url/storage`, `resize/scale/cover/crop/contain/rotate/grayscale/blur/sharpen/flip`, outputs (`to_png/jpg/webp/gif/bmp`), `save`/`store`/`store_publicly`, `dominant_color`, `dimensions`; test fake `Image::fake()` + `assert_resized`/`assert_covered`/`assert_cropped`/`assert_stored` | ✅ |
+| Container attribute `#[BindWhen]` (Laravel 13.22) | `#[bind_when(alias, condition_key)]` attribute + generated `<Trait>ConditionalBindings` registrar; container `bind_if()` / `bind_if_config()` / `bind_default()` — conditions evaluated at resolve time against live config | ✅ |
 
 ## Laravel 13 gaps (not yet implemented)
 
@@ -78,7 +83,6 @@ side-by-side comparison.
 
 | Laravel 13 Feature | Status | Notes |
 |---|---|---|
-| First-party image processing (`Image` facade / `ImageManager`, `resize` / `cover` / `crop` transformations) | ❌ | Laravel 13.20 `Illuminate/Image` — needs an image-encoding library decision; scheduled for a future release |
-| Container attribute `#[BindWhen]` (conditional bindings) | ❌ | Laravel 13.22 — container contextual attributes are a larger architectural feature; scheduled for a future release |
+| _(none currently)_ | — | Previously deferred: first-party image processing and `#[BindWhen]` were implemented in this work cycle (see table above). |
 
-~100% feature parity with 1200+ unit tests (checked against Laravel 13.23.0).
+~100% feature parity with 1300+ unit tests (checked against Laravel 13.23.0).

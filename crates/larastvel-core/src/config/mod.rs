@@ -376,6 +376,38 @@ impl Config {
         Config::default()
     }
 
+    /// Set a dotted config key to a string value at runtime.
+    ///
+    /// Setting `"features.payments.beta"` to `"1"` writes the value into the
+    /// `extra` section, making it resolvable through [`get`](Self::get) — the
+    /// runtime equivalent of Laravel's `config([...])`.
+    pub fn set(&mut self, key: &str, value: &str) {
+        let parts: Vec<&str> = key.split('.').collect();
+        match parts.as_slice() {
+            ["app", "name"] => self.app.name = value.to_string(),
+            ["app", "url"] => self.app.url = value.to_string(),
+            ["app", "env"] => self.app.env = value.to_string(),
+            ["app", "debug"] => self.app.debug = value == "true" || value == "1",
+            ["database", "driver"] => self.database.driver = value.to_string(),
+            ["database", "host"] => self.database.host = value.to_string(),
+            ["database", "port"] => self.database.port = value.parse().unwrap_or(5432),
+            ["database", "database"] => self.database.database = value.to_string(),
+            ["database", "username"] => self.database.username = value.to_string(),
+            ["database", "password"] => self.database.password = value.to_string(),
+            ["logging", "level"] => self.logging.level = value.to_string(),
+            ["logging", "format"] => self.logging.format = value.to_string(),
+            ["logging", "driver"] => self.logging.driver = value.to_string(),
+            ["logging", "path"] => self.logging.path = value.to_string(),
+            ["logging", "max_files"] => {
+                self.logging.max_files = value.parse().unwrap_or(0);
+            }
+            _ => {
+                self.extra
+                    .insert(key.to_string(), toml::Value::String(value.to_string()));
+            }
+        }
+    }
+
     pub fn get(&self, key: &str) -> Option<String> {
         let parts: Vec<&str> = key.split('.').collect();
         match parts.as_slice() {

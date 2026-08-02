@@ -69,6 +69,7 @@ export default defineConfig({
             { text: 'Events', link: '/guide/events' },
             { text: 'Broadcasting', link: '/guide/broadcasting' },
             { text: 'File Storage', link: '/guide/filesystem' },
+            { text: 'Image Processing', link: '/guide/images' },
             { text: 'Localization', link: '/guide/localization' },
             { text: 'Mail', link: '/guide/mail' },
             { text: 'Notifications', link: '/guide/notifications' },
