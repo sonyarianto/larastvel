@@ -4,7 +4,10 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use futures_util::Stream;
 
+use super::image::{ImageOptions, ImageResponse};
+use super::media::AudioOptions;
 use super::messages::{ChatOptions, ChatResponse, EmbeddingOptions, Message};
+use super::moderation::ModerationResponse;
 
 /// An error raised by an AI provider.
 #[derive(Debug, thiserror::Error)]
@@ -23,6 +26,8 @@ pub enum ProviderError {
     NoProvider,
     #[error("Unsupported AI provider: {0}")]
     UnsupportedProvider(String),
+    #[error("The configured AI provider does not support {0}")]
+    Unsupported(String),
 }
 
 /// A stream of incremental text chunks from a streaming chat completion.
@@ -64,4 +69,54 @@ pub trait AiProvider: Send + Sync + Debug {
         inputs: &[String],
         options: &EmbeddingOptions,
     ) -> Result<Vec<Vec<f32>>, ProviderError>;
+
+    /// Generate an image from a text prompt. Defaults to an "unsupported"
+    /// error so providers without image support stay valid.
+    async fn image_create(
+        &self,
+        _prompt: &str,
+        _options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        Err(ProviderError::Unsupported("image generation".into()))
+    }
+
+    /// Edit an image with a text prompt. Defaults to "unsupported".
+    async fn image_edit(
+        &self,
+        _image: &super::media::Media,
+        _prompt: &str,
+        _options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        Err(ProviderError::Unsupported("image editing".into()))
+    }
+
+    /// Create a variation of an image. Defaults to "unsupported".
+    async fn image_variation(
+        &self,
+        _image: &super::media::Media,
+        _options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        Err(ProviderError::Unsupported("image variations".into()))
+    }
+
+    /// Synthesize speech from text, returning audio bytes. Defaults to
+    /// "unsupported".
+    async fn tts(&self, _text: &str, _options: &AudioOptions) -> Result<Vec<u8>, ProviderError> {
+        Err(ProviderError::Unsupported("text-to-speech".into()))
+    }
+
+    /// Transcribe speech to text. Defaults to "unsupported".
+    async fn stt(
+        &self,
+        _audio: &super::media::Media,
+        _options: &AudioOptions,
+    ) -> Result<String, ProviderError> {
+        Err(ProviderError::Unsupported("speech-to-text".into()))
+    }
+
+    /// Moderate content, flagging policy violations. Defaults to
+    /// "unsupported".
+    async fn moderate(&self, _content: &str) -> Result<ModerationResponse, ProviderError> {
+        Err(ProviderError::Unsupported("moderation".into()))
+    }
 }

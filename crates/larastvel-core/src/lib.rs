@@ -40,9 +40,10 @@ pub use serde_json;
 pub use tokio;
 
 pub use ai::{
-    Agent, AgentResult, AgentTask, AgentTaskStatus, AgentTool, Ai, AiProvider, ChatOptions,
-    ChatResponse, EmbeddingOptions, FakeAi, Message, OpenAICompatibleProvider, ProviderError,
-    ResponseFormat, Role, ToolCall, ToolDefinition, ToolError, Usage,
+    Agent, AgentResult, AgentTask, AgentTaskStatus, AgentTool, Ai, AiProvider, AudioOptions,
+    ChatOptions, ChatResponse, EmbeddingOptions, FakeAi, ImageOptions, ImageResponse, ImageResult,
+    Media, Message, ModerationCategory, ModerationResponse, OpenAICompatibleProvider,
+    ProviderError, ResponseFormat, Role, ToolCall, ToolDefinition, ToolError, Usage,
 };
 pub use async_trait::async_trait;
 pub use auth::{

@@ -2,7 +2,10 @@ use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde_json::{json, Value};
 
+use super::image::{ImageOptions, ImageResponse, ImageResult};
+use super::media::{AudioOptions, Media};
 use super::messages::{ChatOptions, ChatResponse, EmbeddingOptions, Message, ResponseFormat};
+use super::moderation::{ModerationCategory, ModerationResponse};
 use super::provider::{AiProvider, ChatStream, ProviderError};
 
 /// An OpenAI-compatible chat / embeddings provider.
@@ -67,6 +70,30 @@ impl OpenAICompatibleProvider {
 
     fn embeddings_url(&self) -> String {
         format!("{}/embeddings", self.base_url)
+    }
+
+    fn images_generations_url(&self) -> String {
+        format!("{}/images/generations", self.base_url)
+    }
+
+    fn images_edits_url(&self) -> String {
+        format!("{}/images/edits", self.base_url)
+    }
+
+    fn images_variations_url(&self) -> String {
+        format!("{}/images/variations", self.base_url)
+    }
+
+    fn audio_speech_url(&self) -> String {
+        format!("{}/audio/speech", self.base_url)
+    }
+
+    fn audio_transcriptions_url(&self) -> String {
+        format!("{}/audio/transcriptions", self.base_url)
+    }
+
+    fn moderations_url(&self) -> String {
+        format!("{}/moderations", self.base_url)
     }
 
     fn chat_body(&self, messages: &[Message], options: &ChatOptions, streaming: bool) -> Value {
@@ -271,6 +298,211 @@ impl AiProvider for OpenAICompatibleProvider {
         }
         Ok(embeddings)
     }
+
+    async fn image_create(
+        &self,
+        prompt: &str,
+        options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        let body = self.image_body(prompt, options);
+        let result = self
+            .post_json(&self.images_generations_url(), &body)
+            .await?;
+        parse_image_response(&result)
+    }
+
+    async fn image_edit(
+        &self,
+        image: &Media,
+        prompt: &str,
+        options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        let form = reqwest::multipart::Form::new()
+            .text("prompt", prompt.to_string())
+            .part("image", media_part(image, "image.png")?);
+        let form = self.image_form_options(form, options);
+        let result = self.post_multipart(&self.images_edits_url(), form).await?;
+        parse_image_response(&result)
+    }
+
+    async fn image_variation(
+        &self,
+        image: &Media,
+        options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        let form = reqwest::multipart::Form::new().part("image", media_part(image, "image.png")?);
+        let form = self.image_form_options(form, options);
+        let result = self
+            .post_multipart(&self.images_variations_url(), form)
+            .await?;
+        parse_image_response(&result)
+    }
+
+    async fn tts(&self, text: &str, options: &AudioOptions) -> Result<Vec<u8>, ProviderError> {
+        let mut body = json!({
+            "model": "tts-1",
+            "input": text,
+            "voice": options.voice.clone().unwrap_or_else(|| "alloy".into()),
+        });
+        if let Some(format) = &options.format {
+            body["response_format"] = json!(format);
+        }
+        if let Some(speed) = options.speed {
+            body["speed"] = json!(speed);
+        }
+        let response = self
+            .client
+            .post(self.audio_speech_url())
+            .bearer_auth(&self.api_key)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| ProviderError::Request(e.to_string()))?;
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let text = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Status(status, text));
+        }
+        response
+            .bytes()
+            .await
+            .map(|bytes| bytes.to_vec())
+            .map_err(|e| ProviderError::InvalidResponse(e.to_string()))
+    }
+
+    async fn stt(&self, audio: &Media, options: &AudioOptions) -> Result<String, ProviderError> {
+        let mut form = reqwest::multipart::Form::new()
+            .text("model", "whisper-1".to_string())
+            .part("file", media_part(audio, "audio.bin")?);
+        if let Some(language) = &options.language {
+            form = form.text("language", language.clone());
+        }
+        let result = self
+            .post_multipart(&self.audio_transcriptions_url(), form)
+            .await?;
+        result["text"].as_str().map(str::to_string).ok_or_else(|| {
+            ProviderError::InvalidResponse("missing transcript in provider response".into())
+        })
+    }
+
+    async fn moderate(&self, content: &str) -> Result<ModerationResponse, ProviderError> {
+        let body = json!({ "model": "omni-moderation-latest", "input": content });
+        let result = self.post_json(&self.moderations_url(), &body).await?;
+        let entry = result["results"]
+            .as_array()
+            .and_then(|results| results.first())
+            .ok_or_else(|| ProviderError::InvalidResponse("missing moderation results".into()))?;
+        let flagged = entry["flagged"].as_bool().unwrap_or(false);
+        let categories = entry["categories"]
+            .as_object()
+            .map(|map| {
+                map.iter()
+                    .map(|(id, value)| ModerationCategory {
+                        id: id.clone(),
+                        flagged: value.as_bool().unwrap_or(false),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(ModerationResponse {
+            flagged,
+            categories,
+        })
+    }
+}
+
+impl OpenAICompatibleProvider {
+    fn image_body(&self, prompt: &str, options: &ImageOptions) -> Value {
+        let mut body = json!({ "model": "dall-e-3", "prompt": prompt });
+        if let Some(size) = &options.size {
+            body["size"] = json!(size);
+        }
+        if let Some(quality) = &options.quality {
+            body["quality"] = json!(quality);
+        }
+        if let Some(format) = &options.response_format {
+            body["response_format"] = json!(format);
+        }
+        if let Some(n) = options.n {
+            body["n"] = json!(n);
+        }
+        body
+    }
+
+    fn image_form_options(
+        &self,
+        form: reqwest::multipart::Form,
+        options: &ImageOptions,
+    ) -> reqwest::multipart::Form {
+        let mut form = form;
+        if let Some(size) = &options.size {
+            form = form.text("size", size.clone());
+        }
+        if let Some(quality) = &options.quality {
+            form = form.text("quality", quality.clone());
+        }
+        if let Some(n) = options.n {
+            form = form.text("n", n.to_string());
+        }
+        form
+    }
+
+    async fn post_multipart(
+        &self,
+        url: &str,
+        form: reqwest::multipart::Form,
+    ) -> Result<Value, ProviderError> {
+        let response = self
+            .client
+            .post(url)
+            .bearer_auth(&self.api_key)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| ProviderError::Request(e.to_string()))?;
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let text = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Status(status, text));
+        }
+        response
+            .json()
+            .await
+            .map_err(|e| ProviderError::InvalidResponse(e.to_string()))
+    }
+}
+
+fn media_part(
+    media: &Media,
+    fallback_name: &str,
+) -> Result<reqwest::multipart::Part, ProviderError> {
+    let part = match reqwest::multipart::Part::bytes(media.content().to_vec())
+        .mime_str(media.mime_type())
+    {
+        Ok(part) => part,
+        Err(_) => reqwest::multipart::Part::bytes(media.content().to_vec()),
+    };
+    Ok(part.file_name(fallback_name.to_string()))
+}
+
+fn parse_image_response(result: &Value) -> Result<ImageResponse, ProviderError> {
+    let data: Vec<ImageResult> = result["data"]
+        .as_array()
+        .map(|data| {
+            data.iter()
+                .map(|entry| ImageResult {
+                    url: entry["url"].as_str().map(str::to_string),
+                    b64_json: entry["b64_json"].as_str().map(str::to_string),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    if data.is_empty() {
+        return Err(ProviderError::InvalidResponse(
+            "missing images in provider response".into(),
+        ));
+    }
+    Ok(ImageResponse { data })
 }
 
 fn parse_embedding(result: &Value) -> Option<Vec<f32>> {
@@ -584,5 +816,155 @@ mod tests {
             parse_sse_line("data: {\"choices\":[{\"delta\":{}}]}"),
             SseLine::Other
         ));
+    }
+
+    #[tokio::test]
+    async fn test_image_create() {
+        let (base, captured) = mock_server(
+            r#"{"data": [{"url": "https://example.test/a.png"}]}"#.into(),
+            "application/json",
+        )
+        .await;
+
+        let response = provider(&base)
+            .image_create(
+                "a red panda",
+                &ImageOptions {
+                    size: Some("1024x1024".into()),
+                    quality: Some("hd".into()),
+                    response_format: Some("url".into()),
+                    n: Some(2),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.first().unwrap().url.as_deref(),
+            Some("https://example.test/a.png")
+        );
+        let body: Value = serde_json::from_str(&captured.lock().unwrap().clone().unwrap()).unwrap();
+        assert_eq!(body["model"], "dall-e-3");
+        assert_eq!(body["prompt"], "a red panda");
+        assert_eq!(body["size"], "1024x1024");
+        assert_eq!(body["quality"], "hd");
+        assert_eq!(body["n"], 2);
+    }
+
+    #[tokio::test]
+    async fn test_image_edit_is_multipart() {
+        let (base, captured) = mock_server(
+            r#"{"data": [{"b64_json": "aGVsbG8="}]}"#.into(),
+            "application/json",
+        )
+        .await;
+        let image = Media::image(vec![0x89, 0x50], "image/png");
+
+        let response = provider(&base)
+            .image_edit(&image, "add sunglasses", &ImageOptions::default())
+            .await
+            .unwrap();
+
+        let bytes = response.first().unwrap().bytes().unwrap();
+        assert_eq!(bytes, b"hello");
+        let body = captured.lock().unwrap().clone().unwrap();
+        assert!(body.contains(r#"name="prompt""#), "body: {body}");
+        assert!(body.contains("add sunglasses"), "body: {body}");
+        assert!(body.contains(r#"name="image""#), "body: {body}");
+        assert!(body.contains("filename=\"image.png\""), "body: {body}");
+        assert!(body.contains("image/png"), "body: {body}");
+    }
+
+    #[tokio::test]
+    async fn test_tts_returns_audio_bytes() {
+        let (base, captured) = mock_server("ID3fakeaudio".into(), "audio/mpeg").await;
+
+        let audio = provider(&base)
+            .tts(
+                "Hello there",
+                &AudioOptions {
+                    voice: Some("shimmer".into()),
+                    format: Some("mp3".into()),
+                    speed: Some(1.25),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(audio, b"ID3fakeaudio");
+        let body: Value = serde_json::from_str(&captured.lock().unwrap().clone().unwrap()).unwrap();
+        assert_eq!(body["model"], "tts-1");
+        assert_eq!(body["input"], "Hello there");
+        assert_eq!(body["voice"], "shimmer");
+        assert_eq!(body["response_format"], "mp3");
+        assert_eq!(body["speed"], 1.25);
+    }
+
+    #[tokio::test]
+    async fn test_stt_transcribes() {
+        let (base, captured) = mock_server(
+            r#"{"text": "Hello world transcript"}"#.into(),
+            "application/json",
+        )
+        .await;
+        let audio = Media::audio(vec![0x00, 0x01, 0x02], "audio/mpeg");
+
+        let transcript = provider(&base)
+            .stt(
+                &audio,
+                &AudioOptions {
+                    language: Some("en".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(transcript, "Hello world transcript");
+        let body = captured.lock().unwrap().clone().unwrap();
+        assert!(body.contains("whisper-1"), "body: {body}");
+        assert!(body.contains(r#"name="language""#), "body: {body}");
+        assert!(body.contains(r#"name="file""#), "body: {body}");
+    }
+
+    #[tokio::test]
+    async fn test_moderate() {
+        let (base, captured) = mock_server(
+            r#"{
+                "results": [{
+                    "flagged": true,
+                    "categories": { "violence": true, "harassment": false }
+                }]
+            }"#
+            .into(),
+            "application/json",
+        )
+        .await;
+
+        let result = provider(&base).moderate("kill them all").await.unwrap();
+
+        assert!(result.flagged);
+        assert!(result.is_flagged("violence"));
+        assert!(!result.is_flagged("harassment"));
+        let body: Value = serde_json::from_str(&captured.lock().unwrap().clone().unwrap()).unwrap();
+        assert_eq!(body["input"], "kill them all");
+    }
+
+    #[tokio::test]
+    async fn test_image_create_missing_data_is_invalid() {
+        let (base, _) = mock_server(r#"{"data": []}"#.into(), "application/json").await;
+        let error = provider(&base)
+            .image_create("x", &ImageOptions::default())
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ProviderError::InvalidResponse(_)));
+    }
+
+    #[tokio::test]
+    async fn test_moderation_missing_results_is_invalid() {
+        let (base, _) = mock_server(r#"{"results": []}"#.into(), "application/json").await;
+        let error = provider(&base).moderate("x").await.unwrap_err();
+        assert!(matches!(error, ProviderError::InvalidResponse(_)));
     }
 }

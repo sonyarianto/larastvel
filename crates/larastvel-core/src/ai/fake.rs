@@ -4,7 +4,10 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 
+use super::image::{ImageOptions, ImageResponse, ImageResult};
+use super::media::{AudioOptions, Media};
 use super::messages::{ChatOptions, ChatResponse, EmbeddingOptions, Message};
+use super::moderation::ModerationResponse;
 use super::provider::{AiProvider, ChatStream, ProviderError};
 
 /// A fake AI provider for tests, mirroring the Laravel AI SDK's faking
@@ -130,6 +133,55 @@ impl AiProvider for FakeAi {
     ) -> Result<Vec<Vec<f32>>, ProviderError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(inputs.iter().map(|input| fake_embedding(input)).collect())
+    }
+
+    async fn image_create(
+        &self,
+        _prompt: &str,
+        _options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(ImageResponse {
+            data: vec![ImageResult {
+                url: Some("https://fake.example.test/image.png".into()),
+                b64_json: None,
+            }],
+        })
+    }
+
+    async fn image_edit(
+        &self,
+        _image: &Media,
+        _prompt: &str,
+        _options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        self.image_create("", &ImageOptions::default()).await
+    }
+
+    async fn image_variation(
+        &self,
+        _image: &Media,
+        _options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        self.image_create("", &ImageOptions::default()).await
+    }
+
+    async fn tts(&self, text: &str, _options: &AudioOptions) -> Result<Vec<u8>, ProviderError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(format!("fake audio for: {text}").into_bytes())
+    }
+
+    async fn stt(&self, _audio: &Media, _options: &AudioOptions) -> Result<String, ProviderError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok("Fake transcript".into())
+    }
+
+    async fn moderate(&self, _content: &str) -> Result<ModerationResponse, ProviderError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(ModerationResponse {
+            flagged: false,
+            categories: Vec::new(),
+        })
     }
 }
 

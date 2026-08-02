@@ -5,9 +5,9 @@ a unified, provider-agnostic interface for text generation (with streaming
 and structured output) and embeddings, plus testing fakes.
 
 The foundation is implemented: `Ai` facade, `AiProvider` trait, an
-OpenAI-compatible HTTP provider, agents with tool calling, 30-day embedding
-caching, and `FakeAi`. Media (images, audio, TTS/STT, reranking, vector
-stores) is the next phase.
+OpenAI-compatible HTTP provider, agents with tool calling, failover, media
+(images, audio, moderation), 30-day embedding caching, and `FakeAi`.
+Reranking and vector stores are the next phase.
 
 ## Configuration
 
@@ -202,6 +202,72 @@ let text = ai
 The fallback receives the primary `ProviderError` and returns a full result;
 if it fails too, its error propagates. Streaming requests have no fallback
 variant — failure can surface mid-stream.
+
+## Images, Audio, and Moderation
+
+### Media values
+
+`Media` wraps raw bytes with a MIME type — the input type for image
+editing, variations, and speech-to-text:
+
+```rust
+use larastvel_core::ai::Media;
+
+let text = Media::text("plain text");
+let image = Media::image(bytes, "image/png");
+let audio = Media::audio(bytes, "audio/mpeg");
+let from_b64 = Media::from_base64("aGVsbG8=", "image/png");
+
+image.content();   // &[u8]
+image.mime_type(); // "image/png"
+image.base64();    // base64-encoded content
+```
+
+### Images
+
+```rust
+let image = ai.image_create("a red panda", &ImageOptions {
+    size: Some("1024x1024".into()),
+    quality: Some("hd".into()),
+    response_format: Some("url".into()),   // or "b64_json"
+    ..Default::default()
+}).await?;
+
+let url = image.first().unwrap().url;       // remote url
+let bytes = image.first().unwrap().bytes(); // decoded, when b64_json
+
+let edited = ai.image_edit(&image_media, "add sunglasses", &ImageOptions::default()).await?;
+let variation = ai.image_variation(&image_media, &ImageOptions::default()).await?;
+```
+
+### Audio
+
+```rust
+let audio_bytes = ai.tts("Hello there", &AudioOptions {
+    voice: Some("shimmer".into()),   // alloy, echo, shimmer, ...
+    format: Some("mp3".into()),      // mp3, opus, wav, ...
+    speed: Some(1.1),                // 0.25–4.0
+    ..Default::default()
+}).await?;   // -> Vec<u8>
+
+let transcript = ai.stt(&Media::audio(bytes, "audio/mpeg"), &AudioOptions {
+    language: Some("en".into()),
+    ..Default::default()
+}).await?;   // -> String
+```
+
+### Moderation
+
+```rust
+let result = ai.moderate("user generated content").await?;
+
+if result.flagged {
+    // reject content flagged in any category
+}
+if result.is_flagged("violence") {
+    // per-category check
+}
+```
 
 ## Custom Providers
 

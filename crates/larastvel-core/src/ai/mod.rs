@@ -18,10 +18,12 @@
 //!
 //! let embedding = ai.embed("search this text").await?;
 //! ```
-
 mod agent;
 mod fake;
+mod image;
+mod media;
 mod messages;
+mod moderation;
 mod openai;
 mod provider;
 
@@ -29,10 +31,13 @@ pub use agent::{
     Agent, AgentResult, AgentTask, AgentTaskStatus, AgentTool, ToolError, DEFAULT_AGENT_MAX_TURNS,
 };
 pub use fake::FakeAi;
+pub use image::{ImageOptions, ImageResponse, ImageResult};
+pub use media::{AudioOptions, Media};
 pub use messages::{
     ChatOptions, ChatResponse, EmbeddingOptions, Message, ResponseFormat, Role, ToolCall,
     ToolDefinition, Usage,
 };
+pub use moderation::{ModerationCategory, ModerationResponse};
 pub use openai::OpenAICompatibleProvider;
 pub use provider::{AiProvider, ChatStream, ProviderError};
 
@@ -316,6 +321,58 @@ impl Ai {
         }
         agent
     }
+
+    /// Generate an image from a text prompt — Laravel's
+    /// `Ai::image()->create()`. The provider must support image
+    /// generation, otherwise [`ProviderError::Unsupported`] is returned.
+    pub async fn image_create(
+        &self,
+        prompt: &str,
+        options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        self.provider.image_create(prompt, options).await
+    }
+
+    /// Edit an image with a text prompt — Laravel's `Ai::image()->edit()`.
+    pub async fn image_edit(
+        &self,
+        image: &Media,
+        prompt: &str,
+        options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        self.provider.image_edit(image, prompt, options).await
+    }
+
+    /// Create a variation of an image — Laravel's
+    /// `Ai::image()->variation()`.
+    pub async fn image_variation(
+        &self,
+        image: &Media,
+        options: &ImageOptions,
+    ) -> Result<ImageResponse, ProviderError> {
+        self.provider.image_variation(image, options).await
+    }
+
+    /// Synthesize speech from text, returning the audio bytes — Laravel's
+    /// `Ai::audio()->tts()`.
+    pub async fn tts(&self, text: &str, options: &AudioOptions) -> Result<Vec<u8>, ProviderError> {
+        self.provider.tts(text, options).await
+    }
+
+    /// Transcribe speech to text — Laravel's `Ai::audio()->stt()`.
+    pub async fn stt(
+        &self,
+        audio: &Media,
+        options: &AudioOptions,
+    ) -> Result<String, ProviderError> {
+        self.provider.stt(audio, options).await
+    }
+
+    /// Moderate content, flagging policy violations — Laravel's
+    /// `Ai::moderation()->moderate()`.
+    pub async fn moderate(&self, content: &str) -> Result<ModerationResponse, ProviderError> {
+        self.provider.moderate(content).await
+    }
 }
 
 fn env_or(config: &crate::config::Config, key: &str, env: &str) -> Option<String> {
@@ -522,6 +579,50 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(text, "fallback text");
+    }
+
+    #[tokio::test]
+    async fn test_media_facade_with_fake() {
+        let fake = Arc::new(FakeAi::new());
+        let ai = Ai::new(fake.clone());
+
+        let image = ai
+            .image_create("a cat", &ImageOptions::default())
+            .await
+            .unwrap();
+        assert_eq!(
+            image.first().unwrap().url.as_deref(),
+            Some("https://fake.example.test/image.png")
+        );
+
+        let audio = ai.tts("hello", &AudioOptions::default()).await.unwrap();
+        assert_eq!(audio, b"fake audio for: hello");
+
+        let transcript = ai
+            .stt(
+                &Media::audio(vec![0x01], "audio/mpeg"),
+                &AudioOptions::default(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(transcript, "Fake transcript");
+
+        let moderation = ai.moderate("hello").await.unwrap();
+        assert!(!moderation.flagged);
+
+        let image = Media::image(vec![0x01], "image/png");
+        let edited = ai
+            .image_edit(&image, "x", &ImageOptions::default())
+            .await
+            .unwrap();
+        assert!(edited.first().is_some());
+        let variation = ai
+            .image_variation(&image, &ImageOptions::default())
+            .await
+            .unwrap();
+        assert!(variation.first().is_some());
+
+        fake.assert_call_count(6);
     }
 
     #[tokio::test]
