@@ -40,24 +40,21 @@ jobs:
           echo "All crates are at v$TAG"
 
       # Dependency order: larastvel-macros -> larastvel-core ->
-      # larastvel-testing / larastvel-tinker / larastvel-cli -> larastvel-new
-      - name: Publish larastvel-macros
-        run: cargo publish -p larastvel-macros
-
-      - name: Publish larastvel-core
-        run: cargo publish -p larastvel-core
-
-      - name: Publish larastvel-testing
-        run: cargo publish -p larastvel-testing
-
-      - name: Publish larastvel-tinker
-        run: cargo publish -p larastvel-tinker
-
-      - name: Publish larastvel-cli
-        run: cargo publish -p larastvel-cli
-
-      - name: Publish larastvel-new
-        run: cargo publish -p larastvel-new
+      # larastvel-testing / larastvel-tinker / larastvel-cli -> larastvel-new.
+      # Idempotent: crates already at the tagged version are skipped, so a
+      # re-run after a partial failure can resume where it left off.
+      - name: Publish crates (dependency order)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for p in larastvel-macros larastvel-core larastvel-testing larastvel-tinker larastvel-cli larastvel-new; do
+            PUBLISHED="$(curl -s -H "User-Agent: larastvel-release" "https://crates.io/api/v1/crates/$p" | python3 -c 'import json,sys; print(json.load(sys.stdin)["crate"]["max_version"])' 2>/dev/null)"
+            if [ "$PUBLISHED" = "$VERSION" ]; then
+              echo "::notice::$p is already at v$VERSION — skipping"
+              continue
+            fi
+            echo "Publishing $p ..."
+            cargo publish -p "$p" || exit 1
+          done
 
   dry-run:
     runs-on: ubuntu-latest
