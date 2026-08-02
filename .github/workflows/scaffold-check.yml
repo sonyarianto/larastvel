@@ -1,0 +1,48 @@
+name: Scaffold check
+
+# Verifies that a freshly generated project builds against the crates
+# actually published on crates.io. This guards against the drift class that
+# broke the v0.2.1 publish: generated scaffolds referencing stale versions
+# or missing re-exports.
+#
+# Runs after every successful publish, weekly, and on manual dispatch.
+
+on:
+  workflow_run:
+    workflows: [Publish to crates.io]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'   # weekly, Monday 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: scaffold-check
+  cancel-in-progress: false
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build CLI from the workspace
+        run: cargo build -p larastvel-cli --release
+
+      - name: Scaffold a fresh project
+        run: |
+          mkdir -p /tmp/scaffold-check && cd /tmp/scaffold-check
+          "$GITHUB_WORKSPACE/target/release/larastvel" new smoke-test-app
+
+      - name: Build the scaffolded app against published crates
+        run: cargo build
+        working-directory: /tmp/scaffold-check/smoke-test-app
+
+      - name: Run the scaffolded app's test suite
+        run: cargo test
+        working-directory: /tmp/scaffold-check/smoke-test-app
