@@ -26,6 +26,7 @@ side-by-side comparison.
 | Authentication | JWT `Auth` service + `AuthenticatedUser` extractor + `auth_middleware` | ✅ |
 | Password Reset | `PasswordResetBroker` / tokens / throttle / expiry / reset email / callback | ✅ |
 | Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / middleware | ✅ |
+| Passkey authentication (WebAuthn) | `PasskeyService` / `PasskeyStore` / `MemoryPasskeyStore` — registration & assertion options, challenge verification (origin, flags, rpIdHash, counter), ES256 via ring | ✅ |
 | Authorization / Gates | `Gate` / `Policy` / `require_ability` middleware / before/after hooks | ✅ |
 | Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `dispatch()` / `ShouldQueue` / retries with backoff, timeout, `fail_on_timeout` | ✅ |
 | Failed job handling | `FailedJobStore` / `Queue::fail(exception)` / `queue:failed` / `queue:retry` / `queue:forget` / `queue:flush` | ✅ |
@@ -50,7 +51,7 @@ side-by-side comparison.
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / middleware / token bucket | ✅ |
 | Encryption / Hashing | AES-256-GCM `Encrypter` / bcrypt `hash::make()` / `hash::check()` | ✅ |
 | Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` / Reverb DB scaling driver (`ReverbDatabaseBroadcaster` + `reverb_scaling` table) | ✅ |
-| Cache | `CacheManager` / Array / File / Database stores / `remember()` / batch ops / `touch()` TTL extension | ✅ |
+| Cache | `CacheManager` / Array / File / Database / Redis stores / `remember()` / batch ops / `touch()` TTL extension | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
 | Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser / `schedule:run` CLI | ✅ |
@@ -68,12 +69,5 @@ side-by-side comparison.
 | Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | `VectorSimilarityQuery` — cosine / L2 / inner product on `Select<E>` | ✅ |
 | `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
 | Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |
-
-## Deferred gaps (tracked, not yet implemented)
-
-| Laravel 13 Feature | Larastvel Equivalent | Status |
-|---|---|---|
-| Passkey authentication (WebAuthn) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
-| Redis cache store | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
 
 ~100% feature parity with 1160+ unit tests (checked against Laravel 13.23.0).

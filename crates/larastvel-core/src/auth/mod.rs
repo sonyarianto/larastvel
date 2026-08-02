@@ -2,6 +2,7 @@ pub mod email_verification;
 mod gates;
 mod jwt;
 mod middleware;
+pub mod passkey;
 pub mod password_reset;
 
 pub use email_verification::{
@@ -11,6 +12,10 @@ pub use email_verification::{
 pub use gates::{authorize, check_ability, require_ability, Gate, GateCheck, Policy};
 pub use jwt::Claims;
 pub use middleware::auth_middleware;
+pub use passkey::{
+    MemoryPasskeyStore, PasskeyCredential, PasskeyError, PasskeyService, PasskeyStore,
+    PasskeyUserAccount, DEFAULT_CHALLENGE_TTL,
+};
 pub use password_reset::{
     PasswordResetBroker, PasswordResetConfig, PasswordResetError, PasswordResetToken,
 };

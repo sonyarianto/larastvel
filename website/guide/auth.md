@@ -180,3 +180,42 @@ async fn dashboard(user: VerifiedUser) -> Json<Value> {
     Json(json!({ "user_id": user.user_id }))
 }
 ```
+
+## Passkeys (WebAuthn)
+
+Laravel 13 ships first-party passkey support; `PasskeyService` provides the
+WebAuthn relying-party logic (challenge issuance, attestation & assertion
+verification). Persist credentials by implementing `PasskeyStore`:
+
+```rust
+use std::sync::Arc;
+use larastvel_core::auth::{
+    MemoryPasskeyStore, PasskeyService, PasskeyStore, PasskeyUserAccount,
+};
+
+let store: Arc<dyn PasskeyStore> = Arc::new(MemoryPasskeyStore::new());
+let service = PasskeyService::new("example.com", "My App", "https://example.com", store);
+
+// Registration — step 1: send the options to the browser
+let user = PasskeyUserAccount {
+    id: "user-1".to_string(),
+    username: "taylor".to_string(),
+    display_name: "Taylor".to_string(),
+};
+let options = service.generate_registration_options(&user).await?;
+// ...navigator.credentials.create(options)...
+
+// Registration — step 2: verify the attestation the browser returns
+let credential = service.verify_registration(&user, &attestation_response).await?;
+
+// Login — request the challenge (optionally scoped to one user)
+let assertion_options = service.generate_assertion_options(Some(&user)).await?;
+// ...navigator.credentials.get()...
+let credential = service.verify_assertion(&assertion).await?;
+```
+
+`verify_registration` and `verify_assertion` validate the challenge
+(single-use, 60s TTL by default), origin, `clientDataJSON` type, rpIdHash,
+user-present flag and the signature counter. In production, back
+`PasskeyService` with a database-backed `PasskeyStore` instead of
+`MemoryPasskeyStore`.

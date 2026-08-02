@@ -76,10 +76,12 @@ Route metadata (->metadata())|route_with_metadata|$CORE/routing
 Signed URLs (signedRoute)|pub fn signed_route|$CORE/routing
 Route/controller/validate macros|pub fn route\(|$MACROS
 Auth (JWT guards)|pub struct Auth|$CORE/auth
+Passkey authentication (WebAuthn)|pub struct PasskeyService|$CORE/auth
 Policies & Gate|struct Gate|$CORE/auth
 Sessions|pub struct Session|$CORE/session
 CSRF protection|csrf|$CORE/session
 Caching (file/redis stores)|pub struct CacheManager|$CORE/cache
+Redis cache store|pub struct RedisStore|$CORE/cache
 Str helpers (slug/studly/camel/snake)|pub struct Str|$CORE/support
 Stringable|struct Stringable|$CORE/support
 Collection (map/filter/pluck/reduce)|pub struct Collection|$CORE/support
@@ -125,8 +127,6 @@ Scaffolding (larastvel new)|create_project|$NEW
 # expected (acknowledged drift) and does NOT fail a --strict run.
 # Keep this list in sync with PARITY.md's "tracked gaps" section.
 DEFERRED_FEATURES="
-Passkey authentication (WebAuthn)|Passkey|$CORE/auth
-Redis cache store|struct RedisStore|$CORE/cache
 "
 
 is_deferred() {

@@ -19,6 +19,27 @@ file_path = "storage/framework/cache/data"
 | `array` | In-memory store (default, non-persistent) |
 | `file` | File-based store |
 | `database` | Database-backed store |
+| `redis` | Redis store (native TTL via `EX`/`EXPIRE`) |
+
+### Redis
+
+Construct a `RedisStore` and register it on the `CacheManager` — no store is
+auto-wired, so the URL stays explicit:
+
+```rust
+use std::sync::Arc;
+use larastvel_core::cache::{CacheManager, RedisStore};
+
+let mut manager = CacheManager::new("redis");
+let redis = RedisStore::new("redis", "redis://127.0.0.1:6379", "larastvel:")?;
+manager.register("redis", redis);
+let cache = manager.store("redis")?;
+
+let val: Option<String> = cache.get("user:123").await?;
+```
+
+Keys are stored under the store's prefix, so `clear()` only removes keys it
+owns (a safe `SCAN` + `DEL` sweep, never `FLUSHDB`).
 
 ## Usage
 

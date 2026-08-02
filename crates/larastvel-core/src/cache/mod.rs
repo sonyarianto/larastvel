@@ -1,6 +1,9 @@
 pub mod array;
 pub mod database;
 pub mod file;
+pub mod redis;
+
+pub use redis::RedisStore;
 
 use std::collections::HashMap;
 use std::future::Future;

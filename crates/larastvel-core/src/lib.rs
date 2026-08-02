@@ -53,8 +53,9 @@ pub use async_trait::async_trait;
 pub use auth::{
     authorize, check_ability, require_ability, require_verified_email, Auth, AuthError,
     AuthenticatedUser, Claims, EmailVerificationBroker, EmailVerificationError, Gate, GateCheck,
-    PasswordResetBroker, PasswordResetConfig, PasswordResetError, PasswordResetToken, Policy,
-    VerificationChecker, VerifiedUser,
+    MemoryPasskeyStore, PasskeyCredential, PasskeyError, PasskeyService, PasskeyStore,
+    PasskeyUserAccount, PasswordResetBroker, PasswordResetConfig, PasswordResetError,
+    PasswordResetToken, Policy, VerificationChecker, VerifiedUser,
 };
 pub use bootstrap::App;
 pub use broadcasting::{
@@ -63,7 +64,8 @@ pub use broadcasting::{
     SubscriberRegistry,
 };
 pub use cache::{
-    prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, DEFAULT_TTL_SECONDS, FOREVER_TTL,
+    prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, RedisStore, DEFAULT_TTL_SECONDS,
+    FOREVER_TTL,
 };
 pub use concurrency::{concurrent, ConcurrencyError};
 pub use config::Config;
