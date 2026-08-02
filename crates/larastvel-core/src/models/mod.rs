@@ -1,4 +1,5 @@
 pub mod factory;
+pub mod jsonapi;
 pub mod serialization;
 pub mod vector;
 

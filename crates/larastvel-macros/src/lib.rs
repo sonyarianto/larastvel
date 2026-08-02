@@ -1712,6 +1712,93 @@ pub fn api_resource(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 // ---------------------------------------------------------------------------
+// Attribute: json_api_resource
+// ---------------------------------------------------------------------------
+
+struct JsonApiResourceArgs {
+    model_type: syn::Type,
+}
+
+impl Parse for JsonApiResourceArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let model_type: syn::Type = input.parse()?;
+        Ok(JsonApiResourceArgs { model_type })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn json_api_resource(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(attr as JsonApiResourceArgs);
+    let input = parse_macro_input!(item as ItemImpl);
+    let name = &input.self_ty;
+    let model_ty = &args.model_type;
+
+    let mut methods = std::collections::HashSet::new();
+    for impl_item in &input.items {
+        if let syn::ImplItem::Fn(fun) = impl_item {
+            methods.insert(fun.sig.ident.to_string());
+        }
+    }
+
+    let mut generated = Vec::new();
+    if methods.contains("attributes") {
+        generated.push(quote! {
+            fn attributes(model: &#model_ty) -> serde_json::Value {
+                Self::attributes(model)
+            }
+        });
+    }
+    if methods.contains("id") {
+        generated.push(quote! {
+            fn id(model: &#model_ty) -> String {
+                Self::id(model)
+            }
+        });
+    }
+    if methods.contains("type_") {
+        generated.push(quote! {
+            fn type_() -> String {
+                Self::type_()
+            }
+        });
+    }
+    if methods.contains("relationships") {
+        generated.push(quote! {
+            fn relationships(
+                model: &#model_ty,
+                query: &larastvel_core::models::jsonapi::JsonApiQuery,
+            ) -> serde_json::Value {
+                Self::relationships(model, query)
+            }
+        });
+    }
+    if methods.contains("links") {
+        generated.push(quote! {
+            fn links(model: &#model_ty) -> serde_json::Value {
+                Self::links(model)
+            }
+        });
+    }
+    if methods.contains("meta") {
+        generated.push(quote! {
+            fn meta(model: &#model_ty) -> serde_json::Value {
+                Self::meta(model)
+            }
+        });
+    }
+
+    let expanded = quote! {
+        #input
+
+        impl larastvel_core::models::jsonapi::JsonApiResource<#model_ty> for #name {
+            #(#generated)*
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ---------------------------------------------------------------------------
 // Attribute: broadcast_event
 // ---------------------------------------------------------------------------
 

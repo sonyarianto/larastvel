@@ -42,13 +42,13 @@ side-by-side comparison.
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser / `schedule:run` CLI | ✅ |
 | Queue routing | `QueueManager::route()` / `routed_queue()` / central job→queue rules | ✅ |
 | Pagination default | 25 per page (Laravel 13 default) | ✅ |
+| JSON:API resources (relationship inclusion, sparse fieldsets, links) | `JsonApiResource` trait + `JsonApiItem` / `JsonApiCollection` — `?include=` compound documents, `?fields[type]=` sparse fieldsets, `when_included()`, `application/vnd.api+json` | ✅ |
 
 ## Laravel 13 gaps (not yet implemented)
 
 | Laravel 13 Feature | Larastvel Equivalent | Status |
 |---|---|---|
 | Laravel AI SDK (agents, embeddings, audio, images, vector stores) | — | ❌ Missing |
-| JSON:API resources (relationship inclusion, sparse fieldsets, links) | `ApiResource` / `JsonResource` / `ResourceCollection` (non-JSON:API) | ❌ Missing |
 | Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | `VectorSimilarityQuery` — cosine / L2 / inner product on `Select<E>` | ✅ |
 | `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
 | Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |
