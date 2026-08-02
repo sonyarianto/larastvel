@@ -50,7 +50,7 @@ side-by-side comparison.
 | Laravel AI SDK (agents, embeddings, audio, images, vector stores) | — | ❌ Missing |
 | JSON:API resources (relationship inclusion, sparse fieldsets, links) | `ApiResource` / `JsonResource` / `ResourceCollection` (non-JSON:API) | ❌ Missing |
 | Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | — | ❌ Missing |
-| `PreventRequestForgery` (origin-aware CSRF) | token-based CSRF only, no origin check | ⚠️ Partial |
+| `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
 | Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job]` / `#[middleware]` / `#[can]` only | ⚠️ Partial |
 
 ~100% feature parity with 1000+ unit tests (checked against Laravel 13.23.0).

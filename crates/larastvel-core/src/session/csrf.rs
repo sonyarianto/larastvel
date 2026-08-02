@@ -13,11 +13,17 @@ use super::SessionHandle;
 #[derive(Debug, Clone)]
 pub struct CsrfLayer {
     except: Vec<String>,
+    allow_same_site: bool,
+    origin_only: bool,
 }
 
 impl CsrfLayer {
     pub fn new() -> Self {
-        Self { except: Vec::new() }
+        Self {
+            except: Vec::new(),
+            allow_same_site: false,
+            origin_only: false,
+        }
     }
 
     /// Exclude URIs from CSRF validation.
@@ -25,6 +31,21 @@ impl CsrfLayer {
     /// Supports trailing `*` globs (e.g. `"/webhook/*"`).
     pub fn except(mut self, uris: Vec<String>) -> Self {
         self.except = uris;
+        self
+    }
+
+    /// Allow requests with `Sec-Fetch-Site: same-site` to bypass token
+    /// verification, mirroring `PreventRequestForgery::allowSameSite()`.
+    pub fn allow_same_site(mut self, allow: bool) -> Self {
+        self.allow_same_site = allow;
+        self
+    }
+
+    /// Rely solely on origin verification, rejecting requests without a valid
+    /// origin even when a token is present, mirroring
+    /// `PreventRequestForgery::useOriginOnly()`.
+    pub fn use_origin_only(mut self, origin_only: bool) -> Self {
+        self.origin_only = origin_only;
         self
     }
 }
@@ -45,6 +66,8 @@ where
         CsrfService {
             inner,
             except: self.except.clone(),
+            allow_same_site: self.allow_same_site,
+            origin_only: self.origin_only,
         }
     }
 }
@@ -53,6 +76,8 @@ where
 pub struct CsrfService<S> {
     inner: S,
     except: Vec<String>,
+    allow_same_site: bool,
+    origin_only: bool,
 }
 
 impl<S> Service<AxumRequest<Body>> for CsrfService<S>
@@ -72,6 +97,8 @@ where
     fn call(&mut self, request: AxumRequest<Body>) -> Self::Future {
         let mut inner = self.inner.clone();
         let except = self.except.clone();
+        let allow_same_site = self.allow_same_site;
+        let origin_only = self.origin_only;
 
         Box::pin(async move {
             if !is_mutating(request.method()) {
@@ -86,6 +113,17 @@ where
                     .call(request)
                     .await
                     .unwrap_or_else(|e| match e.into() {}));
+            }
+
+            match verify_origin(request.headers(), allow_same_site, origin_only) {
+                OriginVerdict::Pass => {
+                    return Ok(inner
+                        .call(request)
+                        .await
+                        .unwrap_or_else(|e| match e.into() {}));
+                }
+                OriginVerdict::Rejected => return Ok(csrf_origin_failed_response()),
+                OriginVerdict::TokenRequired => {}
             }
 
             let session = match request.extensions().get::<SessionHandle>().cloned() {
@@ -146,6 +184,34 @@ where
     }
 }
 
+/// Outcome of Laravel 13-style origin verification via the `Sec-Fetch-Site`
+/// header, mirroring `PreventRequestForgery::hasValidOrigin()`.
+enum OriginVerdict {
+    /// `Sec-Fetch-Site: same-origin` (or `same-site` when allowed).
+    Pass,
+    /// No valid origin and `useOriginOnly` is enabled — reject outright.
+    Rejected,
+    /// No valid origin — fall through to token verification.
+    TokenRequired,
+}
+
+fn verify_origin(
+    headers: &axum::http::HeaderMap,
+    allow_same_site: bool,
+    origin_only: bool,
+) -> OriginVerdict {
+    let sec_fetch_site = headers
+        .get("Sec-Fetch-Site")
+        .and_then(|v| v.to_str().ok());
+
+    match sec_fetch_site {
+        Some("same-origin") => OriginVerdict::Pass,
+        Some("same-site") if allow_same_site => OriginVerdict::Pass,
+        _ if origin_only => OriginVerdict::Rejected,
+        _ => OriginVerdict::TokenRequired,
+    }
+}
+
 fn csrf_misconfigured_response() -> Response {
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -167,6 +233,20 @@ fn csrf_failed_response() -> Response {
             serde_json::json!({
                 "message": "CSRF token mismatch",
                 "exception": "Symfony\\Component\\HttpKernel\\Exception\\HttpException",
+            })
+            .to_string(),
+        ))
+        .unwrap()
+}
+
+fn csrf_origin_failed_response() -> Response {
+    Response::builder()
+        .status(StatusCode::from_u16(419).unwrap())
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::json!({
+                "message": "Origin mismatch.",
+                "exception": "Illuminate\\Http\\Exceptions\\OriginMismatchException",
             })
             .to_string(),
         ))
@@ -254,5 +334,78 @@ mod tests {
             Some("xyz789")
         );
         assert_eq!(extract_form_token("name=test"), None);
+    }
+
+    #[test]
+    fn test_verify_origin_same_origin_passes() {
+        let headers = axum::http::HeaderMap::from_iter([(
+            "Sec-Fetch-Site".parse().unwrap(),
+            "same-origin".parse().unwrap(),
+        )]);
+        assert!(matches!(
+            verify_origin(&headers, false, false),
+            OriginVerdict::Pass
+        ));
+    }
+
+    #[test]
+    fn test_verify_origin_same_site_requires_flag() {
+        let headers = axum::http::HeaderMap::from_iter([(
+            "Sec-Fetch-Site".parse().unwrap(),
+            "same-site".parse().unwrap(),
+        )]);
+        assert!(matches!(
+            verify_origin(&headers, false, false),
+            OriginVerdict::TokenRequired
+        ));
+        assert!(matches!(
+            verify_origin(&headers, true, false),
+            OriginVerdict::Pass
+        ));
+    }
+
+    #[test]
+    fn test_verify_origin_cross_site() {
+        let headers = axum::http::HeaderMap::from_iter([(
+            "Sec-Fetch-Site".parse().unwrap(),
+            "cross-site".parse().unwrap(),
+        )]);
+        assert!(matches!(
+            verify_origin(&headers, true, false),
+            OriginVerdict::TokenRequired
+        ));
+    }
+
+    #[test]
+    fn test_verify_origin_missing_header() {
+        let headers = axum::http::HeaderMap::new();
+        assert!(matches!(
+            verify_origin(&headers, false, false),
+            OriginVerdict::TokenRequired
+        ));
+    }
+
+    #[test]
+    fn test_verify_origin_origin_only_rejects() {
+        let headers = axum::http::HeaderMap::from_iter([(
+            "Sec-Fetch-Site".parse().unwrap(),
+            "cross-site".parse().unwrap(),
+        )]);
+        assert!(matches!(
+            verify_origin(&headers, true, true),
+            OriginVerdict::Rejected
+        ));
+    }
+
+    #[test]
+    fn test_verify_origin_origin_only_still_passes_same_origin() {
+        let headers = axum::http::HeaderMap::from_iter([(
+            "Sec-Fetch-Site".parse().unwrap(),
+            "same-origin".parse().unwrap(),
+        )]);
+        assert!(matches!(
+            verify_origin(&headers, false, true),
+            OriginVerdict::Pass
+        ));
     }
 }
