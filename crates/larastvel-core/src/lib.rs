@@ -97,8 +97,8 @@ pub use notifications::{
 pub use pagination::{paginate, PaginationParams, Paginator};
 pub use pipeline::{pipe_fn, Next, Pipe, Pipeline};
 pub use queue::{
-    dispatch, DatabaseQueue, InMemoryQueue, JobError, JobResolver, Queue, QueueManager,
-    QueueWorker, ShouldQueue, SyncQueue,
+    dispatch, DatabaseQueue, FailedJob, FailedJobStore, InMemoryQueue, JobError, JobResolver,
+    Queue, QueueManager, QueueWorker, ShouldQueue, SyncQueue,
 };
 pub use rate_limiter::{
     rate_limit_middleware, rate_limiter, RateLimitConfig, RateLimitExceeded, RateLimiter,
@@ -119,7 +119,7 @@ pub use translation::{
     trans_choice_with, Translator, __,
 };
 pub use validation::{
-    custom, rules, validate, ValidatedJson, ValidatedQuery, ValidationError, ValidationErrors,
-    ValidationRule, Validator,
+    custom, exists, rules, unique, unique_except, validate, validate_async, ValidatedJson,
+    ValidatedQuery, ValidationError, ValidationErrors, ValidationRule, Validator,
 };
 pub use view::{ViewError, ViewFactory};

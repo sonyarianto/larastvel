@@ -11,7 +11,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use self::rules::check_rule;
-pub use self::rules::{custom, Rule, ValidationError, ValidationRule};
+pub use self::rules::{
+    custom, exists, unique, unique_except, Rule, ValidationError, ValidationRule,
+};
 
 #[derive(Debug, Clone)]
 pub struct ValidationErrors {
@@ -70,6 +72,7 @@ pub struct Validator<'a> {
     data: &'a HashMap<String, Value>,
     rules: Vec<(&'a str, Vec<Rule>)>,
     custom_messages: HashMap<String, String>,
+    db: Option<sea_orm::DatabaseConnection>,
 }
 
 impl<'a> Validator<'a> {
@@ -78,11 +81,20 @@ impl<'a> Validator<'a> {
             data,
             rules,
             custom_messages: HashMap::new(),
+            db: None,
         }
     }
 
     pub fn with_messages(mut self, messages: HashMap<String, String>) -> Self {
         self.custom_messages = messages;
+        self
+    }
+
+    /// Use an explicit database connection for DB-backed rules (`unique` /
+    /// `exists`). Defaults to the global connection set via
+    /// [`crate::models::set_global_database`].
+    pub fn with_database(mut self, db: sea_orm::DatabaseConnection) -> Self {
+        self.db = Some(db);
         self
     }
 
@@ -92,6 +104,42 @@ impl<'a> Validator<'a> {
             let value = self.data.get(*field);
             for rule in field_rules {
                 if let Some(msg) = check_rule(rule, field, value, self.data) {
+                    let msg = self.custom_messages.get(*field).cloned().unwrap_or(msg);
+                    errors.add(field, &msg);
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Async variant of [`Validator::validate`] that also resolves DB-backed
+    /// rules (`unique` / `exists`) against a database connection. When no
+    /// DB-backed rule is present this is equivalent to [`Validator::validate`]
+    /// and does not require a database connection.
+    pub async fn validate_async(&self) -> Result<(), ValidationErrors> {
+        let needs_db = self.rules.iter().any(|(_, rules)| {
+            rules
+                .iter()
+                .any(|r| matches!(r, Rule::Unique(_) | Rule::Exists(_)))
+        });
+        if !needs_db {
+            return self.validate();
+        }
+
+        let db = match &self.db {
+            Some(db) => db.clone(),
+            None => crate::models::database().clone(),
+        };
+        let mut errors = ValidationErrors::new();
+        for (field, field_rules) in &self.rules {
+            let value = self.data.get(*field);
+            for rule in field_rules {
+                if let Some(msg) = rules::check_rule_async(rule, field, value, self.data, &db).await
+                {
                     let msg = self.custom_messages.get(*field).cloned().unwrap_or(msg);
                     errors.add(field, &msg);
                 }
@@ -166,6 +214,23 @@ pub fn validate(
 ) -> Result<(), ValidationErrors> {
     let validator = Validator::new(data, rules);
     validator.validate()
+}
+
+/// Async variant of [`validate`] that also resolves DB-backed rules
+/// (`unique` / `exists`) against the global database connection.
+///
+/// ```rust,ignore
+/// validate_async(&data, vec![
+///     ("email", vec![unique("users", None)]),
+///     ("user_id", vec![exists("users", None)]),
+/// ]).await?;
+/// ```
+pub async fn validate_async(
+    data: &HashMap<String, Value>,
+    rules: Vec<(&str, Vec<Rule>)>,
+) -> Result<(), ValidationErrors> {
+    let validator = Validator::new(data, rules);
+    validator.validate_async().await
 }
 
 #[cfg(test)]
@@ -620,6 +685,134 @@ mod tests {
             let d = data(vec![("username", json!("john@123"))]);
             let err = validate(&d, vec![("username", vec![rules::alpha_numeric()])]).unwrap_err();
             assert!(err.has("username"));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // DB-backed rules (unique / exists)
+    // -------------------------------------------------------------------------
+
+    mod db_rules {
+        use super::*;
+
+        async fn db_with_users() -> sea_orm::DatabaseConnection {
+            use sea_orm::{ConnectionTrait, Statement};
+            let db = sea_orm::Database::connect("sqlite::memory:")
+                .await
+                .expect("Failed to connect to in-memory SQLite");
+            db.execute(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "CREATE TABLE users (
+                    id INTEGER PRIMARY KEY,
+                    email TEXT NOT NULL,
+                    role_id INTEGER NOT NULL
+                )"
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            db.execute(Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                "INSERT INTO users (email, role_id) VALUES (?1, ?2)",
+                ["taken@example.com".into(), 1.into()],
+            ))
+            .await
+            .unwrap();
+            db
+        }
+
+        #[tokio::test]
+        async fn unique_passes_when_value_is_free() {
+            let db = db_with_users().await;
+            let d = data(vec![("email", json!("new@example.com"))]);
+            let result = Validator::new(&d, vec![("email", vec![unique("users", None)])])
+                .with_database(db)
+                .validate_async()
+                .await;
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn unique_fails_when_value_is_taken() {
+            let db = db_with_users().await;
+            let d = data(vec![("email", json!("taken@example.com"))]);
+            let result = Validator::new(&d, vec![("email", vec![unique("users", None)])])
+                .with_database(db)
+                .validate_async()
+                .await;
+            let err = result.unwrap_err();
+            assert!(err.has("email"));
+            assert_eq!(
+                err.first("email").unwrap(),
+                "The email has already been taken."
+            );
+        }
+
+        #[tokio::test]
+        async fn unique_except_ignores_own_row() {
+            let db = db_with_users().await;
+            let d = data(vec![("email", json!("taken@example.com"))]);
+            let result =
+                Validator::new(&d, vec![("email", vec![unique_except("users", None, "1")])])
+                    .with_database(db)
+                    .validate_async()
+                    .await;
+            assert!(result.is_ok(), "own row must be excluded");
+        }
+
+        #[tokio::test]
+        async fn exists_passes_when_value_exists() {
+            let db = db_with_users().await;
+            let d = data(vec![("user_id", json!("1"))]);
+            let result = Validator::new(&d, vec![("user_id", vec![exists("users", Some("id"))])])
+                .with_database(db)
+                .validate_async()
+                .await;
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn exists_fails_when_value_missing() {
+            let db = db_with_users().await;
+            let d = data(vec![("user_id", json!("999"))]);
+            let result = Validator::new(&d, vec![("user_id", vec![exists("users", Some("id"))])])
+                .with_database(db)
+                .validate_async()
+                .await;
+            let err = result.unwrap_err();
+            assert!(err.has("user_id"));
+            assert_eq!(
+                err.first("user_id").unwrap(),
+                "The selected user_id is invalid."
+            );
+        }
+
+        #[tokio::test]
+        async fn db_rules_compose_with_builtin_rules() {
+            let db = db_with_users().await;
+            let d = data(vec![("email", json!("new@example.com"))]);
+            let result = Validator::new(
+                &d,
+                vec![(
+                    "email",
+                    vec![rules::required(), rules::email(), unique("users", None)],
+                )],
+            )
+            .with_database(db)
+            .validate_async()
+            .await;
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn sync_validate_reports_db_rule_needs_async() {
+            let d = data(vec![("email", json!("x@example.com"))]);
+            let result = validate(&d, vec![("email", vec![unique("users", None)])]);
+            let err = result.unwrap_err();
+            assert!(
+                err.first("email").unwrap().contains("asynchronously"),
+                "sync validate must not silently pass DB rules"
+            );
         }
     }
 

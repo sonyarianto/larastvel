@@ -812,7 +812,9 @@ pub fn validate(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             let __rules = #rules_expr;
 
-            if let Err(__errors) = larastvel_core::validation::validate(&__data, __rules) {
+            if let Err(__errors) =
+                larastvel_core::validation::validate_async(&__data, __rules).await
+            {
                 return __errors.into_response();
             }
 
@@ -904,7 +906,9 @@ pub fn validated_query(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             let __rules = #rules_expr;
 
-            if let Err(__errors) = larastvel_core::validation::validate(&__data, __rules) {
+            if let Err(__errors) =
+                larastvel_core::validation::validate_async(&__data, __rules).await
+            {
                 return __errors.into_response();
             }
 

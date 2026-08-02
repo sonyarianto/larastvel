@@ -103,6 +103,30 @@ async fn main() {
         Some(Commands::QueueWork { once, queue, sleep }) => {
             queue_work(once, &queue, sleep).await;
         }
+        Some(Commands::QueueFailed) => {
+            queue_failed_list().await;
+        }
+        Some(Commands::QueueRetry { ids }) => {
+            queue_retry(ids).await;
+        }
+        Some(Commands::QueueForget { id }) => {
+            queue_forget(id).await;
+        }
+        Some(Commands::QueueFlush) => {
+            queue_flush().await;
+        }
+        Some(Commands::About) => {
+            about();
+        }
+        Some(Commands::Optimize) => {
+            optimize_all().await;
+        }
+        Some(Commands::OptimizeClear) => {
+            optimize_clear();
+        }
+        Some(Commands::ConfigShow { section }) => {
+            config_show(&section);
+        }
         Some(Commands::Make { target }) => match target {
             Some(MakeTarget::Model { name }) => {
                 make_model(&name);
@@ -229,6 +253,14 @@ async fn main() {
             println!("  up               Bring the application out of maintenance mode");
             println!("  schedule:list    List all registered scheduled tasks");
             println!("  queue:work       Start processing jobs on the queue");
+            println!("  queue:failed     List all failed jobs");
+            println!("  queue:retry      Retry a failed job by id, or 'all'");
+            println!("  queue:forget     Forget a failed job by id");
+            println!("  queue:flush      Flush all failed jobs");
+            println!("  about            Display framework and environment information");
+            println!("  optimize         Cache config and routes for faster boot");
+            println!("  optimize:clear   Clear the config and route caches");
+            println!("  config:show      Display the values of a config section");
             println!("  version          Display framework version");
         }
     }

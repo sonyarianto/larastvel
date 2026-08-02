@@ -28,10 +28,16 @@ side-by-side comparison.
 | Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / middleware | ✅ |
 | Authorization / Gates | `Gate` / `Policy` / `require_ability` middleware / before/after hooks | ✅ |
 | Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `dispatch()` / `ShouldQueue` / retries with backoff, timeout, `fail_on_timeout` | ✅ |
+| Failed job handling | `FailedJobStore` / `Queue::fail(exception)` / `queue:failed` / `queue:retry` / `queue:forget` / `queue:flush` | ✅ |
+| DB transactions | `DatabaseManager::transaction()` / `begin_transaction()` | ✅ |
 | Notifications / Mail | 5 channels (Mail, Database, Broadcast, SMS, Webhook), `Mailable` builder, `SmtpMailer` / `LogMailer` | ✅ |
 | File Storage | `Filesystem` trait / `LocalDisk` driver / `StorageManager` | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
 | Form Validation | 20 rules, `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
+| Validation DB rules | `unique` / `unique:except` / `exists` (SQL-backed, async validation via `validate_async()` / `#[validate]`) | ✅ |
+| Route model binding | `ModelPath<E>` extractor — implicit `{user}` → model by primary key, 404 on missing | ✅ |
+| Global helpers | `redirect()` / `back()` / `abort()` / `abort_if()` / `abort_unless()` | ✅ |
+| `artisan about` / `optimize` / `config:show` | `larastvel about` / `optimize` / `optimize:clear` / `config:show {section}` | ✅ |
 | Pagination | `Paginator<T>` / `PaginationParams` / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / middleware / token bucket | ✅ |
 | Encryption / Hashing | AES-256-GCM `Encrypter` / bcrypt `hash::make()` / `hash::check()` | ✅ |
@@ -55,4 +61,12 @@ side-by-side comparison.
 | `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
 | Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |
 
-~100% feature parity with 1000+ unit tests (checked against Laravel 13.23.0).
+## Deferred gaps (tracked, not yet implemented)
+
+| Laravel 13 Feature | Larastvel Equivalent | Status |
+|---|---|---|
+| Job batches (`Bus::batch`) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
+| Blade components (`x-slot` slots) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
+| Signed URLs (`signedRoute`) | not implemented — tracked in `scripts/parity-audit.sh` `DEFERRED_FEATURES` | 🕐 |
+
+~100% feature parity with 1100+ unit tests (checked against Laravel 13.23.0).

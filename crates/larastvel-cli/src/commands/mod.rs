@@ -1,3 +1,4 @@
+pub mod about;
 pub mod config;
 pub mod down;
 pub mod env;
@@ -5,6 +6,7 @@ pub mod make;
 pub mod migrate;
 pub mod new;
 pub mod notifications;
+pub mod optimize;
 pub mod queue;
 pub mod route;
 pub mod schedule;
@@ -12,7 +14,8 @@ pub mod seed;
 pub mod serve;
 pub mod storage;
 
-pub use config::{config_cache, config_clear};
+pub use about::about;
+pub use config::{config_cache, config_clear, config_show};
 pub use down::{maintenance_down, maintenance_up};
 pub use env::env_display;
 #[allow(unused_imports)]
@@ -25,7 +28,8 @@ pub use make::{
 pub use migrate::run_migrate_command;
 pub use new::create_project;
 pub use notifications::create_notifications_table;
-pub use queue::queue_work;
+pub use optimize::{optimize_all, optimize_clear};
+pub use queue::{queue_failed_list, queue_flush, queue_forget, queue_retry, queue_work};
 pub use route::{route_cache, route_clear};
 pub use schedule::{run_schedule_command, schedule_list};
 pub use seed::run_seed_command;

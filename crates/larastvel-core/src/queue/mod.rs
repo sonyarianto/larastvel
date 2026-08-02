@@ -1,10 +1,12 @@
 pub mod database;
+pub mod failed;
 pub mod manager;
 pub mod memory;
 pub mod sync;
 pub mod worker;
 
 pub use database::{DatabaseQueue, JobResolver};
+pub use failed::{FailedJob, FailedJobStore};
 pub use manager::QueueManager;
 pub use memory::InMemoryQueue;
 pub use sync::SyncQueue;
@@ -63,9 +65,11 @@ pub trait Queue: Send + Sync + std::fmt::Debug {
         let _ = (attempts, delay_seconds);
         self.push(job).await
     }
-    /// Mark a job as permanently failed. The default implementation drops it.
-    async fn fail(&self, job: JobBox) -> Result<(), JobError> {
-        let _ = job;
+    /// Mark a job as permanently failed. `exception` carries the failure
+    /// reason (mirrors Laravel's `queue.failer` recording). The default
+    /// implementation drops the job.
+    async fn fail(&self, job: JobBox, exception: String) -> Result<(), JobError> {
+        let _ = (job, exception);
         Ok(())
     }
     async fn count(&self) -> usize;
@@ -877,5 +881,48 @@ mod tests {
             "job with tries=1 must not be popped again"
         );
         assert_eq!(queue.count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_db_queue_failed_job_recorded_in_failed_jobs_table() {
+        #[job(tries = 1)]
+        async fn doomed() -> Result<(), JobError> {
+            Err(JobError::Failed("irrecoverable".to_string()))
+        }
+
+        let db = sea_orm::Database::connect("sqlite::memory:")
+            .await
+            .expect("Failed to connect to in-memory SQLite");
+
+        let resolver: JobResolver = Arc::new(|class, _payload| {
+            if class == "doomed" {
+                Some(Box::new(DoomedJob::new()) as JobBox)
+            } else {
+                None
+            }
+        });
+
+        let queue = Arc::new(DatabaseQueue::new("db-fail", db.clone(), resolver));
+        queue.ensure_table_exists().await.unwrap();
+        queue.push(Box::new(DoomedJob::new())).await.unwrap();
+
+        let worker = QueueWorker::new(queue.clone());
+        let result = worker.process_next_job().await.unwrap();
+        assert!(result.is_err(), "tries=1 must fail permanently");
+
+        let store = FailedJobStore::new(db.clone());
+        assert_eq!(store.count().await, 1, "failure must be recorded");
+        let failed = store.all().await.unwrap();
+        assert_eq!(failed[0].class, "doomed");
+        assert!(
+            failed[0].exception.contains("irrecoverable"),
+            "exception message must be stored: {}",
+            failed[0].exception
+        );
+        assert_eq!(queue.count().await, 0, "failed job row must be removed");
+
+        store.requeue("jobs", &failed[0]).await.unwrap();
+        assert_eq!(store.count().await, 0, "requeue must forget the failure");
+        assert_eq!(queue.count().await, 1, "requeued job must be pending");
     }
 }

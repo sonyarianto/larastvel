@@ -95,7 +95,7 @@ impl QueueWorker {
                     e
                 );
                 if attempts >= max {
-                    self.queue.fail(job).await?;
+                    self.queue.fail(job, e.to_string()).await?;
                     tracing::error!(
                         "[QueueWorker] Job {} failed permanently after {} attempts",
                         name,
@@ -121,7 +121,9 @@ impl QueueWorker {
                     max
                 );
                 if fail_on_timeout || attempts >= max {
-                    self.queue.fail(job).await?;
+                    self.queue
+                        .fail(job, format!("Job {} timed out", name))
+                        .await?;
                     tracing::error!(
                         "[QueueWorker] Job {} timed out and failed permanently",
                         name

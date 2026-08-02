@@ -97,6 +97,40 @@ pub enum Commands {
         #[arg(long, default_value = "3")]
         sleep: u64,
     },
+    /// List all failed jobs
+    #[command(name = "queue:failed")]
+    QueueFailed,
+    /// Retry a failed job by id, or "all" to retry every failed job
+    #[command(name = "queue:retry")]
+    QueueRetry {
+        /// One or more job ids, or "all"
+        #[arg(required = true)]
+        ids: Vec<String>,
+    },
+    /// Forget a failed job by id
+    #[command(name = "queue:forget")]
+    QueueForget {
+        /// The id of the failed job
+        #[arg(required = true)]
+        id: String,
+    },
+    /// Flush all failed jobs
+    #[command(name = "queue:flush")]
+    QueueFlush,
+    /// Display framework and environment information
+    About,
+    /// Cache config and routes for faster boot
+    Optimize,
+    /// Clear the config and route caches
+    #[command(name = "optimize:clear")]
+    OptimizeClear,
+    /// Display the values of a config section
+    #[command(name = "config:show")]
+    ConfigShow {
+        /// The config section to display (app, database, cache, ...)
+        #[arg(required = true)]
+        section: String,
+    },
     /// Display help for any command
     Make {
         #[command(subcommand)]

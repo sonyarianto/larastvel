@@ -27,6 +27,28 @@ pub fn config_cache() {
     );
 }
 
+pub fn config_show(section: &str) {
+    let config = larastvel_core::config::Config::load(std::path::Path::new("."));
+    let value = serde_json::to_value(&config).unwrap_or(serde_json::Value::Null);
+    let section_value = match value.get(section) {
+        Some(v) => v,
+        None => {
+            eprintln!("{}", format!("Unknown config section '{}'.", section).red());
+            let known: Vec<String> = value
+                .as_object()
+                .map(|m| m.keys().cloned().collect())
+                .unwrap_or_default();
+            println!("  Known sections: {}", known.join(", "));
+            return;
+        }
+    };
+    println!(
+        "{}",
+        format!("Showing config section: {}", section).cyan().bold()
+    );
+    println!("{}", serde_json::to_string_pretty(section_value).unwrap());
+}
+
 pub fn config_clear() {
     let cache_path = std::path::Path::new("bootstrap/cache/config.json");
     if cache_path.exists() {

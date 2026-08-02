@@ -12,6 +12,7 @@ pub struct DatabaseQueue {
     db: sea_orm::DatabaseConnection,
     resolver: JobResolver,
     last_reserved: Arc<Mutex<Option<i64>>>,
+    failed_table_name: String,
 }
 
 impl std::fmt::Debug for DatabaseQueue {
@@ -33,6 +34,7 @@ impl Clone for DatabaseQueue {
             db: self.db.clone(),
             resolver: self.resolver.clone(),
             last_reserved: self.last_reserved.clone(),
+            failed_table_name: self.failed_table_name.clone(),
         }
     }
 }
@@ -45,11 +47,19 @@ impl DatabaseQueue {
             db,
             resolver,
             last_reserved: Arc::new(Mutex::new(None)),
+            failed_table_name: "failed_jobs".to_string(),
         }
     }
 
     pub fn with_table(mut self, table: &str) -> Self {
         self.table_name = table.to_string();
+        self
+    }
+
+    /// Set the name of the `failed_jobs` table used to record permanent
+    /// failures.
+    pub fn with_failed_table(mut self, table: &str) -> Self {
+        self.failed_table_name = table.to_string();
         self
     }
 
@@ -76,6 +86,49 @@ impl DatabaseQueue {
             ))
             .await
             .map_err(|e| JobError::Queue(format!("Failed to create jobs table: {}", e)))?;
+        Ok(())
+    }
+
+    /// Ensure the `failed_jobs` table exists (used by [`Queue::fail`]).
+    pub async fn ensure_failed_table_exists(&self) -> Result<(), JobError> {
+        super::FailedJobStore::new(self.db.clone())
+            .with_table(&self.failed_table_name)
+            .ensure_table_exists()
+            .await
+    }
+
+    /// Record the last reserved job as failed in the `failed_jobs` table and
+    /// remove it from the jobs table. If no job was reserved, falls back to
+    /// exhausting its attempts.
+    async fn record_failure(&self, job: JobBox, exception: String) -> Result<(), JobError> {
+        let id = {
+            let last = self.last_reserved.lock().unwrap();
+            *last
+        };
+        let Some(job_id) = id else {
+            return Ok(());
+        };
+
+        let store = super::FailedJobStore::new(self.db.clone()).with_table(&self.failed_table_name);
+        store.ensure_table_exists().await?;
+
+        let class = job.name().to_string();
+        let payload = super::failed::job_payload(job.as_ref());
+
+        store
+            .log(&self.name, &self.name, &class, &payload, &exception)
+            .await?;
+
+        let sql = format!("DELETE FROM {} WHERE id = ?1", self.table_name);
+        use sea_orm::ConnectionTrait;
+        self.db
+            .execute(sea_orm::Statement::from_sql_and_values(
+                sea_orm::DatabaseBackend::Sqlite,
+                &sql,
+                [job_id.into()],
+            ))
+            .await
+            .map_err(|e| JobError::Queue(format!("Failed to remove failed job row: {}", e)))?;
         Ok(())
     }
 }
@@ -211,30 +264,10 @@ impl Queue for DatabaseQueue {
         Ok(())
     }
 
-    /// Permanently fail the last reserved row by exhausting its attempts.
-    async fn fail(&self, job: JobBox) -> Result<(), JobError> {
-        let _ = job;
-        let id = {
-            let last = self.last_reserved.lock().unwrap();
-            *last
-        };
-        let Some(job_id) = id else {
-            return Ok(());
-        };
-        let sql = format!(
-            "UPDATE {} SET attempts = max_attempts, reserved_at = NULL WHERE id = ?1",
-            self.table_name
-        );
-        use sea_orm::ConnectionTrait;
-        self.db
-            .execute(sea_orm::Statement::from_sql_and_values(
-                sea_orm::DatabaseBackend::Sqlite,
-                &sql,
-                [job_id.into()],
-            ))
-            .await
-            .map_err(|e| JobError::Queue(format!("Failed to fail job: {}", e)))?;
-        Ok(())
+    /// Permanently fail the last reserved row by recording it in the
+    /// `failed_jobs` table and removing it from the jobs table.
+    async fn fail(&self, job: JobBox, exception: String) -> Result<(), JobError> {
+        self.record_failure(job, exception).await
     }
 
     async fn count(&self) -> usize {

@@ -51,6 +51,38 @@ pub enum Rule {
     Present,
     Prohibited,
     Custom(Arc<dyn ValidationRule>),
+    /// The field value must not already exist in a database table column
+    /// (validated asynchronously via [`crate::validation::validate_async`]).
+    Unique(UniqueRule),
+    /// The field value must exist in a database table column
+    /// (validated asynchronously via [`crate::validation::validate_async`]).
+    Exists(ExistsRule),
+}
+
+/// Parameters for the `unique` rule, mirroring Laravel's
+/// `unique:table,column,except,idColumn`:
+///
+/// ```rust,ignore
+/// validate_async(&data, vec![(
+///     "email",
+///     vec![unique_except("users", Some("email"), "42")],
+/// )]).await?;
+/// ```
+#[derive(Clone, Debug)]
+pub struct UniqueRule {
+    pub table: String,
+    /// Column to check; `None` falls back to the validated field name.
+    pub column: Option<String>,
+    /// Optional primary-key value to exclude (useful when updating a record).
+    pub ignore_id: Option<String>,
+}
+
+/// Parameters for the `exists` rule, mirroring Laravel's `exists:table,column`.
+#[derive(Clone, Debug)]
+pub struct ExistsRule {
+    pub table: String,
+    /// Column to check; `None` falls back to the validated field name.
+    pub column: Option<String>,
 }
 
 impl std::fmt::Debug for Rule {
@@ -77,6 +109,18 @@ impl std::fmt::Debug for Rule {
             Self::Size(n) => write!(f, "Size({})", n),
             Self::Present => write!(f, "Present"),
             Self::Prohibited => write!(f, "Prohibited"),
+            Self::Unique(r) => write!(
+                f,
+                "Unique({}.{})",
+                r.table,
+                r.column.as_deref().unwrap_or("*")
+            ),
+            Self::Exists(r) => write!(
+                f,
+                "Exists({}.{})",
+                r.table,
+                r.column.as_deref().unwrap_or("*")
+            ),
             Self::Custom(rule) => write!(f, "Custom({})", rule.name()),
         }
     }
@@ -145,6 +189,42 @@ pub fn present() -> Rule {
 pub fn prohibited() -> Rule {
     Rule::Prohibited
 }
+
+/// The field value must not already exist in the given database table.
+///
+/// `column` defaults to the validated field name when `None`.
+///
+/// ```rust,ignore
+/// validate_async(&data, vec![("email", vec![unique("users", None)])]).await?;
+/// ```
+pub fn unique(table: &str, column: Option<&str>) -> Rule {
+    Rule::Unique(UniqueRule {
+        table: table.to_string(),
+        column: column.map(|c| c.to_string()),
+        ignore_id: None,
+    })
+}
+
+/// Like [`unique`], but excludes a row by primary key — used when updating
+/// a record so its own value does not trip the rule.
+pub fn unique_except(table: &str, column: Option<&str>, ignore_id: &str) -> Rule {
+    Rule::Unique(UniqueRule {
+        table: table.to_string(),
+        column: column.map(|c| c.to_string()),
+        ignore_id: Some(ignore_id.to_string()),
+    })
+}
+
+/// The field value must already exist in the given database table.
+///
+/// `column` defaults to the validated field name when `None`.
+pub fn exists(table: &str, column: Option<&str>) -> Rule {
+    Rule::Exists(ExistsRule {
+        table: table.to_string(),
+        column: column.map(|c| c.to_string()),
+    })
+}
+
 pub fn custom(rule: Arc<dyn ValidationRule>) -> Rule {
     Rule::Custom(rule)
 }
@@ -339,5 +419,97 @@ pub(crate) fn check_rule(
             let val = value.and_then(|v| v.as_str()).unwrap_or("");
             rule.validate(field, val).err().map(|e| e.0)
         }
+        Rule::Unique(_) | Rule::Exists(_) => Some(format!(
+            "The {} field must be validated asynchronously (use validate_async).",
+            field
+        )),
+    }
+}
+
+/// Async variant of [`check_rule`] that also resolves DB-backed rules
+/// (`unique` / `exists`) against `db`.
+pub(crate) async fn check_rule_async(
+    rule: &Rule,
+    field: &str,
+    value: Option<&serde_json::Value>,
+    all_data: &std::collections::HashMap<String, serde_json::Value>,
+    db: &sea_orm::DatabaseConnection,
+) -> Option<String> {
+    use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+
+    match rule {
+        Rule::Unique(r) => {
+            let raw = value?;
+            let column = r.column.clone().unwrap_or_else(|| field.to_string());
+            let value_str = match raw {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            let sql = match &r.ignore_id {
+                Some(_id) => format!(
+                    "SELECT COUNT(*) FROM {} WHERE {} = ?1 AND id != ?2",
+                    r.table, column
+                ),
+                None => format!("SELECT COUNT(*) FROM {} WHERE {} = ?1", r.table, column),
+            };
+            let mut values = vec![value_str.into()];
+            if let Some(id) = &r.ignore_id {
+                values.push(id.clone().into());
+            }
+            match db
+                .query_one(Statement::from_sql_and_values(
+                    DatabaseBackend::Sqlite,
+                    &sql,
+                    values,
+                ))
+                .await
+            {
+                Ok(Some(row)) => {
+                    let count: i64 = row.try_get_by_index(0).unwrap_or(0);
+                    if count > 0 {
+                        Some(format!("The {} has already been taken.", field))
+                    } else {
+                        None
+                    }
+                }
+                Ok(None) => None,
+                Err(e) => Some(format!(
+                    "The {} could not be validated against the database: {}",
+                    field, e
+                )),
+            }
+        }
+        Rule::Exists(r) => {
+            let raw = value?;
+            let column = r.column.clone().unwrap_or_else(|| field.to_string());
+            let value_str = match raw {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            let sql = format!("SELECT COUNT(*) FROM {} WHERE {} = ?1", r.table, column);
+            match db
+                .query_one(Statement::from_sql_and_values(
+                    DatabaseBackend::Sqlite,
+                    &sql,
+                    [value_str.into()],
+                ))
+                .await
+            {
+                Ok(Some(row)) => {
+                    let count: i64 = row.try_get_by_index(0).unwrap_or(0);
+                    if count == 0 {
+                        Some(format!("The selected {} is invalid.", field))
+                    } else {
+                        None
+                    }
+                }
+                Ok(None) => None,
+                Err(e) => Some(format!(
+                    "The {} could not be validated against the database: {}",
+                    field, e
+                )),
+            }
+        }
+        _ => check_rule(rule, field, value, all_data),
     }
 }

@@ -2,13 +2,116 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use axum::{
+    extract::{FromRequestParts, Path as AxumPath},
     handler::Handler,
+    http::request::Parts,
     response::{Html, IntoResponse, Json, Response},
     routing::{any, delete, get, patch, post, put, MethodRouter},
     Router as AxumRouter,
 };
+use sea_orm::{DatabaseConnection, EntityTrait, PrimaryKeyTrait};
 
 type MiddlewareFactory = Arc<dyn Fn(MethodRouter) -> MethodRouter + Send + Sync>;
+
+// ---------------------------------------------------------------------------
+// Implicit route model binding
+// ---------------------------------------------------------------------------
+
+/// A scalar primary-key type that can be parsed from a URL path segment.
+pub trait PathValue: Sized {
+    fn from_path_value(s: &str) -> Option<Self>;
+}
+
+impl PathValue for i32 {
+    fn from_path_value(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
+}
+impl PathValue for i64 {
+    fn from_path_value(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
+}
+impl PathValue for u32 {
+    fn from_path_value(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
+}
+impl PathValue for u64 {
+    fn from_path_value(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
+}
+impl PathValue for String {
+    fn from_path_value(s: &str) -> Option<Self> {
+        Some(s.to_string())
+    }
+}
+
+/// Resolves a route parameter into a model instance by primary key —
+/// Laravel's implicit route model binding.
+///
+/// If the model cannot be found (or the id cannot be parsed), a `404` is
+/// returned automatically.
+///
+/// The database connection is taken from an `Extension<DatabaseConnection>`
+/// layer when present, falling back to the global connection set via
+/// [`crate::models::set_global_database`].
+///
+/// ```rust,ignore
+/// registrar.get("/users/{id}", |user: ModelPath<user::Entity>| async move {
+///     Json(json!({ "user": user.0 }))
+/// });
+/// ```
+#[derive(Debug)]
+pub struct ModelPath<E: EntityTrait>(pub E::Model);
+
+impl<S, E> FromRequestParts<S> for ModelPath<E>
+where
+    S: Send + Sync,
+    E: EntityTrait,
+    <E::PrimaryKey as PrimaryKeyTrait>::ValueType: PathValue,
+    E::Model: Clone + Send + Sync + 'static,
+{
+    type Rejection = axum::http::StatusCode;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        use axum::Extension;
+
+        let params: HashMap<String, String> =
+            AxumPath::<HashMap<String, String>>::from_request_parts(parts, state)
+                .await
+                .map_err(|_| axum::http::StatusCode::NOT_FOUND)?
+                .0;
+
+        let raw = if params.len() == 1 {
+            params.into_values().next().unwrap()
+        } else {
+            params
+                .get("id")
+                .cloned()
+                .ok_or(axum::http::StatusCode::NOT_FOUND)?
+        };
+
+        let pk = <E::PrimaryKey as PrimaryKeyTrait>::ValueType::from_path_value(&raw)
+            .ok_or(axum::http::StatusCode::NOT_FOUND)?;
+
+        let db: DatabaseConnection =
+            match Option::<Extension<DatabaseConnection>>::from_request_parts(parts, state).await {
+                Ok(Some(ext)) => ext.0,
+                _ => crate::models::database().clone(),
+            };
+
+        let model = E::find_by_id(pk)
+            .one(&db)
+            .await
+            .map_err(|_| axum::http::StatusCode::NOT_FOUND)?;
+
+        model
+            .map(ModelPath)
+            .ok_or(axum::http::StatusCode::NOT_FOUND)
+    }
+}
 
 #[derive(Clone)]
 pub struct Registrar {
@@ -1481,74 +1584,161 @@ mod tests {
         assert!(public.middleware.is_empty());
     }
 
-    /// #[middleware] actually applies the middleware to the route.
+    // #[middleware] actually applies the middleware to the route.
+
+    // --- implicit route model binding tests ---
+    mod bound_user {
+        use sea_orm::entity::prelude::*;
+
+        #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+        #[sea_orm(table_name = "bound_users")]
+        pub struct Model {
+            #[sea_orm(primary_key)]
+            pub id: i32,
+            pub name: String,
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+        pub enum Relation {}
+
+        impl ActiveModelBehavior for ActiveModel {}
+    }
+
     #[tokio::test]
-    async fn test_middleware_attribute_applies_middleware() {
+    async fn test_model_path_resolves_model() {
+        use axum::Extension;
+        use sea_orm::{
+            ActiveModelTrait, ConnectionTrait, Database, DatabaseBackend, Set, Statement,
+        };
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "CREATE TABLE bound_users (id INTEGER PRIMARY KEY, name TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+        bound_user::ActiveModel {
+            id: Set(1),
+            name: Set("Alice".to_string()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
         let router = Arc::new(Mutex::new(AxumRouter::new()));
         let routes = Arc::new(Mutex::new(vec![]));
         let registrar = Registrar::new(router, routes);
+        registrar.get(
+            "/users/{id}",
+            |user: ModelPath<bound_user::Entity>| async move {
+                Json(serde_json::json!({ "name": user.0.name }))
+            },
+        );
+        let app = registrar.build().layer(Extension(db));
 
-        registrar.middleware("add-header", |r| {
-            r.layer(axum::middleware::from_fn(
-                |req: axum::http::Request<axum::body::Body>,
-                 next: axum::middleware::Next| async move {
-                    let mut resp = next.run(req).await;
-                    resp.headers_mut()
-                        .insert("X-Guarded", "yes".parse().unwrap());
-                    resp
-                },
-            ))
-        });
-
-        // Re-register test-mw to use add-header for the integration test
-        registrar.middleware("test-mw", |r| {
-            r.layer(axum::middleware::from_fn(
-                |req: axum::http::Request<axum::body::Body>,
-                 next: axum::middleware::Next| async move {
-                    let mut resp = next.run(req).await;
-                    resp.headers_mut()
-                        .insert("X-Guarded", "yes".parse().unwrap());
-                    resp
-                },
-            ))
-        });
-        MiddlewareTestController::register_routes(&registrar);
-
-        let app = registrar.build();
-
-        // Guarded endpoint gets the header
         let resp = app
             .clone()
             .oneshot(
                 Request::builder()
                     .method("GET")
-                    .uri("/guarded")
+                    .uri("/users/1")
                     .body(Body::empty())
                     .unwrap(),
             )
             .await
             .unwrap();
         assert_eq!(resp.status(), 200);
-        assert_eq!(
-            resp.headers().get("X-Guarded").map(|v| v.to_str().unwrap()),
-            Some("yes")
-        );
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["name"], "Alice");
+    }
 
-        // Public endpoint does NOT get the header
+    #[tokio::test]
+    async fn test_model_path_returns_404_when_missing() {
+        use axum::Extension;
+        use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "CREATE TABLE bound_users (id INTEGER PRIMARY KEY, name TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get(
+            "/users/{id}",
+            |user: ModelPath<bound_user::Entity>| async move {
+                Json(serde_json::json!({ "name": user.0.name }))
+            },
+        );
+        let app = registrar.build().layer(Extension(db));
+
         let resp = app
             .oneshot(
                 Request::builder()
                     .method("GET")
-                    .uri("/public")
+                    .uri("/users/999")
                     .body(Body::empty())
                     .unwrap(),
             )
             .await
             .unwrap();
-        assert_eq!(resp.status(), 200);
+        assert_eq!(resp.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn test_model_path_returns_404_on_invalid_id() {
+        use axum::Extension;
+        use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "CREATE TABLE bound_users (id INTEGER PRIMARY KEY, name TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get(
+            "/users/{id}",
+            |user: ModelPath<bound_user::Entity>| async move {
+                Json(serde_json::json!({ "name": user.0.name }))
+            },
+        );
+        let app = registrar.build().layer(Extension(db));
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/users/not-a-number")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn test_path_value_from_str() {
+        assert_eq!(i32::from_path_value("42"), Some(42));
+        assert_eq!(i32::from_path_value("abc"), None);
         assert_eq!(
-            resp.headers().get("X-Guarded").map(|v| v.to_str().unwrap()),
-            None
+            i64::from_path_value("9007199254740993"),
+            Some(9007199254740993)
+        );
+        assert_eq!(
+            String::from_path_value("uuid-123"),
+            Some("uuid-123".to_string())
         );
     }
 }

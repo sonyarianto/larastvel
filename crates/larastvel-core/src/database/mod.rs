@@ -1,6 +1,7 @@
+use std::future::Future;
 use std::sync::Arc;
 
-use sea_orm::{ConnectOptions, Database, DbConn};
+use sea_orm::{ConnectOptions, Database, DbConn, TransactionTrait};
 use sea_orm_migration::MigratorTrait;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -65,6 +66,56 @@ impl DatabaseManager {
         self.connect().await
     }
 
+    /// Run a closure inside a database transaction.
+    ///
+    /// If the closure returns `Ok`, the transaction is committed. If it
+    /// returns `Err`, the transaction is rolled back and the error is
+    /// propagated. The closure must be boxed with `Box::pin` because it
+    /// borrows the transaction handle:
+    ///
+    /// ```rust,ignore
+    /// let ok = db.transaction(|txn| Box::pin(async move {
+    ///     Order::insert_into(txn).await?;
+    ///     Ok(())
+    /// })).await?;
+    /// ```
+    pub async fn transaction<F, T>(&self, f: F) -> Result<T, sea_orm::DbErr>
+    where
+        F: for<'a> FnOnce(
+                &'a sea_orm::DatabaseTransaction,
+            ) -> std::pin::Pin<
+                Box<dyn Future<Output = Result<T, sea_orm::DbErr>> + Send + 'a>,
+            > + Send,
+        T: Send,
+    {
+        let conn = self.connect().await?;
+        let txn = conn.begin().await?;
+        match f(&txn).await {
+            Ok(value) => {
+                txn.commit().await?;
+                Ok(value)
+            }
+            Err(e) => {
+                let _ = txn.rollback().await;
+                Err(e)
+            }
+        }
+    }
+
+    /// Begin a new database transaction and return a handle to it.
+    ///
+    /// The caller is responsible for calling `commit()` or `rollback()`.
+    ///
+    /// ```rust,ignore
+    /// let txn = db.begin_transaction().await?;
+    /// // ... run queries via `txn` (it implements `ConnectionTrait`) ...
+    /// txn.commit().await?;
+    /// ```
+    pub async fn begin_transaction(&self) -> Result<sea_orm::DatabaseTransaction, sea_orm::DbErr> {
+        let conn = self.connect().await?;
+        conn.begin().await
+    }
+
     pub async fn disconnect(&self) {
         *self.conn.write().await = None;
     }
@@ -85,10 +136,18 @@ impl DatabaseManager {
                 )
             }
             "sqlite" => {
-                format!("sqlite://{}?mode=rwc", db.database)
+                if db.database == ":memory:" {
+                    "sqlite::memory:".to_string()
+                } else {
+                    format!("sqlite://{}?mode=rwc", db.database)
+                }
             }
             _ => {
-                format!("sqlite://{}?mode=rwc", db.database)
+                if db.database == ":memory:" {
+                    "sqlite::memory:".to_string()
+                } else {
+                    format!("sqlite://{}?mode=rwc", db.database)
+                }
             }
         }
     }
@@ -199,5 +258,201 @@ mod tests {
         fn assert_seeder<S: Seeder>() {}
         assert_seeder::<CustomSeeder>();
         assert_seeder::<AutoNameSeeder>();
+    }
+
+    // -----------------------------------------------------------------------
+    // Transaction tests
+    // -----------------------------------------------------------------------
+
+    use sea_orm::{ConnectionTrait, Statement};
+
+    fn sqlite_manager() -> DatabaseManager {
+        let mut config = Config::default();
+        config.database.driver = "sqlite".to_string();
+        config.database.database = ":memory:".to_string();
+        DatabaseManager::new(&config)
+    }
+
+    #[tokio::test]
+    async fn test_transaction_commits() {
+        let db = sqlite_manager();
+        db.transaction(|txn| {
+            Box::pin(async move {
+                txn.execute(Statement::from_string(
+                    sea_orm::DatabaseBackend::Sqlite,
+                    "CREATE TABLE tx_items (id INTEGER PRIMARY KEY, name TEXT)".to_string(),
+                ))
+                .await?;
+                txn.execute(Statement::from_sql_and_values(
+                    sea_orm::DatabaseBackend::Sqlite,
+                    "INSERT INTO tx_items (name) VALUES (?1)",
+                    ["committed".into()],
+                ))
+                .await?;
+                Ok(())
+            })
+        })
+        .await
+        .unwrap();
+
+        let conn = db.connection().await.unwrap();
+        let row = conn
+            .query_one(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT COUNT(*) FROM tx_items".to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let count: i64 = row.try_get_by_index(0).unwrap();
+        assert_eq!(count, 1, "committed transaction should persist the insert");
+    }
+
+    #[tokio::test]
+    async fn test_transaction_rolls_back_on_error() {
+        let db = sqlite_manager();
+        db.connection()
+            .await
+            .unwrap()
+            .execute(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "CREATE TABLE tx_items (id INTEGER PRIMARY KEY, name TEXT)".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        let result = db
+            .transaction(|txn| {
+                Box::pin(async move {
+                    txn.execute(Statement::from_sql_and_values(
+                        sea_orm::DatabaseBackend::Sqlite,
+                        "INSERT INTO tx_items (name) VALUES (?1)",
+                        ["rolled_back".into()],
+                    ))
+                    .await?;
+                    Err::<(), sea_orm::DbErr>(sea_orm::DbErr::Custom("boom".to_string()))
+                })
+            })
+            .await;
+
+        assert!(result.is_err(), "the error should propagate");
+
+        let conn = db.connection().await.unwrap();
+        let row = conn
+            .query_one(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT COUNT(*) FROM tx_items".to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let count: i64 = row.try_get_by_index(0).unwrap();
+        assert_eq!(count, 0, "rolled-back transaction must not persist changes");
+    }
+
+    #[tokio::test]
+    async fn test_begin_transaction_manual_commit() {
+        let db = sqlite_manager();
+        let txn = db.begin_transaction().await.unwrap();
+        txn.execute(Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "CREATE TABLE tx_items (id INTEGER PRIMARY KEY, name TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+        txn.execute(Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            "INSERT INTO tx_items (name) VALUES (?1)",
+            ["manual".into()],
+        ))
+        .await
+        .unwrap();
+        txn.commit().await.unwrap();
+
+        let conn = db.connection().await.unwrap();
+        let row = conn
+            .query_one(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT COUNT(*) FROM tx_items".to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let count: i64 = row.try_get_by_index(0).unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_begin_transaction_manual_rollback() {
+        let db = sqlite_manager();
+        db.connection()
+            .await
+            .unwrap()
+            .execute(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "CREATE TABLE tx_items (id INTEGER PRIMARY KEY, name TEXT)".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        let txn = db.begin_transaction().await.unwrap();
+        txn.execute(Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            "INSERT INTO tx_items (name) VALUES (?1)",
+            ["aborted".into()],
+        ))
+        .await
+        .unwrap();
+        txn.rollback().await.unwrap();
+
+        let conn = db.connection().await.unwrap();
+        let row = conn
+            .query_one(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT COUNT(*) FROM tx_items".to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let count: i64 = row.try_get_by_index(0).unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_transaction_sequential_commits() {
+        let db = sqlite_manager();
+        for name in ["first", "second"] {
+            db.transaction(|txn| {
+                Box::pin(async move {
+                    txn.execute(Statement::from_string(
+                        sea_orm::DatabaseBackend::Sqlite,
+                        "CREATE TABLE IF NOT EXISTS tx_items (id INTEGER PRIMARY KEY, name TEXT)"
+                            .to_string(),
+                    ))
+                    .await?;
+                    txn.execute(Statement::from_sql_and_values(
+                        sea_orm::DatabaseBackend::Sqlite,
+                        "INSERT INTO tx_items (name) VALUES (?1)",
+                        [name.into()],
+                    ))
+                    .await?;
+                    Ok(())
+                })
+            })
+            .await
+            .unwrap();
+        }
+
+        let conn = db.connection().await.unwrap();
+        let row = conn
+            .query_one(Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT COUNT(*) FROM tx_items".to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let count: i64 = row.try_get_by_index(0).unwrap();
+        assert_eq!(count, 2, "two sequential transactions should both commit");
     }
 }
