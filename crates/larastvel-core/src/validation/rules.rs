@@ -45,6 +45,7 @@ pub enum Rule {
     AlphaNumeric,
     Url,
     Ip,
+    Base64,
     Regex(Regex),
     Between(usize, usize),
     Size(usize),
@@ -104,6 +105,7 @@ impl std::fmt::Debug for Rule {
             Self::AlphaNumeric => write!(f, "AlphaNumeric"),
             Self::Url => write!(f, "Url"),
             Self::Ip => write!(f, "Ip"),
+            Self::Base64 => write!(f, "Base64"),
             Self::Regex(_) => write!(f, "Regex"),
             Self::Between(a, b) => write!(f, "Between({}, {})", a, b),
             Self::Size(n) => write!(f, "Size({})", n),
@@ -173,6 +175,12 @@ pub fn url() -> Rule {
 }
 pub fn ip() -> Rule {
     Rule::Ip
+}
+
+/// The field value must be valid base64 (standard alphabet, canonical
+/// encoding with padding — mirrors Laravel 13's `validateBase64`).
+pub fn base64() -> Rule {
+    Rule::Base64
 }
 pub fn regex(pattern: &str) -> Result<Rule, regex::Error> {
     Regex::new(pattern).map(Rule::Regex)
@@ -372,6 +380,20 @@ pub(crate) fn check_rule(
                 let ip_re = Regex::new(r"^(\d{1,3}\.){3}\d{1,3}$|^([0-9a-fA-F:]+)$").unwrap();
                 if !ip_re.is_match(s) {
                     return Some(format!("The {} must be a valid IP address.", field));
+                }
+            }
+            None
+        }
+        Rule::Base64 => {
+            if let Some(s) = value.and_then(|v| v.as_str()) {
+                use base64::Engine as _;
+                let valid = base64::engine::general_purpose::STANDARD
+                    .decode(s.as_bytes())
+                    .ok()
+                    .map(|decoded| base64::engine::general_purpose::STANDARD.encode(decoded) == s)
+                    .unwrap_or(false);
+                if !valid {
+                    return Some(format!("The {} must be a valid base64 string.", field));
                 }
             }
             None

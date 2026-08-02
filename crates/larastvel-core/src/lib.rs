@@ -64,8 +64,8 @@ pub use broadcasting::{
     SubscriberRegistry,
 };
 pub use cache::{
-    prefixed_key, CacheError, CacheItem, CacheManager, CacheStore, RedisStore, DEFAULT_TTL_SECONDS,
-    FOREVER_TTL,
+    prefixed_key, ArrayLockStore, CacheError, CacheItem, CacheManager, CacheStore, Lock, LockStore,
+    RedisStore, DEFAULT_TTL_SECONDS, FOREVER_TTL,
 };
 pub use concurrency::{concurrent, ConcurrencyError};
 pub use config::Config;
@@ -128,7 +128,7 @@ pub use translation::{
     trans_choice_with, Translator, __,
 };
 pub use validation::{
-    custom, exists, rules, unique, unique_except, validate, validate_async, ValidatedJson,
+    base64, custom, exists, rules, unique, unique_except, validate, validate_async, ValidatedJson,
     ValidatedQuery, ValidationError, ValidationErrors, ValidationRule, Validator,
 };
 pub use view::{Component, ViewError, ViewFactory};

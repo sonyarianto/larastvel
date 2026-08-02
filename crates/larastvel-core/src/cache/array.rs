@@ -3,7 +3,8 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use super::{CacheError, CacheItem, CacheStore, FOREVER_TTL};
+use super::lock::ArrayLockStore;
+use super::{CacheError, CacheItem, CacheStore, LockStore, FOREVER_TTL};
 
 /// In-memory cache store using a `HashMap`. Useful for testing and single-server
 /// use where persistence is not required.
@@ -13,6 +14,7 @@ use super::{CacheError, CacheItem, CacheStore, FOREVER_TTL};
 pub struct ArrayStore {
     name: String,
     data: Arc<Mutex<HashMap<String, CacheItem>>>,
+    locks: Arc<ArrayLockStore>,
 }
 
 impl ArrayStore {
@@ -20,6 +22,7 @@ impl ArrayStore {
         Self {
             name: name.to_string(),
             data: Arc::new(Mutex::new(HashMap::new())),
+            locks: Arc::new(ArrayLockStore::new()),
         }
     }
 
@@ -92,6 +95,10 @@ impl CacheStore for ArrayStore {
 
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn as_lock_store(&self) -> Option<Arc<dyn LockStore>> {
+        Some(self.locks.clone())
     }
 }
 

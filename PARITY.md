@@ -28,13 +28,13 @@ side-by-side comparison.
 | Email Verification | `EmailVerificationBroker` / JWT-signed tokens / `VerifiedUser` extractor / middleware | ✅ |
 | Passkey authentication (WebAuthn) | `PasskeyService` / `PasskeyStore` / `MemoryPasskeyStore` — registration & assertion options, challenge verification (origin, flags, rpIdHash, counter), ES256 via ring | ✅ |
 | Authorization / Gates | `Gate` / `Policy` / `require_ability` middleware / before/after hooks | ✅ |
-| Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `dispatch()` / `ShouldQueue` / retries with backoff, timeout, `fail_on_timeout` | ✅ |
+| Queue / Jobs | `SyncQueue` / `InMemoryQueue` / `DatabaseQueue` / `QueueWorker` / `dispatch()` / `ShouldQueue` / retries with backoff, timeout, `fail_on_timeout`, `#[job(delay)]` delayed delivery (`ShouldQueue::delay_seconds()`) | ✅ |
 | Failed job handling | `FailedJobStore` / `Queue::fail(exception)` / `queue:failed` / `queue:retry` / `queue:forget` / `queue:flush` | ✅ |
 | DB transactions | `DatabaseManager::transaction()` / `begin_transaction()` | ✅ |
 | Notifications / Mail | 5 channels (Mail, Database, Broadcast, SMS, Webhook), `Mailable` builder, `SmtpMailer` / `LogMailer` | ✅ |
 | File Storage | `Filesystem` trait / `LocalDisk` driver / `StorageManager` | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
-| Form Validation | 24 rules (incl. DB-backed `unique`/`unique_except`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
+| Form Validation | 25 rules (incl. `base64`, DB-backed `unique`/`unique_except`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
 | Validation DB rules | `unique` / `unique:except` / `exists` (SQL-backed, async validation via `validate_async()` / `#[validate]`) | ✅ |
 | Route model binding | `ModelPath<E>` extractor — implicit `{user}` → model by primary key, 404 on missing | ✅ |
 | Route conflict detection | `route:conflicts` — detects overlapping route definitions (duplicates + static shadowing `{param}`/`*`) | ✅ |
@@ -50,8 +50,9 @@ side-by-side comparison.
 | Pagination | `Paginator<T>` / `PaginationParams` / `to_json()` / `IntoResponse` | ✅ |
 | Rate Limiting | `RateLimiter` / `RateLimiterRegistry` / middleware / token bucket | ✅ |
 | Encryption / Hashing | AES-256-GCM `Encrypter` / bcrypt `hash::make()` / `hash::check()` | ✅ |
+| Logging | `Log::init()` console logging + `monthly` file driver (`MonthlyWriter` — `laravel-YYYY-MM.log` per calendar month, `max_files` retention) | ✅ |
 | Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` / Reverb DB scaling driver (`ReverbDatabaseBroadcaster` + `reverb_scaling` table) | ✅ |
-| Cache | `CacheManager` / Array / File / Database / Redis stores / `remember()` / batch ops / `touch()` TTL extension | ✅ |
+| Cache | `CacheManager` / Array / File / Database / Redis stores / `remember()` / batch ops / `touch()` TTL extension / atomic locks — `CacheManager::lock()` / `store_lock()` / `with_lock()` / `get_locked()`, `Lock::get/release/refresh/block` (Array + Redis: `SET NX PX`, Lua compare-and-release) | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
 | Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser / `schedule:run` CLI | ✅ |
@@ -70,4 +71,11 @@ side-by-side comparison.
 | `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
 | Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |
 
-~100% feature parity with 1160+ unit tests (checked against Laravel 13.23.0).
+## Tracked gaps (deferred)
+
+| Laravel 13 Feature | Status | Notes |
+|---|---|---|
+| First-party image processing (`Image` facade / `ImageManager`, `resize` / `cover` / `crop` transformations) | ❌ | Laravel 13.20 `Illuminate/Image` — needs an image-encoding library decision; scheduled for a future release |
+| Container attribute `#[BindWhen]` (conditional bindings) | ❌ | Laravel 13.22 — container contextual attributes are a larger architectural feature; scheduled for a future release |
+
+~100% feature parity with 1200+ unit tests (checked against Laravel 13.23.0).

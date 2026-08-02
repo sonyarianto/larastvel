@@ -1,6 +1,6 @@
 # Validation
 
-Larastvel provides a Laravel-inspired validation system with 20+ built-in rules.
+Larastvel provides a Laravel-inspired validation system with 25 built-in rules.
 
 ## Basic Usage
 
@@ -53,6 +53,7 @@ match result {
 | `min_value(n)` | Numeric minimum |
 | `max_value(n)` | Numeric maximum |
 | `regex(pattern)` | Must match regex pattern |
+| `base64()` | Must be valid base64 (Laravel 13.21 parity — decodes and re-encodes canonically, so padding is enforced) |
 | `unique(table, column?)` | Value must not exist in the given table (DB-backed) |
 | `unique_except(table, column?, id)` | Value must not exist, ignoring the row with this id (DB-backed) |
 | `exists(table, column?)` | Value must exist in the given table (DB-backed) |

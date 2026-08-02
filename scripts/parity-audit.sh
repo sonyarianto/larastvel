@@ -61,11 +61,13 @@ Model lifecycle events (created/updated/deleted)|ModelCreated<|$CORE/events
 Model observers (#[observer])|fn observer|$MACROS
 Queue manager + job routing|pub struct QueueManager|$CORE/queue
 Queue worker (tries/backoff/timeout)|DEFAULT_MAX_ATTEMPTS|$CORE/queue
+Job delay (#[job(delay)]/ShouldQueue::delay_seconds)|fn delay_seconds|$CORE/queue
 Failed job storage (failed_jobs)|failed_jobs|$CORE/queue
 Job batches (Bus::batch)|pub struct JobBatch|$CORE/queue
 Validator framework|pub struct Validator|$CORE/validation
 Validation rules (built-in set)|fn check_rule|$CORE/validation
 Validation unique/exists DB rules|Rule::Unique|$CORE/validation
+Validation base64 rule|Rule::Base64|$CORE/validation
 HTTP routing (get/post/put/patch/delete)|pub fn post<|$CORE/routing
 Route groups / view / websocket|pub fn group|$CORE/routing
 Middleware aliases + presets|pub fn with_middleware|$CORE/routing
@@ -82,6 +84,7 @@ Sessions|pub struct Session|$CORE/session
 CSRF protection|csrf|$CORE/session
 Caching (file/redis stores)|pub struct CacheManager|$CORE/cache
 Redis cache store|pub struct RedisStore|$CORE/cache
+Cache locks (Lock/with_lock/get_locked)|pub struct Lock|$CORE/cache
 Str helpers (slug/studly/camel/snake)|pub struct Str|$CORE/support
 Stringable|struct Stringable|$CORE/support
 Collection (map/filter/pluck/reduce)|pub struct Collection|$CORE/support
@@ -113,6 +116,7 @@ Vector stores (file/pgvector)|FileVectorStore|$CORE/ai
 Encryption (AES)|pub struct Encrypter|$CORE/encryption
 Hashing (bcrypt/argon2)|pub fn make|$CORE/hash
 Logging|pub fn init|$CORE/logging
+Monthly log driver (laravel-YYYY-MM.log)|pub struct MonthlyWriter|$CORE/logging
 Console kernel + commands|pub trait Command|$CORE/console
 Maintenance mode (down/up)|maintenance_down|$CLI
 CLI queue commands (failed/retry/flush)|queue:failed|$CLI
@@ -127,6 +131,8 @@ Scaffolding (larastvel new)|create_project|$NEW
 # expected (acknowledged drift) and does NOT fail a --strict run.
 # Keep this list in sync with PARITY.md's "tracked gaps" section.
 DEFERRED_FEATURES="
+First-party image processing (Image/ImageManager, resize/cover/crop)|pub struct ImageManager|$CORE
+Container attribute #[BindWhen] (conditional bindings)|BindWhen|$CORE
 "
 
 is_deferred() {

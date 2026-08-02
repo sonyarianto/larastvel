@@ -84,6 +84,12 @@ pub struct LoggingConfig {
     pub level: String,
     #[serde(default = "default_log_format")]
     pub format: String,
+    #[serde(default = "default_log_driver")]
+    pub driver: String,
+    #[serde(default = "default_log_path")]
+    pub path: String,
+    #[serde(default = "default_log_max_files")]
+    pub max_files: usize,
 }
 
 impl Default for LoggingConfig {
@@ -91,6 +97,9 @@ impl Default for LoggingConfig {
         Self {
             level: default_log_level(),
             format: default_log_format(),
+            driver: default_log_driver(),
+            path: default_log_path(),
+            max_files: default_log_max_files(),
         }
     }
 }
@@ -221,6 +230,15 @@ fn default_log_level() -> String {
 fn default_log_format() -> String {
     "text".to_string()
 }
+fn default_log_driver() -> String {
+    "console".to_string()
+}
+fn default_log_path() -> String {
+    "logs/laravel.log".to_string()
+}
+fn default_log_max_files() -> usize {
+    3
+}
 
 fn default_view_engine() -> String {
     "tera".to_string()
@@ -280,6 +298,9 @@ impl Default for Config {
             logging: LoggingConfig {
                 level: default_log_level(),
                 format: default_log_format(),
+                driver: default_log_driver(),
+                path: default_log_path(),
+                max_files: default_log_max_files(),
             },
             view: ViewConfig {
                 engine: default_view_engine(),
@@ -370,6 +391,9 @@ impl Config {
             ["database", "password"] => Some(self.database.password.clone()),
             ["logging", "level"] => Some(self.logging.level.clone()),
             ["logging", "format"] => Some(self.logging.format.clone()),
+            ["logging", "driver"] => Some(self.logging.driver.clone()),
+            ["logging", "path"] => Some(self.logging.path.clone()),
+            ["logging", "max_files"] => Some(self.logging.max_files.to_string()),
             _ => {
                 let full_key = parts.join(".");
                 // Literal keys in `extra` may themselves contain dots.

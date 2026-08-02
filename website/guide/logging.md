@@ -8,8 +8,24 @@ Configure logging in `config/logging.toml`:
 
 ```toml
 level = "debug"
-format = "text"   # or "json"
+format = "text"      # or "json"
+driver = "console"   # "console" or "monthly"
+path = "logs/laravel.log"
+max_files = 3
 ```
+
+## Monthly file driver
+
+The `monthly` driver (Laravel 13.23 parity) writes one log file per calendar
+month instead of printing to the console:
+
+```toml
+driver = "monthly"
+path = "logs/laravel.log"   # writes to logs/laravel-2026-08.log during August
+```
+
+`MonthlyWriter` appends to `laravel-YYYY-MM.log`, rotating once per month. Old
+monthly files beyond `max_files` (default 3) are pruned at startup.
 
 ## Usage
 

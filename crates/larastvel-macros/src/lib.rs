@@ -347,11 +347,11 @@ pub fn listener(attr: TokenStream, item: TokenStream) -> TokenStream {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Attribute: #[job(tries = 5, backoff = 10, timeout = 30, fail_on_timeout)]
+// Attribute: #[job(tries = 5, backoff = 10, timeout = 30, fail_on_timeout, delay = 60)]
 //
 // Generates a `*Job` struct implementing `ShouldQueue` from an async fn, with
-// optional Laravel-style queue attributes: `tries`, `backoff`, `timeout`, and
-// `fail_on_timeout`.
+// optional Laravel-style queue attributes: `tries`, `backoff`, `timeout`,
+// `fail_on_timeout`, and `delay` (Laravel's `#[Delay]` attribute).
 // ---------------------------------------------------------------------------
 
 #[derive(Default)]
@@ -360,6 +360,7 @@ struct JobAttrs {
     backoff: Option<u64>,
     timeout: Option<u64>,
     fail_on_timeout: bool,
+    delay: Option<u64>,
 }
 
 impl Parse for JobAttrs {
@@ -370,7 +371,7 @@ impl Parse for JobAttrs {
             let name = ident.to_string();
             match name.as_str() {
                 "fail_on_timeout" => attrs.fail_on_timeout = true,
-                "tries" | "backoff" | "timeout" => {
+                "tries" | "backoff" | "timeout" | "delay" => {
                     input.parse::<syn::Token![=]>()?;
                     let lit: syn::LitInt = input.parse()?;
                     let value = lit.base10_parse::<u64>().map_err(|_| {
@@ -379,6 +380,7 @@ impl Parse for JobAttrs {
                     match name.as_str() {
                         "tries" => attrs.tries = Some(value),
                         "backoff" => attrs.backoff = Some(value),
+                        "delay" => attrs.delay = Some(value),
                         _ => attrs.timeout = Some(value),
                     }
                 }
@@ -469,6 +471,10 @@ pub fn job(attr: TokenStream, item: TokenStream) -> TokenStream {
     } else {
         quote! { false }
     };
+    let delay = match attrs.delay {
+        Some(d) => quote! { Some(#d) },
+        None => quote! { None },
+    };
 
     let expanded = quote! {
         #[derive(Debug)]
@@ -508,6 +514,10 @@ pub fn job(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             fn fail_on_timeout(&self) -> bool {
                 #fail_on_timeout
+            }
+
+            fn delay_seconds(&self) -> Option<u64> {
+                #delay
             }
 
             async fn handle(&self) -> Result<(), larastvel_core::queue::JobError> {

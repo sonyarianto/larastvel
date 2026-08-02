@@ -1,6 +1,24 @@
 use async_trait::async_trait;
+use std::sync::Arc;
+use std::time::Duration;
 
-use super::{prefixed_key, CacheError, CacheStore};
+use super::{prefixed_key, CacheError, CacheStore, LockStore};
+
+/// Atomically release a lock only when the caller still owns it.
+const RELEASE_LUA: &str = r#"
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('del', KEYS[1])
+end
+return 0
+"#;
+
+/// Atomically extend a lock's TTL only when the caller still owns it.
+const REFRESH_LUA: &str = r#"
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('pexpire', KEYS[1], ARGV[2])
+end
+return 0
+"#;
 
 /// Redis-backed cache store (Laravel's `redis` cache driver).
 ///
@@ -138,6 +156,64 @@ impl CacheStore for RedisStore {
 
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn as_lock_store(&self) -> Option<Arc<dyn LockStore>> {
+        Some(Arc::new(self.clone()))
+    }
+}
+
+#[async_trait]
+impl LockStore for RedisStore {
+    async fn acquire(&self, key: &str, owner: &str, ttl: Duration) -> Result<bool, CacheError> {
+        let mut conn = self.connection().await?;
+        let acquired: bool = redis::cmd("SET")
+            .arg(self.key(key))
+            .arg(owner)
+            .arg("NX")
+            .arg("PX")
+            .arg(ttl.as_millis() as u64)
+            .query_async(&mut conn)
+            .await
+            .map_err(|e| CacheError::Store(format!("Redis SET NX failed: {}", e)))?;
+        Ok(acquired)
+    }
+
+    async fn release(&self, key: &str, owner: &str) -> Result<bool, CacheError> {
+        let mut conn = self.connection().await?;
+        let released: i64 = redis::cmd("EVAL")
+            .arg(RELEASE_LUA)
+            .arg(1)
+            .arg(self.key(key))
+            .arg(owner)
+            .query_async(&mut conn)
+            .await
+            .map_err(|e| CacheError::Store(format!("Redis lock release failed: {}", e)))?;
+        Ok(released > 0)
+    }
+
+    async fn force_release(&self, key: &str) -> Result<bool, CacheError> {
+        let mut conn = self.connection().await?;
+        let removed: i64 = redis::cmd("DEL")
+            .arg(self.key(key))
+            .query_async(&mut conn)
+            .await
+            .map_err(|e| CacheError::Store(format!("Redis DEL failed: {}", e)))?;
+        Ok(removed > 0)
+    }
+
+    async fn refresh(&self, key: &str, owner: &str, ttl: Duration) -> Result<bool, CacheError> {
+        let mut conn = self.connection().await?;
+        let refreshed: i64 = redis::cmd("EVAL")
+            .arg(REFRESH_LUA)
+            .arg(1)
+            .arg(self.key(key))
+            .arg(owner)
+            .arg(ttl.as_millis() as u64)
+            .query_async(&mut conn)
+            .await
+            .map_err(|e| CacheError::Store(format!("Redis lock refresh failed: {}", e)))?;
+        Ok(refreshed > 0)
     }
 }
 
@@ -307,5 +383,57 @@ mod tests {
         };
         assert_eq!(store.name(), "redis");
         assert!(RedisStore::new("redis", "not-a-url", "").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_redis_locks() {
+        let Some(store) = maybe_store().await else {
+            return;
+        };
+        let lock_store = store.as_lock_store().unwrap();
+        let owner_a = "owner-a";
+        let owner_b = "owner-b";
+
+        assert!(lock_store
+            .acquire("lock1", owner_a, Duration::from_secs(60))
+            .await
+            .unwrap());
+        // Second owner is blocked, and only the holder may release.
+        assert!(!lock_store
+            .acquire("lock1", owner_b, Duration::from_secs(60))
+            .await
+            .unwrap());
+        assert!(!lock_store.release("lock1", owner_b).await.unwrap());
+        assert!(lock_store.release("lock1", owner_a).await.unwrap());
+        assert!(lock_store
+            .acquire("lock1", owner_b, Duration::from_secs(60))
+            .await
+            .unwrap());
+
+        // refresh keeps the lock alive for the holder only.
+        assert!(lock_store
+            .refresh("lock1", owner_b, Duration::from_secs(120))
+            .await
+            .unwrap());
+        assert!(!lock_store
+            .refresh("lock1", owner_a, Duration::from_secs(120))
+            .await
+            .unwrap());
+
+        // force_release ignores the owner.
+        assert!(lock_store.force_release("lock1").await.unwrap());
+        assert!(!lock_store.force_release("lock1").await.unwrap());
+
+        // Expiry: a 100ms lock must be free after 300ms.
+        assert!(lock_store
+            .acquire("short", owner_a, Duration::from_millis(100))
+            .await
+            .unwrap());
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(lock_store
+            .acquire("short", owner_b, Duration::from_secs(60))
+            .await
+            .unwrap());
+        let _ = lock_store.force_release("short").await;
     }
 }

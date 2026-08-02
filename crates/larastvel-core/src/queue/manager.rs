@@ -66,11 +66,16 @@ impl QueueManager {
         }
     }
 
-    /// Dispatch a job to its routed queue (or the default queue).
+    /// Dispatch a job to its routed queue (or the default queue), honoring
+    /// the job's `delay_seconds()` (Laravel's `#[Delay]` attribute) when set.
     pub async fn dispatch<J: ShouldQueue + 'static>(&self, job: J) -> Result<(), JobError> {
         let name = job.name().to_string();
+        let delay = job.delay_seconds();
         let queue = self.routed_queue(&name)?;
         let boxed: JobBox = Box::new(job);
-        queue.push(boxed).await
+        match delay {
+            Some(seconds) if seconds > 0 => queue.push_delayed(boxed, seconds).await,
+            _ => queue.push(boxed).await,
+        }
     }
 }

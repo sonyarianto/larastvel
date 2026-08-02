@@ -35,10 +35,10 @@ SendWelcomeEmailJob::new(42).dispatch().await?;
 
 ### Job Attributes
 
-Matching Laravel's `#[Tries]`, `#[Backoff]`, `#[Timeout]`, and `#[FailOnTimeout]`, the `#[job]` macro accepts tuning attributes:
+Matching Laravel's `#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`, and `#[Delay]`, the `#[job]` macro accepts tuning attributes:
 
 ```rust
-#[job(tries = 3, backoff = 5, timeout = 30, fail_on_timeout)]
+#[job(tries = 3, backoff = 5, timeout = 30, fail_on_timeout, delay = 60)]
 async fn send_welcome_email(user_id: i32) -> Result<(), JobError> {
     // ...
 }
@@ -50,8 +50,9 @@ async fn send_welcome_email(user_id: i32) -> Result<(), JobError> {
 | `backoff` | none (0) | Seconds to wait before retrying after a failure; 0 when unset |
 | `timeout` | none | Job runs longer than this (seconds) are killed and retried (or failed with `fail_on_timeout`); no timeout when unset |
 | `fail_on_timeout` | off | Treat a timeout as a permanent failure instead of a retry |
+| `delay` | none (0) | Seconds to wait before the job becomes available (Laravel 13.22 `#[Delay]` parity); the queue honors it via `Queue::push_delayed()` |
 
-The worker enforces these: timed-out jobs stop executing, failed jobs with attempts remaining are re-released after the backoff delay, and jobs past `tries` are marked permanently failed.
+The worker enforces these: timed-out jobs stop executing, failed jobs with attempts remaining are re-released after the backoff delay, and jobs past `tries` are marked permanently failed. Delayed jobs stay in the queue until `delay` seconds after dispatch — `InMemoryQueue` holds them until their `available_at` time, so a delayed job cannot be popped early.
 
 ## Dispatching
 

@@ -46,6 +46,11 @@ pub trait ShouldQueue: Send + Sync + std::fmt::Debug {
     fn fail_on_timeout(&self) -> bool {
         false
     }
+    /// Seconds to wait before the job becomes available, mirroring Laravel's
+    /// `#[Delay]` attribute. `None` (the default) dispatches immediately.
+    fn delay_seconds(&self) -> Option<u64> {
+        None
+    }
 }
 
 pub type JobBox = Box<dyn ShouldQueue>;
@@ -53,6 +58,13 @@ pub type JobBox = Box<dyn ShouldQueue>;
 #[async_trait]
 pub trait Queue: Send + Sync + std::fmt::Debug {
     async fn push(&self, job: JobBox) -> Result<(), JobError>;
+    /// Push a job that must not be processed before `delay_seconds` have
+    /// elapsed. The default implementation pushes immediately; backends
+    /// that support delayed delivery override this.
+    async fn push_delayed(&self, job: JobBox, delay_seconds: u64) -> Result<(), JobError> {
+        let _ = delay_seconds;
+        self.push(job).await
+    }
     /// Pop the next available job together with the number of attempts it has
     /// already consumed (including this one).
     async fn pop(&self) -> Option<(JobBox, u64)>;
@@ -738,6 +750,36 @@ mod tests {
         assert_eq!(<PlainJob as ShouldQueue>::backoff_seconds(&job), None);
         assert_eq!(<PlainJob as ShouldQueue>::timeout_seconds(&job), None);
         assert!(!<PlainJob as ShouldQueue>::fail_on_timeout(&job));
+        assert_eq!(<PlainJob as ShouldQueue>::delay_seconds(&job), None);
+    }
+
+    #[tokio::test]
+    async fn test_job_macro_delay_attribute() {
+        #[job(delay = 60)]
+        async fn delayed_job() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        let job = DelayedJob::new();
+        assert_eq!(<DelayedJob as ShouldQueue>::delay_seconds(&job), Some(60));
+    }
+
+    #[tokio::test]
+    async fn test_queue_manager_dispatch_honors_delay() {
+        let mut manager = QueueManager::new("default");
+        let queue = InMemoryQueue::new("default");
+        manager.register("default", queue.clone());
+        manager.set_default("default");
+
+        #[job(delay = 3600)]
+        async fn later_job() -> Result<(), JobError> {
+            Ok(())
+        }
+
+        manager.dispatch(LaterJob::new()).await.unwrap();
+        // Not available yet — pop must return None and keep the job queued.
+        assert!(queue.pop().await.is_none());
+        assert_eq!(queue.count().await, 1);
     }
 
     #[tokio::test]

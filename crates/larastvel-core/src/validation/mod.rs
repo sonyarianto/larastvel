@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use self::rules::check_rule;
 pub use self::rules::{
-    custom, exists, unique, unique_except, Rule, ValidationError, ValidationRule,
+    base64, custom, exists, unique, unique_except, Rule, ValidationError, ValidationRule,
 };
 
 #[derive(Debug, Clone)]
@@ -287,6 +287,30 @@ mod tests {
             let d = data(vec![("email", json!("not-an-email"))]);
             let err = validate(&d, vec![("email", vec![rules::email()])]).unwrap_err();
             assert!(err.has("email"));
+        }
+    }
+
+    mod base64 {
+        use super::*;
+
+        #[test]
+        fn passes_canonical_base64() {
+            let d = data(vec![("token", json!("aGVsbG8="))]);
+            assert!(validate(&d, vec![("token", vec![rules::base64()])]).is_ok());
+        }
+
+        #[test]
+        fn fails_missing_padding() {
+            let d = data(vec![("token", json!("aGVsbG8"))]);
+            let err = validate(&d, vec![("token", vec![rules::base64()])]).unwrap_err();
+            assert!(err.has("token"));
+        }
+
+        #[test]
+        fn fails_random_string() {
+            let d = data(vec![("token", json!("not-base64!!"))]);
+            let err = validate(&d, vec![("token", vec![rules::base64()])]).unwrap_err();
+            assert!(err.has("token"));
         }
     }
 

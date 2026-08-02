@@ -1,14 +1,17 @@
 pub mod array;
 pub mod database;
 pub mod file;
+pub mod lock;
 pub mod redis;
 
+pub use lock::{ArrayLockStore, Lock, LockStore};
 pub use redis::RedisStore;
 
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -168,6 +171,12 @@ pub trait CacheStore: Send + Sync + std::fmt::Debug {
     }
 
     fn name(&self) -> &str;
+
+    /// Return a [`LockStore`] view of this store when it supports atomic
+    /// locks (array, redis). Stores without lock support return `None`.
+    fn as_lock_store(&self) -> Option<Arc<dyn LockStore>> {
+        None
+    }
 }
 
 /// Manager for multiple cache stores.
@@ -210,6 +219,74 @@ impl CacheManager {
 
     pub fn store_names(&self) -> Vec<String> {
         self.stores.keys().cloned().collect()
+    }
+
+    /// Create a [`Lock`] on the default store. The store must support locks
+    /// (array or redis); returns [`CacheError::Store`] otherwise.
+    ///
+    /// Mirrors Laravel's `Cache::lock('key', $seconds)`.
+    pub fn lock(&self, key: &str, ttl: Duration) -> Result<Lock, CacheError> {
+        self.store_lock(&self.default, key, ttl)
+    }
+
+    /// Create a [`Lock`] on a named store.
+    pub fn store_lock(&self, name: &str, key: &str, ttl: Duration) -> Result<Lock, CacheError> {
+        let store = self.store(name)?;
+        let lock_store = store
+            .as_lock_store()
+            .ok_or_else(|| CacheError::Store(format!("store '{name}' does not support locks")))?;
+        Ok(Lock::new(lock_store, key, ttl))
+    }
+
+    /// Acquire a lock (blocking up to `wait`), run `callback` while holding
+    /// it, then release. Mirrors Laravel's `Cache::withLock($key, $callback,
+    /// $seconds)`.
+    pub async fn with_lock<F, Fut, T>(
+        &self,
+        key: &str,
+        ttl: Duration,
+        wait: Duration,
+        callback: F,
+    ) -> Result<T, CacheError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = T>,
+    {
+        let lock = self.lock(key, ttl)?;
+        if !lock.block(wait).await? {
+            return Err(CacheError::Store(format!(
+                "timed out waiting for lock '{key}'"
+            )));
+        }
+        let result = callback().await;
+        let _ = lock.release().await;
+        Ok(result)
+    }
+
+    /// When the lock is free, run `callback` while holding it; when another
+    /// process holds the lock, return the previously cached value instead.
+    /// The callback is responsible for storing its own result via the cache
+    /// (Laravel's `Cache::getLocked($key, $callback, $seconds)`).
+    pub async fn get_locked<F, Fut>(
+        &self,
+        key: &str,
+        ttl: Duration,
+        callback: F,
+    ) -> Result<String, CacheError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = String>,
+    {
+        let lock = self.lock(key, ttl)?;
+        if lock.get().await? {
+            let result = callback().await;
+            let _ = lock.release().await;
+            Ok(result)
+        } else {
+            self.get(key)
+                .await?
+                .ok_or_else(|| CacheError::KeyNotFound(key.to_string()))
+        }
     }
 
     /// Convenience: get from the default store.
@@ -407,6 +484,117 @@ mod tests {
         manager.register("second", ArrayStore::new("second"));
         manager.set_default("second");
         assert_eq!(manager.default_name(), "second");
+    }
+
+    #[tokio::test]
+    async fn test_manager_lock_mutual_exclusion() {
+        let manager = setup_manager();
+        let a = manager.lock("job-lock", Duration::from_secs(30)).unwrap();
+        assert!(a.get().await.unwrap());
+        assert!(!manager
+            .lock("job-lock", Duration::from_secs(30))
+            .unwrap()
+            .get()
+            .await
+            .unwrap());
+        assert!(a.release().await.unwrap());
+        assert!(manager
+            .lock("job-lock", Duration::from_secs(30))
+            .unwrap()
+            .get()
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_manager_lock_unlock_returns_none() {
+        let manager = setup_manager();
+        assert!(manager.lock("no-key", Duration::from_secs(1)).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_manager_lock_times_out() {
+        let manager = setup_manager();
+        let a = manager.lock("busy", Duration::from_secs(30)).unwrap();
+        a.get().await.unwrap();
+        assert!(!manager
+            .lock("busy", Duration::from_secs(1))
+            .unwrap()
+            .block(Duration::from_millis(300))
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_manager_with_lock_runs_callback_once() {
+        let manager = setup_manager();
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+
+        let result = manager
+            .with_lock(
+                "with-lock",
+                Duration::from_secs(30),
+                Duration::from_secs(2),
+                || async {
+                    calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    "done".to_string()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(result, "done");
+
+        let result = manager
+            .with_lock(
+                "with-lock",
+                Duration::from_secs(30),
+                Duration::from_secs(2),
+                || async { "again".to_string() },
+            )
+            .await
+            .unwrap();
+        assert_eq!(result, "again");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_manager_with_lock_times_out() {
+        let manager = setup_manager();
+        let a = manager.lock("busy-lock", Duration::from_secs(30)).unwrap();
+        a.get().await.unwrap();
+        assert!(manager
+            .with_lock(
+                "busy-lock",
+                Duration::from_secs(30),
+                Duration::from_millis(200),
+                || async { "nope".to_string() },
+            )
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn test_manager_get_locked() {
+        let manager = setup_manager();
+        let cache = manager.clone();
+
+        // Free lock: the callback runs, caches its own result, and holds the
+        // lock while it works.
+        let first = manager.get_locked("expensive", Duration::from_secs(5), || async {
+            cache.set("expensive", "value", Some(30)).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            "value".to_string()
+        });
+
+        // Held lock: the concurrent call returns the cached value instead of
+        // running the callback.
+        let second = manager.get_locked("expensive", Duration::from_secs(5), || async {
+            "recomputed".to_string()
+        });
+
+        let (first, second) = tokio::join!(first, second);
+        assert_eq!(first.unwrap(), "value");
+        assert_eq!(second.unwrap(), "value");
     }
 
     #[tokio::test]

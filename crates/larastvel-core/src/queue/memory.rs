@@ -47,6 +47,16 @@ impl Queue for InMemoryQueue {
         Ok(())
     }
 
+    async fn push_delayed(&self, job: JobBox, delay_seconds: u64) -> Result<(), JobError> {
+        let mut jobs = self.jobs.lock().unwrap();
+        jobs.push_back(Entry {
+            job,
+            attempts: 0,
+            available_at: Instant::now() + Duration::from_secs(delay_seconds),
+        });
+        Ok(())
+    }
+
     async fn pop(&self) -> Option<(JobBox, u64)> {
         let now = Instant::now();
         let mut jobs = self.jobs.lock().unwrap();

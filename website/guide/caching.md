@@ -84,3 +84,42 @@ cache.clear().await?;
 ## Prefix
 
 All keys are automatically prefixed with the configured `prefix` to avoid collisions with other applications sharing the same store.
+
+## Atomic locks
+
+`CacheManager` provides Laravel-style atomic locks backed by a store's
+`LockStore` (array and redis). Redis locks use `SET NX PX` and a Lua
+compare-and-release, so cross-process mutual exclusion is safe:
+
+```rust
+use std::time::Duration;
+
+let cache = CacheManager::new("array");
+
+// Acquire/release manually
+let lock = cache.lock("deploy", Duration::from_secs(60))?;
+if lock.get().await? {
+    // only one process reaches this
+    lock.release().await?;
+}
+
+// Block up to 5s for the lock, run the callback, release
+cache
+    .with_lock("payout", Duration::from_secs(30), Duration::from_secs(5), || async {
+        process_payouts().await
+    })
+    .await?;
+
+// Run the callback only when the lock is free, otherwise return the
+// cached value (the callback stores its own result)
+cache
+    .get_locked("expensive", Duration::from_secs(30), || async {
+        let value = expensive_computation().await;
+        cache.set("expensive", &value, Some(30)).await?;
+        Ok(value)
+    })
+    .await?;
+```
+
+`Lock::block(timeout)` polls every 100 ms; `Lock::refresh()` extends the TTL
+(Laravel 13.17 parity), and `Lock::force_release()` breaks a stale lock.
