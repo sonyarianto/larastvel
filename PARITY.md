@@ -44,7 +44,7 @@ side-by-side comparison.
 | Pagination default | 25 per page (Laravel 13 default) | ✅ |
 | JSON:API resources (relationship inclusion, sparse fieldsets, links) | `JsonApiResource` trait + `JsonApiItem` / `JsonApiCollection` — `?include=` compound documents, `?fields[type]=` sparse fieldsets, `when_included()`, `application/vnd.api+json` | ✅ |
 | AI SDK foundation — text generation, streaming, structured output, embeddings | `Ai` facade + `AiProvider` trait — `generate()`, `chat()`, `chat_stream()`, `structured()`, `embed()` with 30-day caching, OpenAI-compatible HTTP provider, `FakeAi` for tests | ✅ |
-| AI SDK agents / media (agents, images, audio, TTS/STT, vector stores, reranking) | `Ai::agent()` — persona prompt, `AgentTool` tool calling loop (JSON-schema tools, error recovery, turn limit), `AgentTask` / `AgentResult` / `AgentTaskStatus`; media (images, audio, TTS/STT) pending | 🔶 Partial |
+| AI SDK agents / media (agents, images, audio, TTS/STT, vector stores, reranking) | `Ai::agent()` — persona prompt, `AgentTool` tool calling loop (JSON-schema tools, error recovery, turn limit), `AgentTask` / `AgentResult` / `AgentTaskStatus`; failover via `chat_with_fallback()` / `generate_with_fallback()`; media (images, audio, TTS/STT) pending | 🔶 Partial |
 
 ## Laravel 13 gaps (not yet implemented)
 

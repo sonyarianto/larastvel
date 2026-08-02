@@ -175,6 +175,34 @@ Details:
 - **Agent model**: `using_model()` overrides the provider's default for
   that agent only.
 
+## Failover
+
+Wrap a call with a fallback that runs only when the primary provider fails —
+Laravel's `withFallback(...)`:
+
+```rust
+use std::sync::Arc;
+use larastvel_core::ai::{Ai, Message, OpenAICompatibleProvider};
+
+let response = ai
+    .chat_with_fallback(&[Message::user("Hi")], |error| async move {
+        tracing::warn!("primary failed: {error}");
+        let backup = OpenAICompatibleProvider::new(
+            "https://api.anthropic.com/v1", key, "claude-3-5-sonnet", "embed",
+        );
+        Ai::new(Arc::new(backup)).chat(&[Message::user("Hi")]).await
+    })
+    .await?;
+
+let text = ai
+    .generate_with_fallback("Summarize this", |_| async { Ok("fallback".into()) })
+    .await?;
+```
+
+The fallback receives the primary `ProviderError` and returns a full result;
+if it fails too, its error propagates. Streaming requests have no fallback
+variant — failure can surface mid-stream.
+
 ## Custom Providers
 
 Implement `AiProvider` (chat, `chat_stream`, `embed`, `embed_many`) and

@@ -195,6 +195,52 @@ impl Ai {
         self.provider.chat(messages, &options).await
     }
 
+    /// Complete a chat conversation, falling back to another call when the
+    /// primary provider fails — Laravel's `withFallback(...)`.
+    ///
+    /// The fallback receives the primary error and returns a full
+    /// `ChatResponse` (e.g. from a secondary provider):
+    ///
+    /// ```rust,ignore
+    /// let response = ai
+    ///     .chat_with_fallback(&[Message::user("Hi")], |error| async move {
+    ///         let backup = OpenAICompatibleProvider::new("https://…", key, "m", "e");
+    ///         Ai::new(Arc::new(backup)).chat(&[Message::user("Hi")]).await
+    ///     })
+    ///     .await?;
+    /// ```
+    pub async fn chat_with_fallback<F, Fut>(
+        &self,
+        messages: &[Message],
+        fallback: F,
+    ) -> Result<ChatResponse, ProviderError>
+    where
+        F: FnOnce(ProviderError) -> Fut,
+        Fut: std::future::Future<Output = Result<ChatResponse, ProviderError>>,
+    {
+        match self.chat(messages).await {
+            Ok(response) => Ok(response),
+            Err(error) => fallback(error).await,
+        }
+    }
+
+    /// Generate text from a single prompt, with a fallback when the primary
+    /// provider fails — Laravel's `withFallback(...)`.
+    pub async fn generate_with_fallback<F, Fut>(
+        &self,
+        prompt: &str,
+        fallback: F,
+    ) -> Result<String, ProviderError>
+    where
+        F: FnOnce(ProviderError) -> Fut,
+        Fut: std::future::Future<Output = Result<String, ProviderError>>,
+    {
+        match self.generate(prompt).await {
+            Ok(text) => Ok(text),
+            Err(error) => fallback(error).await,
+        }
+    }
+
     /// Stream a chat conversation, yielding incremental text chunks.
     pub async fn chat_stream(&self, messages: &[Message]) -> Result<ChatStream, ProviderError> {
         let options = ChatOptions {
@@ -304,7 +350,51 @@ fn embedding_cache_key(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::async_trait;
     use crate::cache::CacheManager;
+
+    /// A provider that always fails, for exercising fallback behaviour.
+    #[derive(Debug)]
+    struct FailingProvider;
+
+    #[async_trait]
+    impl AiProvider for FailingProvider {
+        fn name(&self) -> &str {
+            "failing"
+        }
+
+        async fn chat(
+            &self,
+            _messages: &[Message],
+            _options: &ChatOptions,
+        ) -> Result<ChatResponse, ProviderError> {
+            Err(ProviderError::Request("primary is down".into()))
+        }
+
+        async fn chat_stream(
+            &self,
+            _messages: &[Message],
+            _options: &ChatOptions,
+        ) -> Result<ChatStream, ProviderError> {
+            Err(ProviderError::Request("primary is down".into()))
+        }
+
+        async fn embed(
+            &self,
+            _input: &str,
+            _options: &EmbeddingOptions,
+        ) -> Result<Vec<f32>, ProviderError> {
+            Err(ProviderError::Request("primary is down".into()))
+        }
+
+        async fn embed_many(
+            &self,
+            _inputs: &[String],
+            _options: &EmbeddingOptions,
+        ) -> Result<Vec<Vec<f32>>, ProviderError> {
+            Err(ProviderError::Request("primary is down".into()))
+        }
+    }
 
     #[tokio::test]
     async fn test_generate_and_chat_with_fake() {
@@ -358,6 +448,80 @@ mod tests {
                 temp: 31
             }
         );
+    }
+
+    #[tokio::test]
+    async fn test_chat_with_fallback_primary_wins() {
+        let fake = Arc::new(FakeAi::new());
+        fake.add_response("primary");
+        let ai = Ai::new(fake.clone());
+
+        let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let called_clone = called.clone();
+        let response = ai
+            .chat_with_fallback(&[Message::user("Hi")], move |_error| {
+                called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+                async { Err(ProviderError::Request("fallback".into())) }
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.text, "primary");
+        assert!(!called.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn test_chat_with_fallback_used_on_failure() {
+        let ai = Ai::new(Arc::new(FailingProvider));
+
+        let response = ai
+            .chat_with_fallback(&[Message::user("Hi")], |error| async move {
+                assert_eq!(error.to_string(), "AI provider error: primary is down");
+                Ok(ChatResponse {
+                    text: "fallback answer".into(),
+                    usage: None,
+                    finish_reason: Some("stop".into()),
+                    tool_calls: Vec::new(),
+                })
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.text, "fallback answer");
+    }
+
+    #[tokio::test]
+    async fn test_chat_with_fallback_error_propagates() {
+        let ai = Ai::new(Arc::new(FailingProvider));
+
+        let error = ai
+            .chat_with_fallback(&[Message::user("Hi")], |_error| async {
+                Err(ProviderError::Request("backup is down too".into()))
+            })
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "AI provider error: backup is down too");
+    }
+
+    #[tokio::test]
+    async fn test_generate_with_fallback() {
+        let fake = Arc::new(FakeAi::new());
+        fake.add_response("primary text");
+        let ai = Ai::new(fake.clone());
+
+        let text = ai
+            .generate_with_fallback("Hi", |_error| async { Ok("fallback text".to_string()) })
+            .await
+            .unwrap();
+        assert_eq!(text, "primary text");
+
+        let ai = Ai::new(Arc::new(FailingProvider));
+        let text = ai
+            .generate_with_fallback("Hi", |_error| async { Ok("fallback text".to_string()) })
+            .await
+            .unwrap();
+        assert_eq!(text, "fallback text");
     }
 
     #[tokio::test]
