@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.2.1 (2026-08-02)
+
+### ✨ New
+- **AI SDK foundation** (Laravel `laravel/ai` parity, Phase 1): `Ai` facade with `generate()`, `chat()`, `chat_stream()`, `structured()`, `embed()`/`embed_many()`; `AiProvider` trait; OpenAI-compatible HTTP provider (chat completions, SSE streaming, embeddings); embeddings cached for 30 days via `CacheManager`; `FakeAi` for tests
+- **JSON:API resources**: `JsonApiResource` trait + `JsonApiItem`/`JsonApiCollection` — `?include=` compound documents, `?fields[type]=` sparse fieldsets, `when_included()`/`when_not_included()`, `application/vnd.api+json`, `#[json_api_resource]` macro
+- **Vector search** (pgvector): `VectorSimilarityQuery` with cosine / L2 / inner-product operators
+- **Origin-aware CSRF** (`PreventRequestForgery` parity): `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()`
+- **Queue routing**: `QueueManager::route()` / `unroute()`, and job attributes `#[job(tries, backoff, timeout, fail_on_timeout)]` enforced by the worker
+- **`Cache::touch()`**; pagination default raised to 25
+- **16 new attribute macros**: `#[route]`, `#[can]`, `#[table]`, `#[job]`, `#[queued_listener]`, `#[scope]`, `#[observer]`, `#[notification]`, `#[rule]`, `#[command]`, `#[policy]`, `#[seeder]`, `#[factory]`, `#[api_resource]`, `#[provider]`, `#[broadcast_event]`, `#[mail]`
+- **`Pipeline`** data transformation workflows; `Str`, `Arr`, `Number`, `Stringable` helpers; Prompt CLI helpers; criterion benchmarks
+
+### 🔧 Changed
+- `Config::get()` now resolves dotted paths through nested config sections (e.g. `ai.provider`)
+- CLI make-target help and docs use `make <target>` (clap subcommand form) instead of `make:<target>`
+- `larastvel new` scaffold: routes + database modules generated under `src/`, routes wired into the router, migrations run at boot
+
+### 🐛 Fixed
+- `larastvel new` scaffold did not compile — `mod routes;` pointed at a root-level `routes/` directory that was never a Rust module; unused imports removed
+- Generated projects now compile against the current API (requires republish — this release)
+- `proc-macro-error2` future-incompat warning dropped (`sea-bae 0.2.2`)
+- Docs drift sweep: 28 files — every code example verified against the actual source (auth, authorization, broadcasting, caching, database, encryption, errors, localization, migrations, pagination, passwords, pipeline, queues, rate-limiting, routing, scheduling, session, sms, testing, views, seeders, policies, CLI reference, parity)
+
+### 📚 Docs
+- New JSON:API resources reference page
+- Website parity sweep: pagination, queues (job attributes + routing), session (origin verification), caching guides updated to the real APIs
+
 ## v0.2.0 (2026-06-14)
 
 ### 🚀 First crates.io release

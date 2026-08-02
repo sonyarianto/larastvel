@@ -1,5 +1,7 @@
 # Quick Start
 
+Current release: **v0.2.1** — see the [Releases](/reference/versions) page.
+
 ## Installation
 
 ### Scaffold a new project
