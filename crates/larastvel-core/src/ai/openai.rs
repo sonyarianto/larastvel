@@ -99,6 +99,10 @@ impl OpenAICompatibleProvider {
                 }),
             };
         }
+        if !options.tools.is_empty() {
+            body["tools"] = serde_json::to_value(&options.tools).unwrap_or_default();
+            body["tool_choice"] = json!("auto");
+        }
         if streaming {
             body["stream"] = json!(true);
         }
@@ -153,11 +157,13 @@ impl AiProvider for OpenAICompatibleProvider {
             .get("usage")
             .cloned()
             .and_then(|usage| serde_json::from_value(usage).ok());
+        let tool_calls = parse_tool_calls(&result);
 
         Ok(ChatResponse {
             text,
             usage,
             finish_reason,
+            tool_calls,
         })
     }
 
@@ -275,6 +281,27 @@ fn parse_embedding(result: &Value) -> Option<Vec<f32>> {
             .map(|v| v as f32)
             .collect()
     })
+}
+
+fn parse_tool_calls(result: &Value) -> Vec<super::messages::ToolCall> {
+    result["choices"][0]["message"]["tool_calls"]
+        .as_array()
+        .map(|calls| {
+            calls
+                .iter()
+                .filter_map(|call| {
+                    Some(super::messages::ToolCall {
+                        id: call["id"].as_str()?.to_string(),
+                        name: call["function"]["name"].as_str()?.to_string(),
+                        arguments: match &call["function"]["arguments"] {
+                            Value::String(raw) => serde_json::from_str(raw).unwrap_or(Value::Null),
+                            other => other.clone(),
+                        },
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 enum SseLine {

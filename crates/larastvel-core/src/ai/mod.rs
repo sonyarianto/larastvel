@@ -19,14 +19,19 @@
 //! let embedding = ai.embed("search this text").await?;
 //! ```
 
+mod agent;
 mod fake;
 mod messages;
 mod openai;
 mod provider;
 
+pub use agent::{
+    Agent, AgentResult, AgentTask, AgentTaskStatus, AgentTool, ToolError, DEFAULT_AGENT_MAX_TURNS,
+};
 pub use fake::FakeAi;
 pub use messages::{
-    ChatOptions, ChatResponse, EmbeddingOptions, Message, ResponseFormat, Role, Usage,
+    ChatOptions, ChatResponse, EmbeddingOptions, Message, ResponseFormat, Role, ToolCall,
+    ToolDefinition, Usage,
 };
 pub use openai::OpenAICompatibleProvider;
 pub use provider::{AiProvider, ChatStream, ProviderError};
@@ -252,6 +257,18 @@ impl Ai {
             model: self.default_embedding_model.clone(),
         };
         self.provider.embed_many(inputs, &options).await
+    }
+
+    /// Create an AI agent — Laravel's `Ai::agent('name')`. The agent inherits
+    /// this manager's provider and default model; configure it with
+    /// [`Agent::prompt`], [`Agent::using_tools`], and [`Agent::using_model`],
+    /// then run it with [`Agent::ask`].
+    pub fn agent(&self, name: impl Into<String>) -> Agent {
+        let mut agent = Agent::new(name, self.provider.clone());
+        if let Some(model) = &self.default_model {
+            agent = agent.using_model(model.clone());
+        }
+        agent
     }
 }
 

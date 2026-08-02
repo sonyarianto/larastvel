@@ -44,13 +44,13 @@ side-by-side comparison.
 | Pagination default | 25 per page (Laravel 13 default) | ✅ |
 | JSON:API resources (relationship inclusion, sparse fieldsets, links) | `JsonApiResource` trait + `JsonApiItem` / `JsonApiCollection` — `?include=` compound documents, `?fields[type]=` sparse fieldsets, `when_included()`, `application/vnd.api+json` | ✅ |
 | AI SDK foundation — text generation, streaming, structured output, embeddings | `Ai` facade + `AiProvider` trait — `generate()`, `chat()`, `chat_stream()`, `structured()`, `embed()` with 30-day caching, OpenAI-compatible HTTP provider, `FakeAi` for tests | ✅ |
-| AI SDK agents / media (agents, images, audio, TTS/STT, vector stores, reranking) | — | ❌ Missing (next phase) |
+| AI SDK agents / media (agents, images, audio, TTS/STT, vector stores, reranking) | `Ai::agent()` — persona prompt, `AgentTool` tool calling loop (JSON-schema tools, error recovery, turn limit), `AgentTask` / `AgentResult` / `AgentTaskStatus`; media (images, audio, TTS/STT) pending | 🔶 Partial |
 
 ## Laravel 13 gaps (not yet implemented)
 
 | Laravel 13 Feature | Larastvel Equivalent | Status |
 |---|---|---|
-| Laravel AI SDK (agents, embeddings, audio, images, vector stores) | `Ai` facade foundation — generation, streaming, structured output, embeddings with caching; agents/media pending | 🔶 Partial |
+| Laravel AI SDK (agents, embeddings, audio, images, vector stores) | `Ai` facade + agents with tool calling — generation, streaming, structured output, embeddings with caching; media (images, audio, TTS/STT, reranking, vector stores) pending | 🔶 Partial |
 | Semantic / vector search (`whereVectorSimilarTo()`, pgvector) | `VectorSimilarityQuery` — cosine / L2 / inner product on `Select<E>` | ✅ |
 | `PreventRequestForgery` (origin-aware CSRF) | `Sec-Fetch-Site` origin verification, `allow_same_site()` / `use_origin_only()` | ✅ |
 | Job attributes (`#[Tries]`, `#[Backoff]`, `#[Timeout]`, `#[FailOnTimeout]`) | `#[job(tries, backoff, timeout, fail_on_timeout)]` with worker retry, delay, timeout enforcement | ✅ |

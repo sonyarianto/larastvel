@@ -5,9 +5,9 @@ a unified, provider-agnostic interface for text generation (with streaming
 and structured output) and embeddings, plus testing fakes.
 
 The foundation is implemented: `Ai` facade, `AiProvider` trait, an
-OpenAI-compatible HTTP provider, 30-day embedding caching, and `FakeAi`.
-Agents and media (images, audio, TTS/STT, reranking, vector stores) are the
-next phase.
+OpenAI-compatible HTTP provider, agents with tool calling, 30-day embedding
+caching, and `FakeAi`. Media (images, audio, TTS/STT, reranking, vector
+stores) is the next phase.
 
 ## Configuration
 
@@ -122,6 +122,59 @@ Embeddings are cached for 30 days when `ai.caching.embeddings.cache` is
 enabled, so identical inputs never hit the provider twice. Pair embeddings
 with `VectorSimilarityQuery` for semantic search.
 
+## Agents
+
+Agents wrap a provider with a persona prompt, an optional model, and tools
+the model can call — Laravel 13's `Ai::agent(...)->ask(...)`:
+
+```rust
+use std::sync::Arc;
+use larastvel_core::ai::{AgentTool, Ai};
+use serde_json::Value;
+
+let ai = Ai::from_config(&config)?;
+
+let tool = AgentTool::from("get_weather", "Get the weather for a city.")
+    .with_parameters(serde_json::json!({
+        "type": "object",
+        "properties": { "city": { "type": "string" } },
+        "required": ["city"],
+    }))
+    .using(|arguments: Value| {
+        let city = arguments["city"].as_str().unwrap_or("Jakarta");
+        Ok(serde_json::json!({ "city": city, "temp": 31 }))
+    });
+
+let agent = ai
+    .agent("weather")
+    .prompt("You are a helpful weather assistant.")
+    .using_tools(vec![tool])
+    .using_model("gpt-4o");
+
+let task = agent.ask("What is the weather in Jakarta?").await?;
+
+println!("{}", task.completion());   // the agent's final answer
+```
+
+`Agent::ask` runs the tool-calling loop: the model may request tool calls,
+the framework executes them, feeds results back into the conversation, and
+repeats until the model produces a final completion. Each run returns an
+`AgentTask` with `id()`, `status()` (`AgentTaskStatus`), `messages()`, and
+`result()` (`AgentResult::completion`). `Agent::run` is the Laravel 12
+compatibility alias.
+
+Details:
+
+- **Tool handlers** receive the parsed JSON arguments and return a JSON
+  value. Returning `Err(ToolError::new(name, msg))` feeds the error text
+  back into the conversation so the model can recover; unknown tool names
+  are likewise surfaced as tool messages.
+- **Turn limit**: agents stop after 10 model turns by default (guarding
+  against a model that never stops calling tools) — configure with
+  `with_max_turns(n)`.
+- **Agent model**: `using_model()` overrides the provider's default for
+  that agent only.
+
 ## Custom Providers
 
 Implement `AiProvider` (chat, `chat_stream`, `embed`, `embed_many`) and
@@ -145,7 +198,8 @@ is the built-in HTTP provider; use it directly for full control.
 
 ## Testing with FakeAi
 
-`Ai::fake()` returns an `Ai` backed by a `FakeAi` — no network needed:
+`Ai::fake()` returns an `Ai` backed by a `FakeAi` — no network needed.
+Fakes ignore tool definitions, so agent runs complete in a single turn:
 
 ```rust
 use std::sync::Arc;
@@ -159,6 +213,10 @@ let ai = Ai::new(fake.clone());
 
 assert_eq!(ai.generate("Say hi").await.unwrap(), "Hello, world!");
 fake.assert_call_count(1);
+
+// Agents work against the fake too — one turn, canned completion.
+let task = ai.agent("greeter").ask("Hi").await.unwrap();
+assert_eq!(task.completion(), "Hello, world!");
 
 // When the queue is empty, the fake answers with "Fake response".
 ```

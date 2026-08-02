@@ -93,6 +93,7 @@ impl AiProvider for FakeAi {
             text: self.next_response(),
             usage: None,
             finish_reason: Some("stop".into()),
+            tool_calls: Vec::new(),
         })
     }
 
