@@ -70,6 +70,14 @@ cd website && npm run build
   actual source. When APIs change, sweep `website/guide/*.md`,
   `website/reference/*.md`, `README.md`, and `CHANGELOG.md` for stale symbols
   (this has bitten the project before — see the v0.2.1 docs drift sweep).
+- **Automated guard — `scripts/docs-audit.sh`** (runs on every `pre-commit`
+  and `pre-push` via lefthook, fails on stale refs): every
+  `larastvel_core::<module>::<symbol>` path and every CLI command in the
+  docs (`website/`, `README.md`, `PARITY.md`) must resolve to a real symbol
+  in the source. When you document a new API, run it to confirm; when you
+  rename/remove a public symbol or CLI command, it will flag the docs.
+  It is the inverse of the parity audit: parity checks the source against
+  claimed features; the docs audit checks the docs against the source.
 - Sidebar entries are in `website/.vitepress/config.mts`.
 - The version shown in the docs nav (`v0.2.1`) is updated on every release —
   see `website/reference/versions.md`.

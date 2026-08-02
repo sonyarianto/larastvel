@@ -124,3 +124,38 @@ queue.ensure_table_exists().await?;
 ```
 
 The `JobResolver` receives the job class name and the raw payload string, and returns the reconstructed job (or `None` if the class is unknown). Note that `DatabaseQueue::push` currently serializes only the job name — job arguments are not persisted, so the resolver must reconstruct the job with the values it needs.
+
+## Failed Jobs
+
+When a job exhausts its attempts (or times out with `fail_on_timeout`), the worker records it in a `failed_jobs` table instead of dropping it silently.
+
+```rust
+use larastvel_core::queue::{DatabaseQueue, FailedJobStore};
+
+// Enable failed-job recording on the database queue
+let queue = DatabaseQueue::new("default", db, resolver)
+    .with_table("jobs")
+    .with_failed_table("failed_jobs");
+queue.ensure_table_exists().await?;
+
+// Inspect and manage failures programmatically
+let store = FailedJobStore::new(db.clone());
+store.ensure_table_exists().await?;
+
+let failed = store.all().await?;        // all failed jobs
+store.find(1).await?;                   // one failed job by id
+store.forget(1).await?;                 // drop one record
+store.flush().await?;                   // drop all records
+store.count().await;                    // number of failed jobs
+```
+
+The CLI manages failed jobs as well:
+
+```bash
+larastvel queue:failed        # list failed jobs with their ids
+larastvel queue:retry 1 2 all # re-queue failed jobs by id (or "all")
+larastvel queue:forget 1      # forget a single failed job
+larastvel queue:flush         # forget all failed jobs
+```
+
+`queue:retry` re-inserts the job into the `jobs` table with its attempts reset, then removes the `failed_jobs` record.

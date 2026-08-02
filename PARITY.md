@@ -33,7 +33,7 @@ side-by-side comparison.
 | Notifications / Mail | 5 channels (Mail, Database, Broadcast, SMS, Webhook), `Mailable` builder, `SmtpMailer` / `LogMailer` | ✅ |
 | File Storage | `Filesystem` trait / `LocalDisk` driver / `StorageManager` | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
-| Form Validation | 20 rules, `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
+| Form Validation | 24 rules (incl. DB-backed `unique`/`unique_except`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
 | Validation DB rules | `unique` / `unique:except` / `exists` (SQL-backed, async validation via `validate_async()` / `#[validate]`) | ✅ |
 | Route model binding | `ModelPath<E>` extractor — implicit `{user}` → model by primary key, 404 on missing | ✅ |
 | Global helpers | `redirect()` / `back()` / `abort()` / `abort_if()` / `abort_unless()` | ✅ |

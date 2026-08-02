@@ -13,6 +13,25 @@ router.delete("/user/{id}", delete_user);
 
 `get`, `post`, `put`, `patch`, `delete`, and `ws` take a URI and a handler and register the route on the underlying Axum router.
 
+## Route Model Binding
+
+The `ModelPath<E>` extractor resolves a `{id}` route parameter into a model
+instance by primary key — Laravel's implicit route model binding. When the
+model (or a parseable id) is missing, the handler returns `404` automatically:
+
+```rust
+use larastvel_core::routing::ModelPath;
+use crate::models::user;
+
+router.get("/users/{id}", |user: ModelPath<user::Entity>| async move {
+    Json(json!({ "user": user.0 }))
+});
+```
+
+The database connection is taken from an `Extension<DatabaseConnection>` layer
+when present, otherwise it falls back to the global connection registered via
+`set_global_database()`.
+
 ## Route Groups
 
 ```rust

@@ -53,6 +53,44 @@ match result {
 | `min_value(n)` | Numeric minimum |
 | `max_value(n)` | Numeric maximum |
 | `regex(pattern)` | Must match regex pattern |
+| `unique(table, column?)` | Value must not exist in the given table (DB-backed) |
+| `unique_except(table, column?, id)` | Value must not exist, ignoring the row with this id (DB-backed) |
+| `exists(table, column?)` | Value must exist in the given table (DB-backed) |
+
+## Database-Backed Rules
+
+The `unique`, `unique_except`, and `exists` rules query the database, so they
+require an async validation pass and a database connection:
+
+```rust
+use larastvel_core::validation::{validate_async, rules};
+use std::collections::HashMap;
+use serde_json::json;
+
+let mut data = HashMap::new();
+data.insert("email".to_string(), json!("admin@example.com"));
+
+// Resolves the connection from larastvel_core::models::database()
+let result = validate_async(&data, vec![
+    ("email", vec![rules::required(), rules::email(), rules::unique("users", Some("email"))]),
+]).await;
+
+// Or supply the connection explicitly
+let validator = Validator::new(&data, vec![
+    ("email", vec![rules::unique("users", Some("email"))]),
+]).with_database(db.clone());
+let result = validator.validate_async().await;
+```
+
+`unique_except` ignores a given row id — useful for "update" forms:
+
+```rust
+rules::unique_except("users", Some("email"), "5") // 5 is the current user's id
+```
+
+The `#[validate]` attribute macro also validates asynchronously and works with
+these rules automatically; when no DB-backed rule is present it validates
+synchronously without needing a connection.
 
 ## Attribute Macro Validation
 

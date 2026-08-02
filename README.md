@@ -116,7 +116,7 @@ See [Configuration Reference](#configuration-reference) for all options.
 | **Task Scheduling** | Cron expression parser, `Schedule` builder, `ScheduleManager` |
 | **Templating** | Tera engine + Blade directives (`@auth`, `@csrf`, `@error`, `@guest`, `@method`) |
 | **Testing** | `TestClient`, `TestResponse`, `RefreshDatabase`, 1000+ tests |
-| **Validation** | 20 built-in rules, `ValidatedJson`/`ValidatedQuery` extractors |
+| **Validation** | 24 built-in rules (incl. DB-backed `unique`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors |
 | **Vite** | Manifest-based asset tag generation |
 | **AI** | AI SDK foundation — text generation, streaming, structured output, embeddings with 30-day caching, OpenAI-compatible provider, `FakeAi` |
 

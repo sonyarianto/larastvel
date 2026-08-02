@@ -39,6 +39,14 @@ Larastvel ships with an Artisan-like CLI.
 | `schedule:list` | List scheduled tasks |
 | `schedule:run` | Run due scheduled tasks |
 | `queue:work` | Start processing queued jobs |
+| `queue:failed` | List all failed jobs |
+| `queue:retry` | Retry a failed job by id, or `all` |
+| `queue:forget` | Forget a failed job by id |
+| `queue:flush` | Forget all failed jobs |
+| `about` | Display framework and environment information |
+| `optimize` | Cache config and routes for faster boot |
+| `optimize:clear` | Clear the config and route caches |
+| `config:show` | Display the values of a config section (e.g. `config:show app`) |
 | `version` | Display framework version |
 
 ## Usage

@@ -15,6 +15,43 @@ username = "root"
 password = ""
 ```
 
+## Transactions
+
+Use `DatabaseManager::transaction()` to run work inside a database
+transaction — it commits on success and rolls back on error:
+
+```rust
+use larastvel_core::database::DatabaseManager;
+
+let db = DatabaseManager::new(&config);
+
+db.transaction(|txn| {
+    Box::pin(async move {
+        let user = user::ActiveModel {
+            name: Set("John".to_string()),
+            ..Default::default()
+        }
+        .insert(txn)
+        .await?;
+
+        wallet::ActiveModel {
+            user_id: Set(user.id),
+            balance: Set(0),
+            ..Default::default()
+        }
+        .insert(txn)
+        .await?;
+
+        Ok(())
+    })
+})
+.await?;
+```
+
+`begin_transaction()` returns a live transaction handle for manual
+`commit()` / `rollback()` control. Note that SQLite does not support nested
+transactions — only one `transaction()` can be open at a time per connection.
+
 ## Models
 
 ```rust

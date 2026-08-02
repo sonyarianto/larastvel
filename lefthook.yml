@@ -11,6 +11,10 @@ pre-commit:
     check:
       glob: "*.rs"
       run: cargo check --workspace
+    docs:
+      # Every larastvel_core:: symbol and CLI command referenced in the
+      # docs must exist in the source. Fails on stale references.
+      run: bash scripts/docs-audit.sh
 
 pre-push:
   commands:
@@ -18,4 +22,7 @@ pre-push:
       # Informational drift report; use --strict (or the parity-audit
       # workflow with strict=true) before a release.
       run: bash scripts/parity-audit.sh
+    docs:
+      # Same docs drift guard as pre-commit, run again before pushing.
+      run: bash scripts/docs-audit.sh
 
