@@ -34,9 +34,11 @@ side-by-side comparison.
 | Notifications / Mail | 5 channels (Mail, Database, Broadcast, SMS, Webhook), `Mailable` builder, `SmtpMailer` / `LogMailer` | ✅ |
 | File Storage | `Filesystem` trait / `LocalDisk` driver / `StorageManager` | ✅ |
 | Events / Listeners | `EventService` / `dispatch()` / `listen()` / `fake()` / `Listener` trait | ✅ |
-| Form Validation | 25 rules (incl. `base64`, DB-backed `unique`/`unique_except`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
+| Form Validation | 26 rules (incl. `base64`, `active_url`, DB-backed `unique`/`unique_except`/`exists`), `ValidatedJson`/`ValidatedQuery` extractors | ✅ |
 | Validation DB rules | `unique` / `unique:except` / `exists` (SQL-backed, async validation via `validate_async()` / `#[validate]`) | ✅ |
+| `active_url` rule + DNS lookup faking | `active_url()` rule (real DNS resolution) + `fake_dns_lookups(bool)` — offline tests skip only the network call (Laravel 13.22 `Validator::fakeDnsLookups()`) | ✅ |
 | Route model binding | `ModelPath<E>` extractor — implicit `{user}` → model by primary key, 404 on missing | ✅ |
+| Route-key binding (`#[RouteKey]`, Laravel 13.21) | `RouteKey` trait + `#[table("…", route_key = "column")]` — binds `{post}` by slug-style column instead of the primary key, 404 on unknown key | ✅ |
 | Route conflict detection | `route:conflicts` — detects overlapping route definitions (duplicates + static shadowing `{param}`/`*`) | ✅ |
 | Route metadata | `Registrar::route_with_metadata()` / `RouteDefinition::metadata` — survives route caching | ✅ |
 | Signed URLs | `signed_route()` / `has_valid_signature()` — HMAC-SHA256 (RFC 2104), canonical query sorting, TTL expiry, constant-time comparison | ✅ |
@@ -53,6 +55,7 @@ side-by-side comparison.
 | Logging | `Log::init()` console logging + `monthly` file driver (`MonthlyWriter` — `laravel-YYYY-MM.log` per calendar month, `max_files` retention) | ✅ |
 | Broadcasting | Pusher / Ably / Log / Native (WebSocket) / `SubscriberRegistry` / `ws_handler` / Reverb DB scaling driver (`ReverbDatabaseBroadcaster` + `reverb_scaling` table) | ✅ |
 | Cache | `CacheManager` / Array / File / Database / Redis stores / `remember()` / batch ops / `touch()` TTL extension / atomic locks — `CacheManager::lock()` / `store_lock()` / `with_lock()` / `get_locked()`, `Lock::get/release/refresh/block` (Array + Redis: `SET NX PX`, Lua compare-and-release) | ✅ |
+| Maintenance mode | `MaintenanceMode` (`down` file under `storage/framework/`), `larastvel down/up`, timing-safe `--secret` bypass (`hash_equals`-style comparison, Laravel 13.23 PR #60896) | ✅ |
 | Localization | `Translator` / `__()` / `trans_choice()` / pluralization / JSON files | ✅ |
 | Testing | `TestClient` / `TestResponse` / `RefreshDatabase` | ✅ |
 | Task Scheduling | `Schedule` / `ScheduleManager` / cron parser / `schedule:run` CLI | ✅ |

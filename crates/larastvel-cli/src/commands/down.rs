@@ -1,6 +1,12 @@
 use colored::*;
 
-pub fn maintenance_down(message: Option<String>, retry: Option<u64>, force: bool) {
+pub fn maintenance_down(
+    message: Option<String>,
+    retry: Option<u64>,
+    force: bool,
+    secret: Option<String>,
+    with_secret: bool,
+) {
     let down_file = std::path::Path::new("storage/framework/down");
 
     if down_file.exists() && !force {
@@ -21,7 +27,13 @@ pub fn maintenance_down(message: Option<String>, retry: Option<u64>, force: bool
 
     std::fs::create_dir_all(down_file.parent().unwrap()).unwrap();
 
-    let payload = serde_json::json!({
+    let secret = match (secret, with_secret) {
+        (Some(s), _) => Some(s),
+        (None, true) => Some(uuid::Uuid::new_v4().to_string()),
+        _ => None,
+    };
+
+    let mut payload = serde_json::json!({
         "message": message.unwrap_or_else(|| "Application is in maintenance mode.".to_string()),
         "retry": retry,
         "time": std::time::SystemTime::now()
@@ -29,6 +41,9 @@ pub fn maintenance_down(message: Option<String>, retry: Option<u64>, force: bool
             .unwrap()
             .as_secs(),
     });
+    if let Some(s) = &secret {
+        payload["secret"] = serde_json::Value::String(s.clone());
+    }
 
     let content = serde_json::to_string_pretty(&payload).unwrap();
     std::fs::write(down_file, content).unwrap();
@@ -46,6 +61,12 @@ pub fn maintenance_down(message: Option<String>, retry: Option<u64>, force: bool
         "{}",
         "  Use 'up' to bring the application back online.".dimmed()
     );
+    if let Some(s) = secret {
+        println!(
+            "{}",
+            format!("  You may bypass maintenance mode via [/{}].", s).dimmed()
+        );
+    }
 }
 
 pub fn maintenance_up() {

@@ -43,6 +43,7 @@ match result {
 | `alpha()` | Must contain only letters |
 | `alpha_numeric()` | Must contain only letters/numbers |
 | `url()` | Must be a valid URL |
+| `active_url()` | Must be a valid URL whose host resolves in DNS (Laravel 13.22 parity) |
 | `ip()` | Must be a valid IP address |
 | `confirmed()` | Field must match `field_confirmation` |
 | `same(field)` | Must match another field |
@@ -92,6 +93,24 @@ rules::unique_except("users", Some("email"), "5") // 5 is the current user's id
 The `#[validate]` attribute macro also validates asynchronously and works with
 these rules automatically; when no DB-backed rule is present it validates
 synchronously without needing a connection.
+
+## DNS Lookup Faking
+
+The `active_url()` rule performs a real DNS lookup. Like Laravel 13.22's
+`Validator::fakeDnsLookups()`, you can fake lookups for offline tests —
+only the network call is skipped, malformed URLs still fail:
+
+```rust
+use larastvel_core::validation::fake_dns_lookups;
+
+// In a test setup:
+fake_dns_lookups(true);
+
+// ... run assertions against active_url() ...
+
+// Turn the fake back off (returns the previous state):
+fake_dns_lookups(false);
+```
 
 ## Attribute Macro Validation
 

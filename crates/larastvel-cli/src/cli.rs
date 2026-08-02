@@ -81,6 +81,12 @@ pub enum Commands {
         /// Allow maintenance mode even if the down file already exists
         #[arg(long)]
         force: bool,
+        /// The secret phrase that may be used to bypass maintenance mode
+        #[arg(long)]
+        secret: Option<String>,
+        /// Generate a random secret phrase that may be used to bypass maintenance mode
+        #[arg(long)]
+        with_secret: bool,
     },
     /// Bring the application out of maintenance mode
     Up,

@@ -32,6 +32,29 @@ The database connection is taken from an `Extension<DatabaseConnection>` layer
 when present, otherwise it falls back to the global connection registered via
 `set_global_database()`.
 
+### Route Key Binding
+
+Like Laravel 13.21's `#[RouteKey]` attribute, a model can be bound by a
+non-primary-key column (e.g. a slug). Set `route_key` on the `#[table]`
+macro to declare the column — the extractor then resolves `{post}` by that
+column instead of the primary key, still returning `404` when no row matches:
+
+```rust
+use larastvel_core::routing::ModelPath;
+
+#[table("posts", route_key = "slug")]
+struct Post {
+    #[sea_orm(primary_key)]
+    id: i32,
+    slug: String,
+    title: String,
+}
+
+router.get("/posts/{post}", |post: ModelPath<post::Entity>| async move {
+    Json(json!({ "post": post.0 }))
+});
+```
+
 ## Route Groups
 
 ```rust

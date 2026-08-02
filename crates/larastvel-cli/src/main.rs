@@ -94,8 +94,10 @@ async fn main() {
             message,
             retry,
             force,
+            secret,
+            with_secret,
         }) => {
-            maintenance_down(message, retry, force);
+            maintenance_down(message, retry, force, secret, with_secret);
         }
         Some(Commands::Up) => {
             maintenance_up();

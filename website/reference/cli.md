@@ -48,6 +48,8 @@ Larastvel ships with an Artisan-like CLI.
 | `optimize` | Cache config and routes for faster boot |
 | `optimize:clear` | Clear the config and route caches |
 | `config:show` | Display the values of a config section (e.g. `config:show app`) |
+| `down` | Put the application into maintenance mode (writes `storage/framework/down`) |
+| `up` | Bring the application out of maintenance mode |
 | `version` | Display framework version |
 
 ## Usage
@@ -74,6 +76,25 @@ The `serve` command starts the Axum server with auto-reload support:
 cargo run -p larastvel-cli -- serve
 # Listening on http://localhost:8080
 ```
+
+## Maintenance Mode
+
+`down` writes `storage/framework/down` to enable maintenance mode; `up`
+removes it. A secret enables the timing-safe bypass (Laravel 13.23 parity —
+comparison is constant-time, no `==`):
+
+```bash
+larastvel down --with-secret
+# Application is now in maintenance mode.
+# You may bypass maintenance mode via [/RANDOM-SECRET].
+
+larastvel down --secret my-secret
+larastvel up
+```
+
+Bypass requests are compared in constant time against the stored secret via
+`MaintenanceMode::bypass_secret_matches(path)` (`hash_equals`-style, Laravel
+13.23 PR #60896).
 
 ## Global Installation
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use async_trait::async_trait;
 use axum::{
     extract::{FromRequestParts, Path as AxumPath},
     handler::Handler,
@@ -52,8 +53,51 @@ impl PathValue for String {
     }
 }
 
-/// Resolves a route parameter into a model instance by primary key —
-/// Laravel's implicit route model binding.
+/// Declares the column used to resolve implicit route model bindings.
+///
+/// `#[table("users")]` generates a default implementation that resolves by
+/// primary key. Pass `route_key` to bind by another column instead — the
+/// Larastvel equivalent of Laravel 13.21's `#[RouteKey]` attribute:
+///
+/// ```rust,ignore
+/// #[table("posts", route_key = "slug")]
+/// pub struct Post { ... }
+/// ```
+///
+/// The `#[table]` macro implements this trait on the generated SeaORM model,
+/// including the column-specific [`find_by_route_key`](Self::find_by_route_key)
+/// lookup. For hand-written entities, implement both methods yourself (the
+/// defaults resolve by primary key).
+#[async_trait]
+pub trait RouteKey: Send + Sync {
+    /// The column used for route model binding; `None` (the default) means
+    /// the entity's primary key.
+    fn route_key() -> Option<&'static str> {
+        None
+    }
+
+    /// Resolve a model by the route-key column. The `#[table]` macro
+    /// generates a column-specific implementation when `route_key = "..."`
+    /// is set; the default returns `Ok(None)` and is only reachable when
+    /// [`route_key`](Self::route_key) is `None`.
+    async fn find_by_route_key(
+        _db: &DatabaseConnection,
+        _value: &str,
+    ) -> Result<Option<Self>, sea_orm::DbErr>
+    where
+        Self: Sized,
+    {
+        Ok(None)
+    }
+}
+
+/// Resolves a route parameter into a model instance — Laravel's implicit
+/// route model binding.
+///
+/// By default the single path parameter is parsed as the model's primary
+/// key. When the entity implements [`RouteKey`] with a column (e.g.
+/// `slug`), the parameter is matched against that column instead — the
+/// Larastvel equivalent of Laravel's `#[RouteKey('slug')]` attribute.
 ///
 /// If the model cannot be found (or the id cannot be parsed), a `404` is
 /// returned automatically.
@@ -75,7 +119,7 @@ where
     S: Send + Sync,
     E: EntityTrait,
     <E::PrimaryKey as PrimaryKeyTrait>::ValueType: PathValue,
-    E::Model: Clone + Send + Sync + 'static,
+    E::Model: RouteKey + Clone + Send + Sync + 'static,
 {
     type Rejection = axum::http::StatusCode;
 
@@ -97,19 +141,25 @@ where
                 .ok_or(axum::http::StatusCode::NOT_FOUND)?
         };
 
-        let pk = <E::PrimaryKey as PrimaryKeyTrait>::ValueType::from_path_value(&raw)
-            .ok_or(axum::http::StatusCode::NOT_FOUND)?;
-
         let db: DatabaseConnection =
             match Option::<Extension<DatabaseConnection>>::from_request_parts(parts, state).await {
                 Ok(Some(ext)) => ext.0,
                 _ => crate::models::database().clone(),
             };
 
-        let model = E::find_by_id(pk)
-            .one(&db)
-            .await
-            .map_err(|_| axum::http::StatusCode::NOT_FOUND)?;
+        let model = match <E::Model as RouteKey>::route_key() {
+            Some(_) => <E::Model as RouteKey>::find_by_route_key(&db, &raw)
+                .await
+                .map_err(|_| axum::http::StatusCode::NOT_FOUND)?,
+            None => {
+                let pk = <E::PrimaryKey as PrimaryKeyTrait>::ValueType::from_path_value(&raw)
+                    .ok_or(axum::http::StatusCode::NOT_FOUND)?;
+                E::find_by_id(pk)
+                    .one(&db)
+                    .await
+                    .map_err(|_| axum::http::StatusCode::NOT_FOUND)?
+            }
+        };
 
         model
             .map(ModelPath)
@@ -1724,6 +1774,128 @@ mod tests {
         pub enum Relation {}
 
         impl ActiveModelBehavior for ActiveModel {}
+
+        impl super::RouteKey for Model {}
+    }
+
+    // --- #[table] macro with route_key option ---
+    #[allow(dead_code)]
+    mod macro_post {
+        use larastvel_macros::table;
+
+        #[table("macro_posts", route_key = "slug")]
+        pub struct MacroPost {
+            #[sea_orm(primary_key)]
+            pub id: i32,
+            pub slug: String,
+            pub title: String,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_table_macro_route_key_option() {
+        use macro_post::Model as MacroPostModel;
+        use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
+
+        assert_eq!(<MacroPostModel as RouteKey>::route_key(), Some("slug"));
+        // Macro-generated model binds by the route key column.
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "CREATE TABLE macro_posts (id INTEGER PRIMARY KEY, slug TEXT, title TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+        assert!(<MacroPostModel as RouteKey>::find_by_route_key(&db, "x")
+            .await
+            .is_ok_and(|m| m.is_none()));
+    }
+
+    #[tokio::test]
+    async fn test_table_macro_route_key_model_path() {
+        use axum::Extension;
+        use macro_post::Entity as MacroPostEntity;
+        use sea_orm::{
+            ActiveModelTrait, ConnectionTrait, Database, DatabaseBackend, Set, Statement,
+        };
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "CREATE TABLE macro_posts (id INTEGER PRIMARY KEY, slug TEXT, title TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+        macro_post::ActiveModel {
+            id: Set(1),
+            slug: Set("macro-slug".to_string()),
+            title: Set("Macro Title".to_string()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get(
+            "/posts/{post}",
+            |post: ModelPath<MacroPostEntity>| async move {
+                Json(serde_json::json!({ "title": post.0.title }))
+            },
+        );
+        let app = registrar.build().layer(Extension(db));
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/posts/macro-slug")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["title"], "Macro Title");
+    }
+
+    // --- route-key (non-primary-key) model binding tests ---
+    mod bound_post {
+        use sea_orm::entity::prelude::*;
+
+        #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+        #[sea_orm(table_name = "bound_posts")]
+        pub struct Model {
+            #[sea_orm(primary_key)]
+            pub id: i32,
+            pub slug: String,
+            pub title: String,
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+        pub enum Relation {}
+
+        impl ActiveModelBehavior for ActiveModel {}
+
+        #[async_trait::async_trait]
+        impl super::RouteKey for Model {
+            fn route_key() -> Option<&'static str> {
+                Some("slug")
+            }
+
+            async fn find_by_route_key(
+                db: &sea_orm::DatabaseConnection,
+                value: &str,
+            ) -> Result<Option<Self>, sea_orm::DbErr> {
+                Entity::find()
+                    .filter(Column::Slug.eq(value.to_string()))
+                    .one(db)
+                    .await
+            }
+        }
     }
 
     #[tokio::test]
@@ -1862,6 +2034,100 @@ mod tests {
             String::from_path_value("uuid-123"),
             Some("uuid-123".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn test_model_path_resolves_by_route_key() {
+        use axum::Extension;
+        use sea_orm::{
+            ActiveModelTrait, ConnectionTrait, Database, DatabaseBackend, Set, Statement,
+        };
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "CREATE TABLE bound_posts (id INTEGER PRIMARY KEY, slug TEXT, title TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+        bound_post::ActiveModel {
+            id: Set(1),
+            slug: Set("hello-world".to_string()),
+            title: Set("Hello World".to_string()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get(
+            "/posts/{post}",
+            |post: ModelPath<bound_post::Entity>| async move {
+                Json(serde_json::json!({ "title": post.0.title }))
+            },
+        );
+        let app = registrar.build().layer(Extension(db));
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/posts/hello-world")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["title"], "Hello World");
+    }
+
+    #[tokio::test]
+    async fn test_model_path_route_key_missing_returns_404() {
+        use axum::Extension;
+        use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "CREATE TABLE bound_posts (id INTEGER PRIMARY KEY, slug TEXT, title TEXT)".to_string(),
+        ))
+        .await
+        .unwrap();
+
+        let router = Arc::new(Mutex::new(AxumRouter::new()));
+        let routes = Arc::new(Mutex::new(vec![]));
+        let registrar = Registrar::new(router, routes);
+        registrar.get(
+            "/posts/{post}",
+            |post: ModelPath<bound_post::Entity>| async move {
+                Json(serde_json::json!({ "title": post.0.title }))
+            },
+        );
+        let app = registrar.build().layer(Extension(db));
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/posts/no-such-slug")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn test_route_key_defaults_to_none() {
+        assert_eq!(bound_user::Model::route_key(), None);
+        assert_eq!(bound_post::Model::route_key(), Some("slug"));
     }
 
     // --- route conflict detection tests ---

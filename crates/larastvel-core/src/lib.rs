@@ -73,6 +73,7 @@ pub use console::{Command, ConsoleKernel};
 pub use database::{DatabaseManager, DatabaseSeeder, Seeder};
 pub use encryption::{generate_key, EncryptError, Encrypter};
 pub use events::EventService;
+pub use foundation::maintenance::{constant_time_eq, MaintenanceMode};
 pub use foundation::{
     Application, DeferrableProvider, EventServiceProvider, Kernel, RouteServiceProvider,
     ServiceProvider,
@@ -128,7 +129,8 @@ pub use translation::{
     trans_choice_with, Translator, __,
 };
 pub use validation::{
-    base64, custom, exists, rules, unique, unique_except, validate, validate_async, ValidatedJson,
-    ValidatedQuery, ValidationError, ValidationErrors, ValidationRule, Validator,
+    active_url, base64, custom, exists, fake_dns_lookups, rules, unique, unique_except, validate,
+    validate_async, ValidatedJson, ValidatedQuery, ValidationError, ValidationErrors,
+    ValidationRule, Validator,
 };
 pub use view::{Component, ViewError, ViewFactory};

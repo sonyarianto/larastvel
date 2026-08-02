@@ -1,3 +1,4 @@
+pub mod dns;
 pub mod rules;
 
 use std::collections::HashMap;
@@ -10,9 +11,11 @@ use axum::{
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+pub use self::dns::fake_dns_lookups;
 use self::rules::check_rule;
 pub use self::rules::{
-    base64, custom, exists, unique, unique_except, Rule, ValidationError, ValidationRule,
+    active_url, base64, custom, exists, unique, unique_except, Rule, ValidationError,
+    ValidationRule,
 };
 
 #[derive(Debug, Clone)]
@@ -478,6 +481,38 @@ mod tests {
             let d = data(vec![("val", json!("not-an-ip"))]);
             let err = validate(&d, vec![("val", vec![rules::ip()])]).unwrap_err();
             assert!(err.has("val"));
+        }
+    }
+
+    mod active_url {
+        use super::*;
+
+        #[test]
+        fn faked_lookups_pass_for_well_formed_url() {
+            let prev = fake_dns_lookups(true);
+            let d = data(vec![("val", json!("https://example.com"))]);
+            assert!(validate(&d, vec![("val", vec![rules::active_url()])]).is_ok());
+            fake_dns_lookups(prev);
+        }
+
+        #[test]
+        fn faked_lookups_still_fail_malformed_url() {
+            let prev = fake_dns_lookups(true);
+            let d = data(vec![("val", json!("not-a-url"))]);
+            let err = validate(&d, vec![("val", vec![rules::active_url()])]).unwrap_err();
+            assert!(err.has("val"));
+            let d2 = data(vec![("val", json!("ftp://example.com"))]);
+            let err2 = validate(&d2, vec![("val", vec![rules::active_url()])]).unwrap_err();
+            assert!(err2.has("val"));
+            fake_dns_lookups(prev);
+        }
+
+        #[test]
+        fn fake_dns_lookups_returns_previous_state() {
+            let prev = fake_dns_lookups(true);
+            assert!(!prev);
+            assert!(fake_dns_lookups(false));
+            assert!(!fake_dns_lookups(false));
         }
     }
 

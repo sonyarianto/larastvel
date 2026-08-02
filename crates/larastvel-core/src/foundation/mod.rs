@@ -1,4 +1,5 @@
 pub mod event_service_provider;
+pub mod maintenance;
 pub mod route_service_provider;
 
 use std::any::{Any, TypeId};

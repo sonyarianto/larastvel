@@ -68,11 +68,15 @@ Validator framework|pub struct Validator|$CORE/validation
 Validation rules (built-in set)|fn check_rule|$CORE/validation
 Validation unique/exists DB rules|Rule::Unique|$CORE/validation
 Validation base64 rule|Rule::Base64|$CORE/validation
+Validation active_url rule + DNS faking|pub fn active_url|$CORE/validation
+DNS lookup faking (fake_dns_lookups)|pub fn fake_dns_lookups|$CORE/validation
 HTTP routing (get/post/put/patch/delete)|pub fn post<|$CORE/routing
 Route groups / view / websocket|pub fn group|$CORE/routing
 Middleware aliases + presets|pub fn with_middleware|$CORE/routing
 Resource controllers|pub trait ResourceController|$CORE/routing
 Route model binding (implicit {model})|ModelPath|$CORE/routing
+Route-key binding (#[RouteKey])|pub trait RouteKey|$CORE/routing
+Timing-safe maintenance bypass|constant_time_eq|$CORE/foundation
 Route conflict detection (route:conflicts)|route_conflicts|$CORE/routing
 Route metadata (->metadata())|route_with_metadata|$CORE/routing
 Signed URLs (signedRoute)|pub fn signed_route|$CORE/routing
@@ -119,6 +123,7 @@ Logging|pub fn init|$CORE/logging
 Monthly log driver (laravel-YYYY-MM.log)|pub struct MonthlyWriter|$CORE/logging
 Console kernel + commands|pub trait Command|$CORE/console
 Maintenance mode (down/up)|maintenance_down|$CLI
+Maintenance bypass secret (--secret/--with-secret)|with_secret|$CLI
 CLI queue commands (failed/retry/flush)|queue:failed|$CLI
 CLI about/optimize/config:show|config:show|$CLI
 CLI make generators|make_migration|$CLI

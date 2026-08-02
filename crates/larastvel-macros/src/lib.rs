@@ -930,7 +930,7 @@ pub fn validated_query(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 // ---------------------------------------------------------------------------
-// Attribute: #[table("name")]
+// Attribute: #[table("name")] / #[table("name", route_key = "column")]
 //
 // Converts a plain struct into a full SeaORM entity, eliminating the
 // boilerplate of `DeriveEntityModel`, `Relation`, `ActiveModelBehavior`,
@@ -958,18 +958,83 @@ pub fn validated_query(attr: TokenStream, item: TokenStream) -> TokenStream {
 // to `DeriveEntityModel` – all SeaORM options (primary_key,
 // auto_increment, unique, default_value, indexed, column_type, …)
 // are supported.
+//
+// The optional `route_key = "column"` option (Laravel 13.21's
+// `#[RouteKey('slug')]` attribute) selects the column used by implicit
+// route model binding (`ModelPath`); without it, binding resolves by
+// primary key.
 // ---------------------------------------------------------------------------
 
 #[proc_macro_attribute]
 pub fn table(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let table_name: syn::LitStr = syn::parse_macro_input!(attr as syn::LitStr);
     let input: syn::ItemStruct = syn::parse_macro_input!(item as syn::ItemStruct);
+
+    use syn::parse::Parser as _;
+
+    let parsed = syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
+        .parse(attr)
+        .unwrap_or_else(|e| {
+            panic!(
+                "#[table] expects `\"table_name\"` or `\"table_name\", route_key = \"column\"`: {}",
+                e
+            )
+        });
+    let mut iter = parsed.iter();
+    let table_name: String = match iter.next() {
+        Some(syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(s),
+            ..
+        })) => s.value(),
+        _ => panic!("#[table] expects a table name string as the first argument"),
+    };
+    let mut route_key: Option<String> = None;
+    for option in iter {
+        if let syn::Expr::Assign(syn::ExprAssign { left, right, .. }) = option {
+            if let (
+                syn::Expr::Path(p),
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(s),
+                    ..
+                }),
+            ) = (&**left, &**right)
+            {
+                if p.path.is_ident("route_key") {
+                    route_key = Some(s.value());
+                    continue;
+                }
+            }
+        }
+        panic!("#[table] unknown option (expected `route_key = \"column\"`)");
+    }
 
     let name = &input.ident;
     let vis = &input.vis;
     let fields = &input.fields;
-    let table = table_name.value();
+    let table = table_name;
     let mod_name = syn::Ident::new(&format!("__table_{}", name), name.span());
+
+    // route_key = "slug" → Column variant ident (PascalCase of the column).
+    let route_key_method = match &route_key {
+        Some(column) => {
+            let variant = column_variant_ident(column);
+            quote! {
+                fn route_key() -> Option<&'static str> {
+                    Some(#column)
+                }
+
+                async fn find_by_route_key(
+                    db: &sea_orm::DatabaseConnection,
+                    value: &str,
+                ) -> Result<Option<Self>, sea_orm::DbErr> {
+                    Entity::find()
+                        .filter(Column::#variant.eq(value.to_string()))
+                        .one(db)
+                        .await
+                }
+            }
+        }
+        None => quote! {},
+    };
 
     let expanded = quote! {
         #[doc(hidden)]
@@ -986,6 +1051,11 @@ pub fn table(attr: TokenStream, item: TokenStream) -> TokenStream {
             pub enum Relation {}
 
             impl ActiveModelBehavior for ActiveModel {}
+
+            #[larastvel_core::async_trait]
+            impl larastvel_core::routing::RouteKey for Model {
+                #route_key_method
+            }
         }
 
         pub use #mod_name::Model;
@@ -1001,6 +1071,24 @@ pub fn table(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+/// `"user_id"` → `UserId` — the SeaORM column variant name for a column.
+fn column_variant_ident(column: &str) -> syn::Ident {
+    let pascal: String = column
+        .split('_')
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect();
+    if pascal.is_empty() {
+        panic!("#[table] route_key column name must not be empty");
+    }
+    syn::Ident::new(&pascal, proc_macro2::Span::call_site())
 }
 
 // ---------------------------------------------------------------------------

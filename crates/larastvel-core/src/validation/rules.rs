@@ -1,5 +1,8 @@
 use regex::Regex;
+use std::net::ToSocketAddrs;
 use std::sync::Arc;
+
+use super::dns::dns_lookups_faked;
 
 /// An error returned by a custom validation rule.
 #[derive(Debug, Clone)]
@@ -44,6 +47,9 @@ pub enum Rule {
     Alpha,
     AlphaNumeric,
     Url,
+    /// The field value must be a valid URL whose host resolves in DNS
+    /// (mirrors Laravel's `active_url`).
+    ActiveUrl,
     Ip,
     Base64,
     Regex(Regex),
@@ -104,6 +110,7 @@ impl std::fmt::Debug for Rule {
             Self::Alpha => write!(f, "Alpha"),
             Self::AlphaNumeric => write!(f, "AlphaNumeric"),
             Self::Url => write!(f, "Url"),
+            Self::ActiveUrl => write!(f, "ActiveUrl"),
             Self::Ip => write!(f, "Ip"),
             Self::Base64 => write!(f, "Base64"),
             Self::Regex(_) => write!(f, "Regex"),
@@ -172,6 +179,14 @@ pub fn alpha_numeric() -> Rule {
 }
 pub fn url() -> Rule {
     Rule::Url
+}
+/// The field value must be a valid URL whose host resolves in DNS.
+///
+/// The DNS lookup can be faked for offline tests via
+/// [`fake_dns_lookups`](crate::validation::fake_dns_lookups) — malformed
+/// URLs still fail, only the network call is skipped.
+pub fn active_url() -> Rule {
+    Rule::ActiveUrl
 }
 pub fn ip() -> Rule {
     Rule::Ip
@@ -371,6 +386,28 @@ pub(crate) fn check_rule(
             if let Some(s) = value.and_then(|v| v.as_str()) {
                 if !s.starts_with("http://") && !s.starts_with("https://") {
                     return Some(format!("The {} must be a valid URL.", field));
+                }
+            }
+            None
+        }
+        Rule::ActiveUrl => {
+            if let Some(s) = value.and_then(|v| v.as_str()) {
+                if !s.starts_with("http://") && !s.starts_with("https://") {
+                    return Some(format!("The {} must be a valid URL.", field));
+                }
+                if !dns_lookups_faked() {
+                    let host = s
+                        .split_once("://")
+                        .and_then(|(_, rest)| rest.split(['/', '?', '#', ':']).next())
+                        .unwrap_or("");
+                    let resolves = !host.is_empty()
+                        && (host, 80u16)
+                            .to_socket_addrs()
+                            .map(|mut addrs| addrs.next().is_some())
+                            .unwrap_or(false);
+                    if !resolves {
+                        return Some(format!("The {} must be a valid URL.", field));
+                    }
                 }
             }
             None
