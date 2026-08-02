@@ -11,6 +11,10 @@ use axum::{
 };
 use sea_orm::{DatabaseConnection, EntityTrait, PrimaryKeyTrait};
 
+pub mod signed;
+
+pub use signed::{has_valid_signature, signed_route, SignedUrlError};
+
 type MiddlewareFactory = Arc<dyn Fn(MethodRouter) -> MethodRouter + Send + Sync>;
 
 // ---------------------------------------------------------------------------

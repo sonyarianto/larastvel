@@ -159,3 +159,48 @@ larastvel queue:flush         # forget all failed jobs
 ```
 
 `queue:retry` re-inserts the job into the `jobs` table with its attempts reset, then removes the `failed_jobs` record.
+
+## Job Batches
+
+Group jobs into a batch and track them as a unit (Laravel's `Bus::batch`):
+
+```rust
+use larastvel_core::queue::{batch, DatabaseQueue, JobBox};
+
+let batch = queue
+    .dispatch_batch(
+        batch(vec![
+            Box::new(ProcessReportJob::new(1)) as JobBox,
+            Box::new(ProcessReportJob::new(2)) as JobBox,
+        ])
+        .name("process_reports")
+        .add_job(Box::new(ProcessReportJob::new(3)) as JobBox),
+    )
+    .await?;
+
+println!("{}", batch.id);          // uuid
+println!("{}", batch.total_jobs());   // 3
+println!("{}", batch.pending_jobs()); // 3
+println!("{}", batch.progress());     // 0.0 (fraction finished)
+```
+
+The batch is persisted in a `job_batches` table (auto-created by `dispatch_batch`). The queue worker decrements `pending_jobs` on each success, increments `failed_jobs` on permanent failures, and stamps `finished_at` when the last job completes:
+
+```rust
+let latest = queue.batch(&batch.id).await?;   // refresh from the database
+assert!(latest.finished());                   // pending_jobs == 0
+
+let progress = latest.progress();             // 0.0 -> 1.0
+let failed = latest.failed_jobs();            // permanent failures so far
+```
+
+Cancel a batch to prevent its remaining jobs from running — the worker skips and deletes jobs belonging to a cancelled batch:
+
+```rust
+queue.cancel_batch(&batch.id).await?;         // or batch.cancel(&db).await?
+let found = queue.batch(&batch.id).await?.unwrap();
+assert!(found.cancelled());
+assert!(found.cancelled_at.is_some());
+```
+
+Job arguments are not persisted (see the [Database Queue](#database-queue) note), so the resolver must reconstruct batch jobs the same way it does regular ones.

@@ -85,7 +85,10 @@ impl QueueWorker {
         };
 
         match outcome {
-            Ok(Ok(())) => Ok(()),
+            Ok(Ok(())) => {
+                self.queue.job_succeeded(job).await?;
+                Ok(())
+            }
             Ok(Err(e)) => {
                 tracing::warn!(
                     "[QueueWorker] Job {} failed on attempt {}/{}: {}",

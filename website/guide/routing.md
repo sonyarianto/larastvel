@@ -240,6 +240,30 @@ router.ws("/ws", ws_handler);
 
 See the broadcasting docs for a full WebSocket example with NativeBroadcaster.
 
+## Signed URLs
+
+Sign a path (or full URL) with a secret key so tampering and expiry are detectable — Laravel's `URL::signedRoute()`:
+
+```rust
+use larastvel_core::{signed_route, has_valid_signature};
+
+// Build a signed URL. ttl is optional; when given, an `expires` param is
+// added and enforced.
+let url = signed_route("/verify-email", &[("user", "42")], Some(Duration::from_secs(3600)), APP_KEY)?;
+
+// Verify an incoming request target (path + query string)
+if has_valid_signature(&request_uri, APP_KEY) {
+    // signature valid and not expired
+}
+```
+
+Properties:
+
+- HMAC-SHA256 per RFC 2104 (constant-time comparison, so the signature check does not leak timing information).
+- Query parameters are canonicalized (sorted) before signing, so the order in the URL does not matter.
+- With a `ttl`, the `expires` parameter is included in the signature, so an expired URL cannot be "un-expired" by editing the query string.
+- Missing or malformed signatures, wrong keys, and expired links all return `false` from `has_valid_signature`.
+
 ## Route Listing
 
 ```bash

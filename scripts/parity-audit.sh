@@ -62,6 +62,7 @@ Model observers (#[observer])|fn observer|$MACROS
 Queue manager + job routing|pub struct QueueManager|$CORE/queue
 Queue worker (tries/backoff/timeout)|DEFAULT_MAX_ATTEMPTS|$CORE/queue
 Failed job storage (failed_jobs)|failed_jobs|$CORE/queue
+Job batches (Bus::batch)|pub struct JobBatch|$CORE/queue
 Validator framework|pub struct Validator|$CORE/validation
 Validation rules (built-in set)|fn check_rule|$CORE/validation
 Validation unique/exists DB rules|Rule::Unique|$CORE/validation
@@ -72,6 +73,7 @@ Resource controllers|pub trait ResourceController|$CORE/routing
 Route model binding (implicit {model})|ModelPath|$CORE/routing
 Route conflict detection (route:conflicts)|route_conflicts|$CORE/routing
 Route metadata (->metadata())|route_with_metadata|$CORE/routing
+Signed URLs (signedRoute)|pub fn signed_route|$CORE/routing
 Route/controller/validate macros|pub fn route\(|$MACROS
 Auth (JWT guards)|pub struct Auth|$CORE/auth
 Policies & Gate|struct Gate|$CORE/auth
@@ -121,9 +123,7 @@ Scaffolding (larastvel new)|create_project|$NEW
 # expected (acknowledged drift) and does NOT fail a --strict run.
 # Keep this list in sync with PARITY.md's "tracked gaps" section.
 DEFERRED_FEATURES="
-Job batches (Bus::batch)|JobBatch|$CORE/queue
 Blade components (x-slot)|x-slot|$CORE/view
-Signed URLs (signedRoute)|signed_route|$CORE/routing
 Passkey authentication (WebAuthn)|Passkey|$CORE/auth
 Reverb database broadcasting driver|reverb|$CORE/broadcasting
 Redis cache store|struct RedisStore|$CORE/cache

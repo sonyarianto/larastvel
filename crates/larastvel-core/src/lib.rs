@@ -102,14 +102,14 @@ pub use pagination::{paginate, PaginationParams, Paginator};
 pub use pipeline::{pipe_fn, Next, Pipe, Pipeline};
 pub use process::{foreground, run as process_run, ProcessBuilder, ProcessResult};
 pub use queue::{
-    dispatch, DatabaseQueue, FailedJob, FailedJobStore, InMemoryQueue, JobError, JobResolver,
-    Queue, QueueManager, QueueWorker, ShouldQueue, SyncQueue,
+    batch, dispatch, DatabaseQueue, FailedJob, FailedJobStore, InMemoryQueue, JobBatch, JobError,
+    JobResolver, PendingBatch, Queue, QueueManager, QueueWorker, ShouldQueue, SyncQueue,
 };
 pub use rate_limiter::{
     rate_limit_middleware, rate_limiter, RateLimitConfig, RateLimitExceeded, RateLimiter,
     RateLimiterRegistry,
 };
-pub use routing::Registrar;
+pub use routing::{has_valid_signature, signed_route, Registrar, SignedUrlError};
 pub use scheduling::{parse_cron, CronExpression, Schedule, ScheduleManager, ScheduledEvent};
 pub use session::{Session, SessionHandle};
 pub use sms::{LogSmsSender, SmsError, SmsMessage, SmsSender, VonageSmsSender};

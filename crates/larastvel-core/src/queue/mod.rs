@@ -1,3 +1,4 @@
+pub mod batches;
 pub mod database;
 pub mod failed;
 pub mod manager;
@@ -5,6 +6,7 @@ pub mod memory;
 pub mod sync;
 pub mod worker;
 
+pub use batches::{batch, JobBatch, JobBatchStore, PendingBatch};
 pub use database::{DatabaseQueue, JobResolver};
 pub use failed::{FailedJob, FailedJobStore};
 pub use manager::QueueManager;
@@ -70,6 +72,11 @@ pub trait Queue: Send + Sync + std::fmt::Debug {
     /// implementation drops the job.
     async fn fail(&self, job: JobBox, exception: String) -> Result<(), JobError> {
         let _ = (job, exception);
+        Ok(())
+    }
+    /// Called by the worker after a job finishes successfully. Queues that
+    /// track batch progress (e.g. [`DatabaseQueue`]) override this.
+    async fn job_succeeded(&self, _job: JobBox) -> Result<(), JobError> {
         Ok(())
     }
     async fn count(&self) -> usize;
