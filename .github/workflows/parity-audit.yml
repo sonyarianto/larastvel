@@ -1,0 +1,27 @@
+name: Parity audit
+
+# Symbol-level drift detector for Laravel-13 feature parity (see
+# scripts/parity-audit.sh). Runs weekly and on manual dispatch; the report
+# is printed to the job log. The schedule run is informational (exit 0 even
+# with gaps); use the `strict` input to fail the job on unreported gaps
+# (e.g. before a release).
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'   # weekly, Monday 05:00 UTC
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: 'Fail the job when unreported gaps are found'
+        type: boolean
+        default: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run parity audit
+        run: |
+          bash scripts/parity-audit.sh ${{ (github.event_name == 'workflow_dispatch' && inputs.strict) && '--strict' || '' }}

@@ -12,3 +12,10 @@ pre-commit:
       glob: "*.rs"
       run: cargo check --workspace
 
+pre-push:
+  commands:
+    parity:
+      # Informational drift report; use --strict (or the parity-audit
+      # workflow with strict=true) before a release.
+      run: bash scripts/parity-audit.sh
+

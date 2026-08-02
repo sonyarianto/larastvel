@@ -74,6 +74,60 @@ cd website && npm run build
 - The version shown in the docs nav (`v0.2.1`) is updated on every release —
   see `website/reference/versions.md`.
 
+## Parity Audit & Drift Prevention
+
+Parity drift (claiming Laravel features that silently don't exist) has
+bitten this project — a manual audit once surfaced real gaps in DB
+transactions, failed jobs, validation DB rules, and more. This section is
+the defense-in-depth protocol. **Follow all of it.**
+
+### 1. `scripts/parity-audit.sh` — the automated drift detector
+
+A symbol-level probe script covering every feature the framework claims:
+
+```bash
+bash scripts/parity-audit.sh            # informational report (exit 0)
+bash scripts/parity-audit.sh --strict   # fail on any non-deferred gap
+```
+
+- Each feature has a `name|regex-probe|search-path` row in the script.
+- A probe must match a **real symbol** — add a row whenever you implement a
+  Laravel feature; verify the probe greps positive before committing.
+- **Deferred items** (known gaps tracked in PARITY.md) live in the
+  script's `DEFERRED_FEATURES` list — they may stay red without failing
+  `--strict`. Everything else must be green.
+- Trait methods are probed without `pub` (e.g. `fn has_many`, not
+  `pub async fn has_many`) — inherent-impl methods keep `pub`.
+
+### 2. CI guard — `.github/workflows/parity-audit.yml`
+
+Runs the script weekly (Monday 05:00 UTC, informational) and on manual
+dispatch. `workflow_dispatch` with `strict: true` fails the job on
+unreported gaps — use it before a release.
+
+### 3. Claim verification rules
+
+- **Never claim parity from memory.** Every `✅` row in `PARITY.md` and
+  every "implemented" statement must be backed by a probe that matches or
+  a source-level check (`grep` for the symbol, read the code).
+- **When auditing Laravel features, verify against upstream source** —
+  raw GitHub is the ground truth:
+  `https://raw.githubusercontent.com/laravel/framework/13.x/src/Illuminate/<Component>/<File>.php`
+  (the local `laravel-skeleton` checkout referenced in PARITY.md is
+  optional; do not assume it exists).
+- **Gaps found during an audit are written into PARITY.md** as deferred
+  items AND moved to the script's `DEFERRED_FEATURES` (so the strict gate
+  stays meaningful), then scheduled for implementation. A gap that is
+  neither implemented nor deferred must fail the strict gate.
+- **Before every release**: run `bash scripts/parity-audit.sh --strict`
+  and confirm zero unreported gaps. Add this to the release checklist.
+
+### 4. Drift trigger: when anything changes
+
+Re-run the parity audit whenever you: rename or remove a public symbol,
+move a module, add/remove a crate, or implement a new Laravel feature.
+A regression in any probed symbol must show up as a `GAP` in the next run.
+
 ## Release Process (v0.2.1+)
 
 1. Bump `version = "0.2.1"` → `0.3.0` in **all 7 manifests**:
@@ -84,7 +138,8 @@ cd website && npm run build
 3. Update version references: `website/reference/versions.md`,
    `website/.vitepress/config.mts` nav badge, `website/guide/getting-started.md`.
    README badge is dynamic (crates.io) — no change needed.
-4. Run quality gates above, then commit and push.
+4. Run quality gates above AND `bash scripts/parity-audit.sh --strict`
+   (zero unreported gaps), then commit and push.
 5. Tag the release: `git tag v0.3.0 && git push origin v0.3.0`.
  6. **Publishing happens automatically** via `.github/workflows/publish.yml`
     when the tag is pushed — it verifies the tag matches all crate versions,
